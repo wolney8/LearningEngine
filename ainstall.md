@@ -19,7 +19,7 @@ Use the Orchestrator agent in VS Code and send your prompt.
 
 ## Agent Breakdown
 
-### Orchestrator (Sonnet 4.5)
+### Orchestrator (Opus 4.6)
 
 The orchestrator agent that receives requests and delegates work. It:
 - Analyzes requests and gathers context
@@ -32,10 +32,10 @@ The orchestrator agent that receives requests and delegates work. It:
 
 Creates comprehensive implementation plans by researching the codebase, consulting documentation, and identifying edge cases. Use when you need a detailed plan before implementing a feature or fixing a complex issue.
 
-### Coder (GPT-5.2-Codex)
+### Coder (GPT-5.3-Codex)
 
 Writes code following mandatory principles including structure, architecture, naming conventions, error handling, and regenerability. Always uses context7 MCP Server for documentation.
 
-### Designer (Gemini 3 Pro)
+### Designer (Gemini 3.1 Pro)
 
 Focuses on creating the best possible user experience and interface designs with emphasis on usability, accessibility, and aesthetics.
