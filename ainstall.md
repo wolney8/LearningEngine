@@ -28,7 +28,7 @@ The orchestrator agent that receives requests and delegates work. It:
 - Delegates UI/UX work to the Designer agent
 - Integrates results and validates final output
 
-### Planner (GPT-5.2)
+### Planner (Opus 4.6)
 
 Creates comprehensive implementation plans by researching the codebase, consulting documentation, and identifying edge cases. Use when you need a detailed plan before implementing a feature or fixing a complex issue.
 
