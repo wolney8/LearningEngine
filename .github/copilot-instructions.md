@@ -9,12 +9,12 @@ A stack-agnostic scaffold for multi-agent AI workflows in VS Code Copilot. Pull 
 Fill this in when adopting this scaffold for a specific project. Agents read this section before starting any task. If a field is blank, agents detect the toolchain from config files at runtime.
 
 ```
-Language:        # e.g. TypeScript, Python, Go
-Framework:       # e.g. Next.js, FastAPI, Gin
-Frontend:        # e.g. React (JSX/TSX), Vue (SFC), Jinja2, None
-Test runner:     # e.g. Vitest, Jest, pytest, go test
-Linter:          # e.g. ESLint + Biome, Ruff, golangci-lint
-Package manager: # e.g. pnpm, poetry, go modules
+Language:        Python (backend), TypeScript (frontend)
+Framework:       FastAPI (backend), React 18 (frontend)
+Frontend:        React (TSX) with Vite
+Test runner:     pytest (backend), Playwright (frontend e2e)
+Linter:          Ruff (Python), Biome (TypeScript/frontend)
+Package manager: pip + venv (Python), pnpm (frontend)
 ```
 
 ## Build, Test, and Lint Commands
@@ -22,14 +22,19 @@ Package manager: # e.g. pnpm, poetry, go modules
 Fill these in once the project's tooling is configured.
 
 ```
-build:
-test:
-lint:
+build:   cd backend && uvicorn app.main:app --reload   |   cd frontend && pnpm build
+test:    cd backend && pytest                           |   cd frontend && pnpm exec playwright test
+lint:    cd backend && ruff check .                    |   cd frontend && pnpm exec biome check src/
 ```
 
 ## Architecture
 
-No source files yet — update this section as the project takes shape.
+- Browser → React 18 + TypeScript frontend (port 5173, Vite dev server)
+- Frontend ↔ FastAPI backend (port 8000, uvicorn)
+- Backend reads YAML content packages from the packages/ directory
+- Packages validated via Pydantic models on load
+- In-process cache only (no database in Phase 1–7); SQLite deferred
+- Full architecture detail: docs/ARCHITECTURE.md
 
 ---
 
