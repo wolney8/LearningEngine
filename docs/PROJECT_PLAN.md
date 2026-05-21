@@ -218,53 +218,53 @@ LocalLearningEngine/
 
 ## Dependency Table
 
-| ID  | Description                     | Depends on   | Agent    |
-|-----|---------------------------------|--------------|----------|
-| T1  | Update README                   | —            | Coder    |
-| T2  | YAML schema spec                | —            | Coder    |
-| T3  | API contract doc                | T2           | Coder    |
-| T4  | Backend scaffold                | —            | Coder    |
-| T5  | Frontend scaffold               | —            | Coder    |
-| T6  | Root layout / .gitignore        | T4, T5       | Coder    |
-| T7  | CI skeleton                     | T4, T5       | Coder    |
-| T8  | Pydantic models                 | T2, T4       | Coder    |
-| T9  | Zod schemas                     | T2, T5       | Coder    |
-| T10 | Sample YAML package             | T2           | Coder    |
-| T11 | Model unit tests                | T8, T10      | Coder    |
-| T12 | Package loader service          | T8           | Coder    |
-| T13 | Package router                  | T12          | Coder    |
-| T14 | Router tests                    | T13, T10     | Coder    |
-| T15 | API client (frontend)           | T9, T5       | Coder    |
-| T16 | PackageCard component           | T9, T5       | Designer |
-| T17 | PackageSelectionScreen          | T15, T16     | Coder    |
-| T18 | Wire routes                     | T17          | Coder    |
-| T19 | Playwright: selection           | T18          | Coder    |
-| T20 | LearningPage component          | T9, T5       | Designer |
-| T21 | PageNavigator component         | T5           | Designer |
-| T22 | LearningModeScreen              | T15, T20, T21| Coder    |
-| T23 | Wire learn route                | T22          | Coder    |
-| T24 | Playwright: learning            | T23          | Coder    |
-| T25 | randomise.ts                    | T9           | Coder    |
-| T26 | QuestionCard component          | T25          | Designer |
-| T27 | TestNavigator component         | T5           | Designer |
-| T28 | TestModeScreen                  | T15,T25–T27  | Coder    |
-| T29 | Route guard                     | T28, T23     | Coder    |
-| T30 | Playwright: test mode           | T29          | Coder    |
-| T31 | scoring.py                      | T12          | Coder    |
-| T32 | POST /sessions/submit           | T31, T13     | Coder    |
-| T33 | Scoring unit tests              | T31, T10     | Coder    |
-| T34 | Sessions router tests           | T32, T33     | Coder    |
-| T35 | ResultsScreen                   | T9, T5       | Designer |
-| T36 | Wire submit + results           | T32, T35     | Coder    |
-| T37 | Playwright: results             | T36          | Coder    |
-| T38 | tokens.css                      | T5           | Designer |
-| T39 | useTheme hook                   | T38          | Coder    |
-| T40 | ThemeToggle component           | T39          | Designer |
-| T41 | Apply tokens to stylesheets     | T38, T40     | Designer |
-| T42 | axe-core audit                  | T41          | Designer |
-| T43 | Skip-nav + headings             | T42          | Coder    |
-| T44 | axe assertions in specs         | T42, T43     | Coder    |
-| T45 | Playwright CI job               | T44          | Coder    |
+| ID  | Description                 | Depends on    | Agent    |
+| --- | --------------------------- | ------------- | -------- |
+| T1  | Update README               | —             | Coder    |
+| T2  | YAML schema spec            | —             | Coder    |
+| T3  | API contract doc            | T2            | Coder    |
+| T4  | Backend scaffold            | —             | Coder    |
+| T5  | Frontend scaffold           | —             | Coder    |
+| T6  | Root layout / .gitignore    | T4, T5        | Coder    |
+| T7  | CI skeleton                 | T4, T5        | Coder    |
+| T8  | Pydantic models             | T2, T4        | Coder    |
+| T9  | Zod schemas                 | T2, T5        | Coder    |
+| T10 | Sample YAML package         | T2            | Coder    |
+| T11 | Model unit tests            | T8, T10       | Coder    |
+| T12 | Package loader service      | T8            | Coder    |
+| T13 | Package router              | T12           | Coder    |
+| T14 | Router tests                | T13, T10      | Coder    |
+| T15 | API client (frontend)       | T9, T5        | Coder    |
+| T16 | PackageCard component       | T9, T5        | Designer |
+| T17 | PackageSelectionScreen      | T15, T16      | Coder    |
+| T18 | Wire routes                 | T17           | Coder    |
+| T19 | Playwright: selection       | T18           | Coder    |
+| T20 | LearningPage component      | T9, T5        | Designer |
+| T21 | PageNavigator component     | T5            | Designer |
+| T22 | LearningModeScreen          | T15, T20, T21 | Coder    |
+| T23 | Wire learn route            | T22           | Coder    |
+| T24 | Playwright: learning        | T23           | Coder    |
+| T25 | randomise.ts                | T9            | Coder    |
+| T26 | QuestionCard component      | T25           | Designer |
+| T27 | TestNavigator component     | T5            | Designer |
+| T28 | TestModeScreen              | T15,T25–T27   | Coder    |
+| T29 | Route guard                 | T28, T23      | Coder    |
+| T30 | Playwright: test mode       | T29           | Coder    |
+| T31 | scoring.py                  | T12           | Coder    |
+| T32 | POST /sessions/submit       | T31, T13      | Coder    |
+| T33 | Scoring unit tests          | T31, T10      | Coder    |
+| T34 | Sessions router tests       | T32, T33      | Coder    |
+| T35 | ResultsScreen               | T9, T5        | Designer |
+| T36 | Wire submit + results       | T32, T35      | Coder    |
+| T37 | Playwright: results         | T36           | Coder    |
+| T38 | tokens.css                  | T5            | Designer |
+| T39 | useTheme hook               | T38           | Coder    |
+| T40 | ThemeToggle component       | T39           | Designer |
+| T41 | Apply tokens to stylesheets | T38, T40      | Designer |
+| T42 | axe-core audit              | T41           | Designer |
+| T43 | Skip-nav + headings         | T42           | Coder    |
+| T44 | axe assertions in specs     | T42, T43      | Coder    |
+| T45 | Playwright CI job           | T44           | Coder    |
 
 ---
 
