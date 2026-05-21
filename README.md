@@ -2,7 +2,7 @@
 
 A pull-and-use orchestration scaffold for VS Code + GitHub Copilot. Drop it into any project to get a multi-agent workflow with built-in review gates and a feedback loop.
 
-Minimal setup, fully customisable.
+Uses Copilot Agents, custom instructions, custom skills, MCP server (using Docker MCP for Context7 and GitHub Official) and hooks. Additional setup is required for the Docker MCP Gateway — see [MCP Setup](#mcp-setup--docker-gateway) below.
 
 > Built on [Ultralight Orchestration](https://gist.github.com/burkeholland/0e68481f96e94bbb98134fa6efd00436) by [Burke Holland](https://github.com/burkeholland).
 
@@ -34,11 +34,11 @@ Minimal setup, fully customisable.
 
 ### Skills
 
-| Skill              | Description                                                            |
-| ------------------ | ---------------------------------------------------------------------- |
-| `lint-and-analyse` | Detects and runs linters and type checkers                             |
-| `task-board`       | Tracks task dependencies and creates GitHub issues                     |
-| `ui-inspect`       | Inspects UI components against design specs and WCAG 2.2               |
+| Skill              | Description                                              |
+| ------------------ | -------------------------------------------------------- |
+| `lint-and-analyse` | Detects and runs linters and type checkers               |
+| `task-board`       | Tracks task dependencies and creates GitHub issues       |
+| `ui-inspect`       | Inspects UI components against design specs and WCAG 2.2 |
 
 ### Hooks
 
