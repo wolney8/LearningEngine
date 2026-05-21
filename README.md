@@ -1,8 +1,8 @@
 # AgentMatrix
 
-A pull-and-use orchestration scaffold for VS Code + GitHub Copilot. Drop it into any project to get a structured multi-agent workflow with built-in review gates, accessibility validation, and a structured feedback loop from day one.
+A pull-and-use orchestration scaffold for VS Code + GitHub Copilot. Drop it into any project to get a multi-agent workflow with built-in review gates and a feedback loop.
 
-No tech stack required — the scaffold adapts to whatever language, framework, and tooling you choose.
+Minimal setup, fully customisable.
 
 > Built on [Ultralight Orchestration](https://gist.github.com/burkeholland/0e68481f96e94bbb98134fa6efd00436) by [Burke Holland](https://github.com/burkeholland).
 
@@ -16,7 +16,7 @@ No tech stack required — the scaffold adapts to whatever language, framework, 
 | ---------------- | ----------------- | ---------------------------------------------------------------------------------- |
 | **Orchestrator** | Claude Sonnet 4.6 | Coordinates all work, enforces review gates, reports to you                        |
 | **Planner**      | Claude Sonnet 4.6 | Researches the codebase, produces phased implementation plans                      |
-| **Coder**        | GPT-5.3-Codex     | Writes and modifies code, runs lint and tests, fixes findings                      |
+| **Coder**        | GPT-5.3-Codex     | Writes code, runs lint and tests, fixes findings                                   |
 | **Designer**     | Gemini 3.1 Pro    | Validates UI against specs and WCAG 2.2, reports deviations as structured findings |
 
 ### Instructions
@@ -25,31 +25,31 @@ No tech stack required — the scaffold adapts to whatever language, framework, 
 | --------------------------- | ------------------------------------------------------------------- |
 | `response-style`            | UK English, brevity                                                 |
 | `brand-guidelines`          | Brand colours, typography, logo, spacing, voice and tone (template) |
-| `multi-agent-orchestration` | Architecture patterns, parallelisation, context isolation           |
-| `wcag-accessibility`        | WCAG 2.2 AA compliance, POUR principles, Context7 lookup            |
+| `multi-agent-orchestration` | Architecture patterns and parallelisation                           |
+| `wcag-accessibility`        | WCAG 2.2 AA, POUR principles, Context7 lookup                       |
 | `review-quality-gates`      | Mandatory halt after code changes, three quality gates              |
-| `testing-and-feedback`      | Functional testing, structured findings, user status reports        |
-| `git-workflow`              | Branching, commit messages, PR process                              |
-| `memory-conventions`        | Agent memory format, what to persist, pruning rules                 |
+| `testing-and-feedback`      | Functional testing and structured findings                          |
+| `git-workflow`              | Branching strategy and PR process                                   |
+| `memory-conventions`        | Memory format and pruning rules                                     |
 
 ### Skills
 
 | Skill              | Description                                                            |
 | ------------------ | ---------------------------------------------------------------------- |
-| `lint-and-analyse` | Detects and runs linters, type checkers, and static analysis           |
-| `task-board`       | Maps task dependencies, tracks phase completion, creates GitHub issues |
+| `lint-and-analyse` | Detects and runs linters and type checkers                             |
+| `task-board`       | Tracks task dependencies and creates GitHub issues                     |
 | `ui-inspect`       | Inspects UI components against design specs and WCAG 2.2               |
 
 ### Hooks
 
-Hooks run deterministically at agent lifecycle events — they enforce policy rather than guide it.
+Hooks run deterministically at agent lifecycle events. They enforce policy rather than guide it.
 
 | Hook                       | Event        | Blocks?  | Description                                                                          |
 | -------------------------- | ------------ | -------- | ------------------------------------------------------------------------------------ |
 | `format-on-save`           | PostToolUse  | No       | Runs Prettier on any file the agent edits                                            |
 | `lint-on-change`           | PostToolUse  | Yes      | Runs ESLint/Biome (JS/TS) or Ruff/Flake8 (Python) + `tsc --noEmit` after each edit   |
 | `vulnerability-check`      | PostToolUse  | No\*     | Runs `npm audit`, `pip-audit`, or `govulncheck` when manifest or lock files change   |
-| `scan-secrets`             | PostToolUse  | Yes      | Blocks on hardcoded API keys, tokens, and PEM keys; skips `.env.example` and tests   |
+| `scan-secrets`             | PostToolUse  | Yes      | Blocks hardcoded API keys and secret tokens; skips `.env.example` and tests          |
 | `block-dangerous-commands` | PreToolUse   | Deny/Ask | Hard-blocks irreversible shell commands; prompts confirmation for risky ones         |
 | `session-context`          | SessionStart | No       | Injects branch, last commit, detected stack, and available agents into every session |
 | `context-snapshot`         | PreCompact   | No       | Prompts the agent to save a work summary to session memory before context compacts   |
@@ -106,7 +106,7 @@ You → Orchestrator
         → Planner: research + phased implementation plan
         → Execute phase(s):
             → Coder / Designer  (parallel where file scopes allow)
-        → HALT — Review Phase:
+        → HALT: Review Phase:
             → Gate 1: Code Quality  (lint + type check)
             → Gate 2: Accessibility (Context7 + WCAG 2.2 AA)
             → Gate 3: Security      (SAST + dependency audit)
