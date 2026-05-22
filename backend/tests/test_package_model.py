@@ -24,7 +24,7 @@ def _minimal_question(**overrides) -> dict:
         "text": "Question text?",
         "answers": [_minimal_answer("a"), _minimal_answer("b")],
         "correct_answer": "a",
-        "weight": 10,
+        "weight": 100,
         "feedback": "Feedback text.",
     }
     base.update(overrides)
