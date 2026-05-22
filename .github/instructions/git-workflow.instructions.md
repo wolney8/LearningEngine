@@ -16,9 +16,10 @@ The correct sequence is:
 3. Coder runs lint, type-check, and tests locally
 4. All quality gates pass (see review-quality-gates.instructions.md)
 5. Orchestrator halts and hands work to the user for review
-6. User approves → THEN commit and push to the remote branch
+6. For UI phases: user approves via the running app at localhost → THEN commit, push, and merge the PR.
+	For non-UI phases: commit, push, and merge automatically after all gates pass. No user review step.
 7. Orchestrator opens PR
-8. User merges
+8. Orchestrator merges PR via GitHub MCP.
 ```
 
 **GitHub MCP tools (`push_files`, `create_or_update_file`) are FORBIDDEN for writing source code.** They exist solely for project management operations — issues, PRs, labels, and milestones. Using them to write source code bypasses local testing and user review and violates this rule.
