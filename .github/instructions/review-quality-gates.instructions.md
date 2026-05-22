@@ -117,15 +117,25 @@ When either gate fails, execute this loop:
 
 ---
 
-## Rule 5 — User Handoff Before Git Operations
+## Rule 5 — User Handoff
 
-Once all gates pass, the Orchestrator MUST:
+The handoff experience depends on whether the phase produces visible UI:
 
-1. **Present the local changes to the user** — summarise what files were created or modified, what the tests confirmed, and the gate results.
-2. **Await explicit user approval** before any git operation (commit, push, branch creation, PR).
-3. Only after approval: instruct the Coder to commit locally, push to the remote branch, and open the PR via GitHub MCP.
+### Phases with UI changes (frontend components, pages, routes)
 
-This rule exists to ensure the user can inspect, run, and verify the application locally before the changes become part of the permanent git history.
+1. After all gates pass, start the development servers locally:
+  - Backend: `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload`
+  - Frontend: `cd frontend && pnpm dev`
+2. Report to the user: "Running at **http://localhost:5173** — please [specific scenario: e.g. 'open the package list and click a card']."
+3. The user tests by interacting with the running app — not by reading files.
+4. When the user says it works (or flags an issue), that is the approval signal.
+5. The Orchestrator then commits, pushes, opens a PR, and merges it. The user does not need to manually merge.
+
+### Phases with no UI changes (backend models, schemas, tests, config)
+
+1. After all gates pass, commit and merge automatically — no user review required.
+2. Report to the user only: phase name, files added, test count passed. One sentence.
+3. Do not ask the user to read code, inspect files, or approve the commit.
 
 ---
 
