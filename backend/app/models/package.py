@@ -56,3 +56,14 @@ class Package(BaseModel):
                         f"does not match any page id"
                     )
         return self
+
+
+class PackageSummary(BaseModel):
+    id: str
+    title: str
+    description: str
+    version: str
+    tags: list[str]
+    passing_score: float
+    page_count: int
+    question_count: int
