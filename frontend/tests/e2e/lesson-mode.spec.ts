@@ -1,0 +1,161 @@
+import { expect, test } from "@playwright/test";
+
+const MOCK_PACKAGE_ID = "python-basics";
+const API_BASE_URL = "http://localhost:8000";
+
+const MOCK_SUMMARY = {
+  id: MOCK_PACKAGE_ID,
+  title: "Python Basics",
+  description: "Learn Python fundamentals.",
+  version: "1.0.0",
+  tags: ["python"],
+  passing_score: 0.75,
+  page_count: 2,
+  question_count: 2,
+};
+
+const MOCK_FULL_PACKAGE = {
+  id: MOCK_PACKAGE_ID,
+  title: "Python Basics",
+  description: "Learn Python fundamentals.",
+  version: "1.0.0",
+  tags: ["python"],
+  passing_score: 0.75,
+  pages: [
+    {
+      id: "p1",
+      title: "Introduction",
+      content: "Python is a versatile language.",
+    },
+    { id: "p2", title: "Variables", content: "Variables store data." },
+  ],
+  questions: [
+    {
+      id: "q1",
+      text: "What is Python?",
+      answers: [
+        { id: "a1", text: "A programming language" },
+        { id: "a2", text: "A snake" },
+      ],
+      correct_answer: "a1",
+      weight: 1.0,
+      feedback: "Python is indeed a programming language.",
+      revision_page_ids: [],
+    },
+    {
+      id: "q2",
+      text: "What do variables do?",
+      answers: [
+        { id: "b1", text: "Store data" },
+        { id: "b2", text: "Delete data" },
+      ],
+      correct_answer: "b1",
+      weight: 1.0,
+      feedback: "Variables store data values.",
+      revision_page_ids: [],
+    },
+  ],
+};
+
+test.describe("Lesson Mode", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_FULL_PACKAGE),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/packages`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_SUMMARY]),
+      });
+    });
+  });
+
+  test("navigating to a package loads the lesson page", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
+  });
+
+  test("first study page content is visible", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await expect(page.getByText("Introduction")).toBeVisible();
+  });
+
+  test("progress bar shows page 1 of 2", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await expect(page.getByText("Page 1 of 2")).toBeVisible();
+  });
+
+  test("clicking Next Page advances to second page", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Next Page/i }).click();
+    await expect(page.getByText("Page 2 of 2")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Variables" })).toBeVisible();
+  });
+
+  test("clicking Start Questions on last page enters question phase", async ({
+    page,
+  }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Next Page/i }).click();
+    await page.getByRole("button", { name: /Start Questions/i }).click();
+    await expect(page.getByText("Question 1 of 2")).toBeVisible();
+  });
+
+  test("answering a question correctly shows correct feedback", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Next Page/i }).click();
+    await page.getByRole("button", { name: /Start Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await expect(page.getByText("Correct!")).toBeVisible();
+    await expect(
+      page.getByText("Python is indeed a programming language."),
+    ).toBeVisible();
+  });
+
+  test("answering a question incorrectly shows incorrect feedback", async ({
+    page,
+  }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Next Page/i }).click();
+    await page.getByRole("button", { name: /Start Questions/i }).click();
+    await page.getByRole("button", { name: "A snake" }).click();
+    await expect(page.getByText("Incorrect", { exact: true })).toBeVisible();
+  });
+
+  test("completing all questions shows the completion screen", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+    await expect(page.getByText("2 / 2 correct")).toBeVisible();
+  });
+
+  test("404 package shows error state", async ({ page }) => {
+    await page.unrouteAll({ behavior: "wait" });
+    await page.route(`${API_BASE_URL}/packages/nonexistent`, (route) => {
+      route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Package not found" }),
+      });
+    });
+
+    await page.goto("/packages/nonexistent");
+    await expect(page.getByText(/not found|Failed to load/i)).toBeVisible();
+  });
+
+  test("back link navigates to home", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("link", { name: /Back to packages/i }).click();
+    await expect(page).toHaveURL("/");
+  });
+});

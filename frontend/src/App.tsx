@@ -1,10 +1,12 @@
 import { Route, Routes } from "react-router-dom";
+import { LessonPage } from "./pages/LessonPage";
 import { PackageListPage } from "./pages/PackageListPage";
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<PackageListPage />} />
+      <Route path="/packages/:id" element={<LessonPage />} />
       <Route
         path="*"
         element={
