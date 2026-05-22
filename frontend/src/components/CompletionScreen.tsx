@@ -5,6 +5,8 @@ interface CompletionScreenProps {
   correctCount: number;
   totalQuestions: number;
   xpEarned: number;
+  attemptNumber?: number;
+  isFirstCompletion?: boolean;
   onRetry: () => void;
   onBack: () => void;
 }
@@ -13,6 +15,8 @@ export function CompletionScreen({
   correctCount,
   totalQuestions,
   xpEarned,
+  attemptNumber,
+  isFirstCompletion,
   onRetry,
   onBack,
 }: CompletionScreenProps) {
@@ -48,6 +52,47 @@ export function CompletionScreen({
       <p className="completion-screen__message">{message}</p>
 
       {xpEarned > 0 && <p className="completion-screen__xp">+{xpEarned} XP earned</p>}
+
+      {isFirstCompletion && (
+        <span
+          className="completion-screen__badge completion-screen__badge--first"
+          aria-label="First completion bonus, 20 extra experience points"
+        >
+          +20 XP bonus
+        </span>
+      )}
+
+      {(attemptNumber ?? 1) === 2 && (
+        <span
+          className="completion-screen__badge completion-screen__badge--reduced"
+          aria-label="Reduced experience points, multiplier 0.5"
+        >
+          Reduced XP (×0.5)
+        </span>
+      )}
+
+      {(attemptNumber ?? 1) === 3 && (
+        <span
+          className="completion-screen__badge completion-screen__badge--reduced"
+          aria-label="Reduced experience points, multiplier 0.25"
+        >
+          Reduced XP (×0.25)
+        </span>
+      )}
+
+      {(attemptNumber ?? 1) >= 4 && (
+        <>
+          <span
+            className="completion-screen__badge completion-screen__badge--reduced"
+            aria-label="Zero experience points earned, practice mode"
+          >
+            0 XP (Practice Mode)
+          </span>
+          <p className="completion-screen__xp-note">
+            Practice makes perfect! Full XP returns tomorrow.
+          </p>
+        </>
+      )}
 
       <div className="completion-screen__actions">
         <button
