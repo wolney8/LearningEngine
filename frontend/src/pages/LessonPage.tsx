@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { CompletionScreen } from "../components/CompletionScreen";
 import { QuestionView } from "../components/QuestionView";
 import { StudyPageView } from "../components/StudyPageView";
+import { useAttempts } from "../hooks/useAttempts";
+import { useFirstCompletion } from "../hooks/useFirstCompletion";
 import { useStreak } from "../hooks/useStreak";
 import { useXP } from "../hooks/useXP";
 import type { Package } from "../schemas/package";
@@ -33,6 +35,8 @@ type LessonPhase =
       correctCount: number;
       totalQuestions: number;
       xpEarned: number;
+      attemptNumber: number;
+      wasFirstCompletion: boolean;
     };
 
 // ---------------------------------------------------------------------------
@@ -44,6 +48,8 @@ export function LessonPage() {
   const navigate = useNavigate();
   const { addXP } = useXP();
   const { markPractised } = useStreak();
+  const { attemptNumber, recordAttempt } = useAttempts(id ?? "");
+  const { isFirstCompletion, markCompleted } = useFirstCompletion(id ?? "");
 
   const [pkg, setPkg] = useState<Package | null>(null);
   const [phase, setPhase] = useState<LessonPhase>({ kind: "loading" });
@@ -113,21 +119,35 @@ export function LessonPage() {
   function handleAnswer(_answerId: string, correct: boolean): void {
     if (!pkg || phase.kind !== "questions") return;
 
-    const xpGain = correct ? 10 : 0;
     const newStreak = correct ? phase.streak + 1 : 0;
     const newCorrectCount = phase.correctCount + (correct ? 1 : 0);
-    const newXP = phase.xpEarned + xpGain;
     const nextQIndex = phase.questionIndex + 1;
 
     if (nextQIndex >= pkg.questions.length) {
       // All questions done
-      addXP(newXP);
+      const currentAttemptNumber = attemptNumber;
+      const wasFirstCompletion = isFirstCompletion;
+      const multipliers: Record<number, number> = { 1: 1.0, 2: 0.5, 3: 0.25 };
+      const multiplier = multipliers[currentAttemptNumber] ?? 0;
+      const baseXP = newCorrectCount * 10;
+      let earned = Math.round(baseXP * multiplier);
+
+      recordAttempt();
+
+      if (wasFirstCompletion) {
+        markCompleted();
+        earned += 20;
+      }
+
+      addXP(earned);
       markPractised();
       setPhase({
         kind: "complete",
         correctCount: newCorrectCount,
         totalQuestions: pkg.questions.length,
-        xpEarned: newXP,
+        xpEarned: earned,
+        attemptNumber: currentAttemptNumber,
+        wasFirstCompletion,
       });
     } else {
       setPhase({
@@ -135,7 +155,7 @@ export function LessonPage() {
         questionIndex: nextQIndex,
         correctCount: newCorrectCount,
         streak: newStreak,
-        xpEarned: newXP,
+        xpEarned: phase.xpEarned,
       });
     }
   }
@@ -163,6 +183,13 @@ export function LessonPage() {
       </header>
 
       <main className="lesson-page__content">
+        {(phase.kind === "studying" || phase.kind === "questions") &&
+          attemptNumber > 1 && (
+            <div className="lesson-page__reduced-xp-notice" aria-live="polite">
+              Reduced XP this attempt
+            </div>
+          )}
+
         {phase.kind === "loading" && (
           <p aria-live="polite" aria-busy="true">
             Loading lesson...
@@ -204,6 +231,8 @@ export function LessonPage() {
             correctCount={phase.correctCount}
             totalQuestions={phase.totalQuestions}
             xpEarned={phase.xpEarned}
+            attemptNumber={phase.attemptNumber}
+            isFirstCompletion={phase.wasFirstCompletion}
             onRetry={handleRetry}
             onBack={() => navigate("/")}
           />

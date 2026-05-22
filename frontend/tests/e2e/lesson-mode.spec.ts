@@ -158,4 +158,69 @@ test.describe("Lesson Mode", () => {
     await page.getByRole("link", { name: /Back to packages/i }).click();
     await expect(page).toHaveURL("/");
   });
+
+  test("first-completion bonus badge shows +20 XP on CompletionScreen", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.removeItem("lle_completed_python-basics");
+      localStorage.removeItem("lle_attempt_python-basics");
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+
+    await expect(page.getByText("+20 XP bonus")).toBeVisible();
+  });
+
+  test("second attempt shows Reduced XP badge on CompletionScreen", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem(
+        "lle_attempt_python-basics",
+        JSON.stringify({ count: 1, date: today }),
+      );
+      localStorage.setItem("lle_completed_python-basics", "1");
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+
+    await expect(page.getByText("Reduced XP (×0.5)")).toBeVisible();
+  });
+
+  test("fourth attempt shows 0 XP practice mode on CompletionScreen", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem(
+        "lle_attempt_python-basics",
+        JSON.stringify({ count: 3, date: today }),
+      );
+      localStorage.setItem("lle_completed_python-basics", "1");
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+
+    await expect(page.getByText("0 XP (Practice Mode)")).toBeVisible();
+    await expect(
+      page.getByText("Practice makes perfect! Full XP returns tomorrow."),
+    ).toBeVisible();
+  });
 });
