@@ -20,7 +20,7 @@ _VALID_DATA = {
             "text": "Question?",
             "answers": [{"id": "a", "text": "Yes"}, {"id": "b", "text": "No"}],
             "correct_answer": "a",
-            "weight": 1.0,
+            "weight": 100.0,
             "feedback": "Correct.",
         }
     ],

@@ -55,6 +55,12 @@ class Package(BaseModel):
                         f"revision_page_id '{rpid}' in question '{question.id}' "
                         f"does not match any page id"
                     )
+
+        total_weight = sum(question.weight for question in self.questions)
+        if abs(total_weight - 100.0) >= 0.01:
+            raise ValueError(
+                f"question weights must sum to 100, got {total_weight:.2f}"
+            )
         return self
 
 
