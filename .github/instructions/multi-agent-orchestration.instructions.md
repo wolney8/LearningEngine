@@ -23,6 +23,30 @@ description: "Use when designing multi-agent systems, orchestration workflows, a
 - Restrict write/destructive tools to the single agent responsible for side effects.
 - Read-only exploration agents must not invoke write or shell tools.
 
+### Coder Agent — File Writing Rule (MANDATORY)
+
+The Coder agent is the **only** agent that writes files. It must follow these rules without exception:
+
+1. **Write all files to the local workspace** (the project root open in VS Code) using local file-creation and file-editing tools provided by VS Code.
+2. **Never use GitHub MCP tools** (`push_files`, `create_or_update_file`, `delete_file`) to write source code, tests, configuration files, or instruction files. These tools are reserved for project management operations only (issues, PRs, labels, milestones).
+3. **Install dependencies locally** after creating or modifying package manifests — `pip install -e ".[dev]"` for backend changes, `pnpm install` for frontend changes. Run these in the terminal. After installing backend deps, regenerate `backend/requirements.txt` by running `pip freeze > requirements.txt` from inside the `backend/` directory with the venv activated. Commit the updated lockfile as part of the same change.
+4. **Run all lint, type-check, and test commands locally** against the files just written. Do not treat a successful GitHub push as a substitute for local validation.
+5. **Report completion** to the Orchestrator with: list of files written, commands run, and their pass/fail results. Do not self-approve gate passage.
+
+The Coder must never commit or push to git. That responsibility belongs to the Orchestrator, and only after the user has reviewed and approved.
+
+### Designer Agent — File Writing Rule
+
+The Designer produces specifications, tokens, and visual assets. Any output that results in a file being written (e.g., updating `brand-guidelines.instructions.md`, creating a token CSS file) must follow the same local-first rule as the Coder. The Designer reports its output to the Orchestrator, who delegates file writing to the Coder if needed.
+
+### Orchestrator — No File Writing
+
+The Orchestrator coordinates, delegates, and reports. It does not write source code or configuration files. The only write operations the Orchestrator may perform directly are via GitHub MCP project management tools (issues, PRs, milestones) — and only after the user has approved the phase.
+
+### Planner — Read Only
+
+The Planner researches the codebase and produces plans. It uses only read tools (file search, file read, semantic search, codebase exploration). It does not write files.
+
 ## Reliability
 
 - Design each agent to be idempotent where possible.
