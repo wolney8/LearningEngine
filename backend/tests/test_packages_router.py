@@ -1,3 +1,6 @@
+from pathlib import Path
+from unittest.mock import AsyncMock
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -129,3 +132,78 @@ async def test_get_package_unknown_id_returns_404(
 async def test_get_package_empty_cache_returns_404(client_empty: AsyncClient) -> None:
     response = await client_empty.get("/packages/sample-demo")
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /packages/generate
+# ---------------------------------------------------------------------------
+
+
+async def test_generate_package_returns_503_when_api_key_missing(
+    client_empty: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    response = await client_empty.post(
+        "/packages/generate",
+        json={
+            "topic": "Basic cyber hygiene",
+            "audience": "new employees",
+            "num_pages": 3,
+            "num_questions": 4,
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "AI service not configured. Set GEMINI_API_KEY in backend/.env"
+    )
+
+
+async def test_generate_package_returns_yaml_on_success(
+    client_empty: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sample_yaml = (
+        Path(__file__).resolve().parents[2] / "packages" / "sample-demo.yaml"
+    ).read_text(encoding="utf-8")
+    mock_generate = AsyncMock(return_value=sample_yaml)
+    monkeypatch.setattr("app.routers.packages.generate_package", mock_generate)
+
+    response = await client_empty.post(
+        "/packages/generate",
+        json={
+            "topic": "Fraud prevention",
+            "audience": "frontline staff",
+            "num_pages": 2,
+            "num_questions": 3,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["yaml_content"] == sample_yaml
+
+
+async def test_generate_package_passes_request_values_to_service(
+    client_empty: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mock_generate = AsyncMock(return_value="id: demo\n")
+    monkeypatch.setattr("app.routers.packages.generate_package", mock_generate)
+
+    payload = {
+        "topic": "Data protection essentials",
+        "audience": "general learners",
+        "num_pages": 5,
+        "num_questions": 8,
+    }
+    response = await client_empty.post("/packages/generate", json=payload)
+
+    assert response.status_code == 200
+    mock_generate.assert_awaited_once_with(
+        topic=payload["topic"],
+        audience=payload["audience"],
+        num_pages=payload["num_pages"],
+        num_questions=payload["num_questions"],
+    )
