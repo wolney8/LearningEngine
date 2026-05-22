@@ -56,3 +56,16 @@ export type Answer = z.infer<typeof AnswerSchema>;
 export type Page = z.infer<typeof PageSchema>;
 export type Question = z.infer<typeof QuestionSchema>;
 export type Package = z.infer<typeof PackageSchema>;
+
+export const PackageSummarySchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  tags: z.array(z.string()).default([]),
+  passing_score: z.number().min(0).max(1),
+  page_count: z.number().int().nonnegative(),
+  question_count: z.number().int().nonnegative(),
+});
+
+export type PackageSummary = z.infer<typeof PackageSummarySchema>;
