@@ -10,13 +10,26 @@ Every workflow in which the Coder agent modifies or creates files is subject to 
 
 ---
 
+## Precondition — Local Workspace (MANDATORY)
+
+Before any gate can run, the following must be true:
+
+1. **All files modified or created in this phase exist in the local workspace.** Files written only to a remote GitHub branch via API do not satisfy this precondition.
+2. **Dependencies are installed locally.** For backend changes: `pip install -e ".[dev]"` must have run without error. For frontend changes: `pnpm install` must have run without error.
+3. **The Coder is operating against the local filesystem**, not a remote API.
+
+If the precondition is not met, the Coder has not completed its task. The Orchestrator must halt and instruct the Coder to write files locally before gates begin. Do not attempt to run gates remotely or treat a GitHub push as a substitute for local execution.
+
+---
+
 ## Rule 1 — HALT After Code Changes
 
 After the Coder returns from any code-producing task, the Orchestrator MUST:
 
 1. **Halt further generation** — do not proceed to the next phase, task, or parallel branch.
 2. **Declare a Review Phase** explicitly in the progress report.
-3. Run both quality gates (§ Gate 1 and § Gate 2) before resuming.
+3. Verify the local workspace precondition is met.
+4. Run all quality gates (§ Gate 1, Gate 2, Gate 3) before resuming.
 
 > In parallel phases: if any parallel task produced code, the entire phase pauses at completion and all gates run before the next phase begins.
 
@@ -24,7 +37,7 @@ After the Coder returns from any code-producing task, the Orchestrator MUST:
 
 ## Rule 2 — Gate Sequence
 
-Gates run **in this order**. Both must pass; they cannot run concurrently.
+Gates run **in this order**. All must pass; they cannot run concurrently.
 
 ### Gate 1 — Code Quality
 
@@ -104,14 +117,27 @@ When either gate fails, execute this loop:
 
 ---
 
-## Rule 5 — Phase Completion Report
+## Rule 5 — User Handoff Before Git Operations
 
-Once both gates pass, include a gate summary in the phase completion report before starting the next phase:
+Once all gates pass, the Orchestrator MUST:
+
+1. **Present the local changes to the user** — summarise what files were created or modified, what the tests confirmed, and the gate results.
+2. **Await explicit user approval** before any git operation (commit, push, branch creation, PR).
+3. Only after approval: instruct the Coder to commit locally, push to the remote branch, and open the PR via GitHub MCP.
+
+This rule exists to ensure the user can inspect, run, and verify the application locally before the changes become part of the permanent git history.
+
+---
+
+## Rule 6 — Phase Completion Report
+
+Once all gates pass and the user has approved, include a gate summary in the phase completion report:
 
 ```
 Gate 1 (Code Quality): PASSED — N issues auto-fixed, 0 remaining
 Gate 2 (Accessibility): PASSED / NOT APPLICABLE
 Gate 3 (Security):     PASSED / NOT APPLICABLE
+User handoff:          APPROVED by user on [date]
 ```
 
 If a gate triggered remediation, note the iteration count: `PASSED after 2 iterations`.

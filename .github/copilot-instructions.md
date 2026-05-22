@@ -19,7 +19,7 @@ Package manager: pip + venv (Python), pnpm (frontend)
 
 ## Build, Test, and Lint Commands
 
-Fill these in once the project's tooling is configured.
+All commands run locally in the workspace. Agents must execute these against local files — not remote GitHub content.
 
 ```
 build:   cd backend && uvicorn app.main:app --reload   |   cd frontend && pnpm build
@@ -47,6 +47,19 @@ lint:    cd backend && ruff check .                    |   cd frontend && pnpm e
 | Coder        | GPT-5.3-Codex     | Implements code, runs pre-submission lint, writes and runs tests, fixes findings         |
 | Designer     | Gemini 3.1 Pro    | UI/UX validation, design token management, WCAG audits, reports findings to Orchestrator |
 
+## GitHub MCP Tool Scope (HARD BOUNDARY)
+
+The GitHub MCP integration provides two categories of tools. Agents **must not** cross this boundary:
+
+| Category              | Permitted tools                                                                 | Examples |
+| --------------------- | ------------------------------------------------------------------------------- | -------- |
+| **Project management** | `issue_write`, `issue_read`, `create_pull_request`, `list_branches`, `create_branch`, `merge_pull_request`, `list_issues`, `search_issues`, `sub_issue_write`, `update_pull_request`, `list_milestones` | Creating issues, opening PRs, assigning milestones, labelling |
+| **FORBIDDEN for code** | `push_files`, `create_or_update_file`, `delete_file` | Writing, updating, or deleting source code files |
+
+**`push_files` and `create_or_update_file` must never be used to write source code, configuration files, or tests.** The only exception is documentation-only commits (e.g., updating `brand-guidelines.instructions.md`) where no executable code is involved and no local testing is required.
+
+All source code must be written to the local workspace by the Coder agent using local file-creation tools, tested locally, reviewed by the user, and only then committed and pushed via standard git commands.
+
 ## Instruction Files
 
 | File                        | Governs                                                                                           |
@@ -67,11 +80,16 @@ You → Orchestrator
         → Planner: research + phased implementation plan
         → Execute phase(s):
             → Coder / Designer (parallel where safe)
+              [Coder writes files LOCALLY, installs deps locally, runs tests locally]
         → HALT: Review Phase
-            → Gate 1: Code Quality (lint + type check)
+            → Gate 1: Code Quality (lint + type check) — runs locally
             → Gate 2: Accessibility (Context7 + WCAG 2.2 AA)
-            → Gate 3: Security (SAST + dependency audit)
+            → Gate 3: Security (SAST + dependency audit) — runs locally
             → Testing: functional tests + reviewer checklist
+        → HALT: User Handoff
+            → Orchestrator presents local changes to user
+            → User reviews and approves
+        → Git operations (commit → push → PR) — ONLY after user approval
         → Status report → You
 ```
 
