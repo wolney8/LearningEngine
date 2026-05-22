@@ -1,0 +1,116 @@
+id: sample-demo
+title: "Python Basics Demo"
+description: "A short demo package covering Python fundamentals, used for testing the schema layer."
+version: "1.0.0"
+tags:
+  - demo
+  - testing
+passing_score: 0.75
+
+pages:
+  - id: variables
+    title: "Variables and Data Types"
+    content: |
+      # Variables and Data Types
+
+      In Python, variables are created by assignment. Python is dynamically typed —
+      you don't declare types explicitly.
+
+      ```python
+      name = "Alice"  # str
+      age = 30        # int
+      score = 9.5     # float
+      active = True   # bool
+      ```
+
+  - id: functions
+    title: "Functions"
+    content: |
+      # Functions
+
+      Functions are defined using the `def` keyword and may return a value.
+
+      ```python
+      def greet(name):
+          return f"Hello, {name}!"
+      ```
+
+      Functions can have default argument values:
+
+      ```python
+      def power(base, exp=2):
+          return base ** exp
+      ```
+
+  - id: lists
+    title: "Lists"
+    content: |
+      # Lists
+
+      Lists are ordered, mutable sequences. Items are accessed by zero-based index.
+
+      ```python
+      items = [1, 2, 3]
+      items.append(4)   # [1, 2, 3, 4]
+      first = items[0]  # 1
+      ```
+
+questions:
+  - id: q1
+    text: "What keyword is used to define a function in Python?"
+    answers:
+      - id: a
+        text: "func"
+      - id: b
+        text: "def"
+      - id: c
+        text: "function"
+      - id: d
+        text: "define"
+    correct_answer: b
+    weight: 25
+    feedback: "In Python, functions are defined using the `def` keyword."
+    revision_page_ids:
+      - functions
+
+  - id: q2
+    text: "Which of the following is a valid Python boolean literal?"
+    answers:
+      - id: a
+        text: "true"
+      - id: b
+        text: "TRUE"
+      - id: c
+        text: "True"
+      - id: d
+        text: "1 == 1"
+    correct_answer: c
+    weight: 25
+    feedback: "Python boolean literals are `True` and `False` (capitalised)."
+    revision_page_ids:
+      - variables
+
+  - id: q3
+    text: "How do you add an item to the end of a Python list?"
+    answers:
+      - id: a
+        text: "list.add(item)"
+      - id: b
+        text: "list.append(item)"
+    correct_answer: b
+    weight: 25
+    feedback: "The `append()` method adds an item to the end of a list."
+    revision_page_ids:
+      - lists
+      - functions
+
+  - id: q4
+    text: "What is the index of the first element in a Python list?"
+    answers:
+      - id: a
+        text: "0"
+      - id: b
+        text: "1"
+    correct_answer: a
+    weight: 25
+    feedback: "Python uses zero-based indexing, so the first element is at index 0."
