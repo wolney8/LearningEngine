@@ -5,6 +5,7 @@ import { QuestionView } from "../components/QuestionView";
 import { StudyPageView } from "../components/StudyPageView";
 import { useAttempts } from "../hooks/useAttempts";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
+import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
 import { useXP } from "../hooks/useXP";
 import type { Package } from "../schemas/package";
@@ -50,6 +51,7 @@ export function LessonPage() {
   const { markPractised } = useStreak();
   const { attemptNumber, recordAttempt } = useAttempts(id ?? "");
   const { isFirstCompletion, markCompleted } = useFirstCompletion(id ?? "");
+  const { settings } = useSettings();
 
   const [pkg, setPkg] = useState<Package | null>(null);
   const [phase, setPhase] = useState<LessonPhase>({ kind: "loading" });
@@ -127,16 +129,18 @@ export function LessonPage() {
       // All questions done
       const currentAttemptNumber = attemptNumber;
       const wasFirstCompletion = isFirstCompletion;
-      const multipliers: Record<number, number> = { 1: 1.0, 2: 0.5, 3: 0.25 };
-      const multiplier = multipliers[currentAttemptNumber] ?? 0;
-      const baseXP = newCorrectCount * 10;
+      const multiplier =
+        settings.xp.attempt_multipliers[
+          String(currentAttemptNumber) as "1" | "2" | "3"
+        ] ?? 0;
+      const baseXP = newCorrectCount * settings.xp.lesson_base_xp_per_correct;
       let earned = Math.round(baseXP * multiplier);
 
       recordAttempt();
 
       if (wasFirstCompletion) {
         markCompleted();
-        earned += 20;
+        earned += settings.xp.first_completion_bonus;
       }
 
       addXP(earned);
@@ -233,6 +237,8 @@ export function LessonPage() {
             xpEarned={phase.xpEarned}
             attemptNumber={phase.attemptNumber}
             isFirstCompletion={phase.wasFirstCompletion}
+            firstCompletionBonus={settings.xp.first_completion_bonus}
+            attemptMultipliers={settings.xp.attempt_multipliers}
             onRetry={handleRetry}
             onBack={() => navigate("/")}
           />

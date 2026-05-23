@@ -7,6 +7,8 @@ interface CompletionScreenProps {
   xpEarned: number;
   attemptNumber?: number;
   isFirstCompletion?: boolean;
+  firstCompletionBonus: number;
+  attemptMultipliers: { "1": number; "2": number; "3": number };
   onRetry: () => void;
   onBack: () => void;
 }
@@ -17,6 +19,8 @@ export function CompletionScreen({
   xpEarned,
   attemptNumber,
   isFirstCompletion,
+  firstCompletionBonus,
+  attemptMultipliers,
   onRetry,
   onBack,
 }: CompletionScreenProps) {
@@ -56,27 +60,27 @@ export function CompletionScreen({
       {isFirstCompletion && (
         <span
           className="completion-screen__badge completion-screen__badge--first"
-          aria-label="First completion bonus, 20 extra experience points"
+          aria-label={`First completion bonus, ${firstCompletionBonus} extra experience points`}
         >
-          +20 XP bonus
+          +{firstCompletionBonus} XP bonus
         </span>
       )}
 
       {(attemptNumber ?? 1) === 2 && (
         <span
           className="completion-screen__badge completion-screen__badge--reduced"
-          aria-label="Reduced experience points, multiplier 0.5"
+          aria-label={`Reduced experience points, multiplier ${attemptMultipliers["2"]}`}
         >
-          Reduced XP (×0.5)
+          Reduced XP (×{attemptMultipliers["2"]})
         </span>
       )}
 
       {(attemptNumber ?? 1) === 3 && (
         <span
           className="completion-screen__badge completion-screen__badge--reduced"
-          aria-label="Reduced experience points, multiplier 0.25"
+          aria-label={`Reduced experience points, multiplier ${attemptMultipliers["3"]}`}
         >
-          Reduced XP (×0.25)
+          Reduced XP (×{attemptMultipliers["3"]})
         </span>
       )}
 

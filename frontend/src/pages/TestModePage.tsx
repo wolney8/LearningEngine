@@ -6,17 +6,13 @@ import { TestResultsScreen } from "../components/TestResultsScreen";
 import { useAttempts } from "../hooks/useAttempts";
 import { useCountdown } from "../hooks/useCountdown";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
+import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
 import { useTestResults } from "../hooks/useTestResults";
 import { useXP } from "../hooks/useXP";
 import type { Package, Question } from "../schemas/package";
 import { fetchPackage } from "../services/api";
-import {
-  DIFFICULTY_LABEL,
-  DIFFICULTY_XP_MULTIPLIER,
-  type Difficulty,
-  SECONDS_PER_QUESTION,
-} from "../types/difficulty";
+import { DIFFICULTY_LABEL, type Difficulty } from "../types/difficulty";
 import { shuffleArray } from "../utils/randomise";
 import "./TestModePage.css";
 
@@ -73,6 +69,7 @@ export function TestModePage() {
   const { addXP, subtractXP } = useXP();
   const { markPractised } = useStreak();
   const { saveResult } = useTestResults(id);
+  const { settings } = useSettings();
 
   const inProgress = phase.kind === "in-progress" ? phase : null;
   const { timeRemaining } = useCountdown(
@@ -85,9 +82,9 @@ export function TestModePage() {
   const applyExitPenalty = useCallback((): void => {
     if (exitPenaltyAppliedRef.current) return;
     exitPenaltyAppliedRef.current = true;
-    subtractXP(50);
+    subtractXP(settings.xp.hard_expert_exit_penalty);
     recordAttempt();
-  }, [recordAttempt, subtractXP]);
+  }, [recordAttempt, settings.xp.hard_expert_exit_penalty, subtractXP]);
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -124,41 +121,45 @@ export function TestModePage() {
     };
   }, [id, navigate]);
 
-  const startExam = useCallback((pkg: Package, difficulty: Difficulty): void => {
-    const isTaggedPackage = pkg.questions.some((q) => q.difficulty != null);
+  const startExam = useCallback(
+    (pkg: Package, difficulty: Difficulty): void => {
+      const isTaggedPackage = pkg.questions.some((q) => q.difficulty != null);
 
-    let pool: typeof pkg.questions;
-    if (isTaggedPackage) {
-      const filtered = pkg.questions.filter((q) => q.difficulty === difficulty);
-      if (filtered.length === 0) {
-        console.warn(
-          `[TestModePage] No questions tagged "${difficulty}" in package "${pkg.id}". Falling back to full question set.`,
-        );
-        pool = pkg.questions;
+      let pool: typeof pkg.questions;
+      if (isTaggedPackage) {
+        const filtered = pkg.questions.filter((q) => q.difficulty === difficulty);
+        if (filtered.length === 0) {
+          console.warn(
+            `[TestModePage] No questions tagged "${difficulty}" in package "${pkg.id}". Falling back to full question set.`,
+          );
+          pool = pkg.questions;
+        } else {
+          pool = filtered;
+        }
       } else {
-        pool = filtered;
+        pool = pkg.questions;
       }
-    } else {
-      pool = pkg.questions;
-    }
 
-    const shuffled = shuffleArray(pool).map((q) => ({
-      ...q,
-      answers: shuffleArray(q.answers),
-    }));
-    const totalSeconds = SECONDS_PER_QUESTION[difficulty] * shuffled.length;
+      const shuffled = shuffleArray(pool).map((q) => ({
+        ...q,
+        answers: shuffleArray(q.answers),
+      }));
+      const totalSeconds =
+        settings.difficulty.seconds_per_question[difficulty] * shuffled.length;
 
-    setPhase({
-      kind: "in-progress",
-      pkg,
-      shuffledQuestions: shuffled,
-      currentIndex: 0,
-      answers: {},
-      flagged: new Set(),
-      difficulty,
-      totalSeconds,
-    });
-  }, []);
+      setPhase({
+        kind: "in-progress",
+        pkg,
+        shuffledQuestions: shuffled,
+        currentIndex: 0,
+        answers: {},
+        flagged: new Set(),
+        difficulty,
+        totalSeconds,
+      });
+    },
+    [settings.difficulty.seconds_per_question],
+  );
 
   const handleSelectDifficulty = useCallback(
     (difficulty: Difficulty): void => {
@@ -202,7 +203,7 @@ export function TestModePage() {
       setSubmitWarning(null);
 
       if (options?.applyFewAnswerPenalty) {
-        subtractXP(50);
+        subtractXP(settings.xp.hard_expert_low_answer_penalty);
       }
 
       const weightScore = shuffledQuestions.reduce(
@@ -218,11 +219,12 @@ export function TestModePage() {
           ? weightScore / totalPossibleWeight >= phase.pkg.passing_score
           : false;
       const minimumAnswerGateApplies =
-        (difficulty === "easy" || difficulty === "normal") && correctCount < 2;
+        correctCount < settings.xp.min_correct_for_xp[difficulty];
 
-      const attemptMults: Record<number, number> = { 1: 1.0, 2: 0.5, 3: 0.25 };
-      const diffMult = DIFFICULTY_XP_MULTIPLIER[difficulty];
-      const mult = (attemptMults[attemptNumber] ?? 0) * diffMult;
+      const attemptMult =
+        settings.xp.attempt_multipliers[String(attemptNumber) as "1" | "2" | "3"] ?? 0;
+      const diffMult = settings.difficulty.xp_multiplier[difficulty];
+      const mult = attemptMult * diffMult;
       let earned = minimumAnswerGateApplies ? 0 : Math.round(weightScore * mult);
       const wasFirst = isFirstCompletion;
       const awardFirstCompletionBonus = wasFirst && !minimumAnswerGateApplies;
@@ -230,7 +232,7 @@ export function TestModePage() {
       recordAttempt();
       if (awardFirstCompletionBonus) {
         markCompleted();
-        earned += 20;
+        earned += settings.xp.first_completion_bonus;
       }
 
       if (!minimumAnswerGateApplies) {
@@ -273,6 +275,11 @@ export function TestModePage() {
       phase,
       recordAttempt,
       saveResult,
+      settings.difficulty.xp_multiplier,
+      settings.xp.attempt_multipliers,
+      settings.xp.first_completion_bonus,
+      settings.xp.hard_expert_low_answer_penalty,
+      settings.xp.min_correct_for_xp,
       subtractXP,
     ],
   );
@@ -384,10 +391,10 @@ export function TestModePage() {
                 {DIFFICULTY_LABEL[d]}
               </span>
               <span className="test-mode-page__difficulty-timer">
-                {SECONDS_PER_QUESTION[d]}s per question
+                {settings.difficulty.seconds_per_question[d]}s per question
               </span>
               <span className="test-mode-page__difficulty-xp">
-                ×{DIFFICULTY_XP_MULTIPLIER[d]} XP
+                ×{settings.difficulty.xp_multiplier[d]} XP
               </span>
             </button>
           ))}
@@ -416,7 +423,7 @@ export function TestModePage() {
           <h2>⚠ {DIFFICULTY_LABEL[difficulty]} Mode</h2>
           <p>
             If you leave or cancel this exam mid-way, you will automatically fail and
-            lose 50 XP.
+            lose {settings.xp.hard_expert_exit_penalty} XP.
           </p>
           <div className="test-mode-page__warning-actions">
             <button
@@ -574,7 +581,7 @@ export function TestModePage() {
               <p>
                 {submitWarning === "zero-answer"
                   ? "You haven't answered any questions — are you sure you want to submit?"
-                  : "You've answered very few questions. Submitting will deduct 50 XP. Continue?"}
+                  : `You've answered very few questions. Submitting will deduct ${settings.xp.hard_expert_low_answer_penalty} XP. Continue?`}
               </p>
               <div className="test-mode-page__submit-warning-actions">
                 <button
@@ -632,9 +639,11 @@ export function TestModePage() {
         passed={phase.passed}
         passingScore={phase.pkg.passing_score}
         difficulty={phase.difficulty}
+        difficultyMultiplier={settings.difficulty.xp_multiplier[phase.difficulty]}
         xpEarned={phase.xpEarned}
         attemptNumber={phase.attemptNumber}
         isFirstCompletion={phase.wasFirstCompletion}
+        firstCompletionBonus={settings.xp.first_completion_bonus}
         timedOut={phase.timedOut}
         onRetry={() => setPhase({ kind: "difficulty-select", pkg: phase.pkg })}
         onBack={() => navigate("/")}

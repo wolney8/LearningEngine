@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import type { Question } from "../schemas/package";
 import type { Difficulty } from "../types/difficulty";
-import { DIFFICULTY_LABEL, DIFFICULTY_XP_MULTIPLIER } from "../types/difficulty";
+import { DIFFICULTY_LABEL } from "../types/difficulty";
 import "./TestResultsScreen.css";
 
 interface TestResultsScreenProps {
@@ -13,9 +13,11 @@ interface TestResultsScreenProps {
   passed: boolean;
   passingScore: number;
   difficulty: Difficulty;
+  difficultyMultiplier: number;
   xpEarned: number;
   attemptNumber: number;
   isFirstCompletion: boolean;
+  firstCompletionBonus: number;
   timedOut: boolean;
   onRetry: () => void;
   onBack: () => void;
@@ -33,9 +35,11 @@ export function TestResultsScreen({
   passed,
   passingScore,
   difficulty,
+  difficultyMultiplier,
   xpEarned,
   attemptNumber,
   isFirstCompletion,
+  firstCompletionBonus,
   timedOut,
   onRetry,
   onBack,
@@ -96,7 +100,7 @@ export function TestResultsScreen({
 
       <div className="test-results__badges">
         <span className="test-results__badge">
-          {DIFFICULTY_LABEL[difficulty]} x{DIFFICULTY_XP_MULTIPLIER[difficulty]} XP
+          {DIFFICULTY_LABEL[difficulty]} x{difficultyMultiplier} XP
         </span>
 
         {xpEarned > 0 && (
@@ -107,7 +111,7 @@ export function TestResultsScreen({
 
         {isFirstCompletion && (
           <span className="test-results__badge test-results__badge--xp">
-            +20 XP bonus
+            +{firstCompletionBonus} XP bonus
           </span>
         )}
 

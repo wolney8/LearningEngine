@@ -6,7 +6,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers.packages import router as packages_router
+from app.routers.settings import router as settings_router
 from app.services.package_loader import load_packages
+from app.services.settings_loader import load_settings
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     YAML package loading is added in Phase 3 (OA-001 resolved).
     """
     logger.info("startup")
+    app.state.settings = load_settings()
     app.state.packages = load_packages()
     yield
     logger.info("shutdown")
@@ -35,6 +38,7 @@ app.add_middleware(
 )
 
 app.include_router(packages_router)
+app.include_router(settings_router)
 
 
 @app.get("/health")

@@ -1,0 +1,149 @@
+id: phishing-and-email-security
+title: "Phishing and Email Security"
+description: "Practical defences against phishing, spoofing, and social engineering in email workflows."
+version: "1.0.0"
+tags:
+  - security
+  - phishing
+  - email
+passing_score: 0.8
+
+pages:
+  - id: phishing-basics
+    title: "Phishing Basics"
+    content: |
+      # Phishing Basics
+
+      Phishing messages try to trick users into revealing credentials or installing malware.
+
+      Common signs include urgency, unexpected attachments, and suspicious sender details.
+
+  - id: email-authentication
+    title: "Email Authentication (SPF, DKIM, DMARC)"
+    content: |
+      # Email Authentication
+
+      SPF, DKIM, and DMARC help receiving servers verify whether a message is legitimate.
+
+      DMARC builds on SPF and DKIM alignment to define how failures should be handled.
+
+  - id: link-and-attachment-safety
+    title: "Link and Attachment Safety"
+    content: |
+      # Link and Attachment Safety
+
+      Hover over links to inspect destination domains.
+      Treat unexpected attachments and macro-enabled files as high risk.
+
+  - id: incident-reporting-and-response
+    title: "Incident Reporting and Response"
+    content: |
+      # Incident Reporting and Response
+
+      Early reporting reduces impact.
+      Security teams can block domains, reset credentials, and investigate lateral movement.
+
+questions:
+  - id: q-easy-1
+    difficulty: easy
+    text: "Which behaviour is a common phishing indicator?"
+    answers:
+      - { id: a, text: "Expected monthly payroll notification" }
+      - { id: b, text: "Urgent request to verify your password immediately" }
+      - { id: c, text: "Internal newsletter from a known sender" }
+      - { id: d, text: "Calendar reminder from your own account" }
+    correct_answer: b
+    weight: 50
+    feedback: "Attackers often create urgency to pressure quick actions without verification."
+    revision_page_ids: [phishing-basics]
+
+  - id: q-easy-2
+    difficulty: easy
+    text: "What is the safest first step when you receive an unexpected attachment?"
+    answers:
+      - { id: a, text: "Open it quickly to check if it is important" }
+      - { id: b, text: "Forward it to colleagues for opinions" }
+      - { id: c, text: "Verify the request through a trusted channel before opening" }
+      - { id: d, text: "Reply and ask the sender for a second copy" }
+    correct_answer: c
+    weight: 50
+    feedback: "Independent verification prevents social engineering from succeeding."
+    revision_page_ids: [link-and-attachment-safety]
+
+  - id: q-normal-1
+    difficulty: normal
+    text: "What is the main purpose of SPF in email security?"
+    answers:
+      - { id: a, text: "Encrypt message contents" }
+      - { id: b, text: "List authorised mail servers for a domain" }
+      - { id: c, text: "Block all external email" }
+      - { id: d, text: "Scan attachments for malware" }
+    correct_answer: b
+    weight: 50
+    feedback: "SPF publishes which servers are permitted to send mail for a domain."
+    revision_page_ids: [email-authentication]
+
+  - id: q-normal-2
+    difficulty: normal
+    text: "Why is hovering over a link useful during email review?"
+    answers:
+      - { id: a, text: "It automatically scans the URL for malware" }
+      - { id: b, text: "It previews the real destination so you can spot mismatched domains" }
+      - { id: c, text: "It confirms the sender identity cryptographically" }
+      - { id: d, text: "It disables tracking pixels" }
+    correct_answer: b
+    weight: 50
+    feedback: "The visible text may be benign while the real URL points to a malicious site."
+    revision_page_ids: [link-and-attachment-safety]
+
+  - id: q-hard-1
+    difficulty: hard
+    text: "If DKIM passes but the From domain is not aligned with DMARC policy, what is the likely outcome?"
+    answers:
+      - { id: a, text: "DMARC may still fail because alignment is required" }
+      - { id: b, text: "DMARC always passes if DKIM passes" }
+      - { id: c, text: "SPF is ignored permanently" }
+      - { id: d, text: "The message is encrypted automatically" }
+    correct_answer: a
+    weight: 50
+    feedback: "DMARC checks alignment, not only raw SPF or DKIM pass/fail status."
+    revision_page_ids: [email-authentication]
+
+  - id: q-hard-2
+    difficulty: hard
+    text: "A colleague clicked a suspicious link and entered credentials. What should happen first?"
+    answers:
+      - { id: a, text: "Wait to see whether anything unusual happens" }
+      - { id: b, text: "Report the incident immediately and reset affected credentials" }
+      - { id: c, text: "Delete the browser history and continue working" }
+      - { id: d, text: "Send a warning only to your immediate team" }
+    correct_answer: b
+    weight: 50
+    feedback: "Rapid reporting and credential reset are critical to contain compromise."
+    revision_page_ids: [incident-reporting-and-response]
+
+  - id: q-expert-1
+    difficulty: expert
+    text: "Which DMARC policy provides monitoring without instructing receivers to quarantine or reject failures?"
+    answers:
+      - { id: a, text: "p=reject" }
+      - { id: b, text: "p=quarantine" }
+      - { id: c, text: "p=none" }
+      - { id: d, text: "p=monitor" }
+    correct_answer: c
+    weight: 50
+    feedback: "p=none is typically used during rollout to observe reports before enforcement."
+    revision_page_ids: [email-authentication]
+
+  - id: q-expert-2
+    difficulty: expert
+    text: "Why should incident reporting procedures include a dedicated reporting channel (for example, a security mailbox or button)?"
+    answers:
+      - { id: a, text: "It reduces response consistency" }
+      - { id: b, text: "It centralises triage and speeds coordinated response actions" }
+      - { id: c, text: "It guarantees phishing emails are legally invalid" }
+      - { id: d, text: "It replaces the need for user awareness training" }
+    correct_answer: b
+    weight: 50
+    feedback: "A clear channel improves detection speed, ownership, and evidence collection."
+    revision_page_ids: [incident-reporting-and-response, phishing-basics]

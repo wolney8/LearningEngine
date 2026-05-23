@@ -3,6 +3,41 @@ import { expect, test } from "@playwright/test";
 const MOCK_PACKAGE_ID = "python-basics";
 const API_BASE_URL = "http://localhost:8000";
 
+const DEFAULT_SETTINGS = {
+  version: 1,
+  xp: {
+    lesson_base_xp_per_correct: 10,
+    first_completion_bonus: 20,
+    attempt_multipliers: {
+      "1": 1.0,
+      "2": 0.5,
+      "3": 0.25,
+    },
+    hard_expert_exit_penalty: 50,
+    hard_expert_low_answer_penalty: 50,
+    min_correct_for_xp: {
+      easy: 2,
+      normal: 2,
+      hard: 0,
+      expert: 0,
+    },
+  },
+  difficulty: {
+    seconds_per_question: {
+      easy: 90,
+      normal: 45,
+      hard: 20,
+      expert: 10,
+    },
+    xp_multiplier: {
+      easy: 0.5,
+      normal: 1.0,
+      hard: 1.5,
+      expert: 2.0,
+    },
+  },
+};
+
 const MOCK_SUMMARY = {
   id: MOCK_PACKAGE_ID,
   title: "Python Basics",
@@ -72,6 +107,14 @@ test.describe("Lesson Mode", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([MOCK_SUMMARY]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/api/settings`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(DEFAULT_SETTINGS),
       });
     });
   });
@@ -222,5 +265,37 @@ test.describe("Lesson Mode", () => {
     await expect(
       page.getByText("Practice makes perfect! Full XP returns tomorrow."),
     ).toBeVisible();
+  });
+
+  test("settings endpoint changes first-completion bonus badge text", async ({
+    page,
+  }) => {
+    await page.route(`${API_BASE_URL}/api/settings`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...DEFAULT_SETTINGS,
+          xp: {
+            ...DEFAULT_SETTINGS.xp,
+            first_completion_bonus: 35,
+          },
+        }),
+      });
+    });
+
+    await page.addInitScript(() => {
+      localStorage.removeItem("lle_completed_python-basics");
+      localStorage.removeItem("lle_attempt_python-basics");
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+
+    await expect(page.getByText("+35 XP bonus")).toBeVisible();
   });
 });

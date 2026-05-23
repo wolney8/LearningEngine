@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { PackageSchema, PackageSummarySchema } from "../schemas/package";
 import type { Package, PackageSummary } from "../schemas/package";
+import { SettingsSchema } from "../schemas/settings";
+import type { Settings } from "../schemas/settings";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const TIMEOUT_MS = 10_000;
@@ -38,4 +40,13 @@ export async function fetchPackage(id: string): Promise<Package> {
   }
   const data: unknown = await response.json();
   return PackageSchema.parse(data);
+}
+
+export async function fetchSettings(): Promise<Settings> {
+  const response = await fetchWithTimeout(`${BASE_URL}/api/settings`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch settings: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return SettingsSchema.parse(data);
 }

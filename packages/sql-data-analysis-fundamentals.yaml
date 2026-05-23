@@ -1,0 +1,171 @@
+id: sql-data-analysis-fundamentals
+title: "SQL Data Analysis Fundamentals"
+description: "Core SQL skills for analysing datasets, including filtering, grouping, joins, and window functions."
+version: "1.0.0"
+tags:
+  - sql
+  - data-analysis
+  - fundamentals
+passing_score: 0.75
+
+pages:
+  - id: filtering-and-selection
+    title: "Filtering and Selection"
+    content: |
+      # Filtering and Selection
+
+      Analysts use SELECT, WHERE, and ORDER BY to retrieve the right rows quickly.
+
+      ```sql
+      SELECT customer_id, total_amount
+      FROM orders
+      WHERE total_amount >= 100
+      ORDER BY total_amount DESC;
+      ```
+
+  - id: aggregation-and-grouping
+    title: "Aggregation and Grouping"
+    content: |
+      # Aggregation and Grouping
+
+      Aggregate functions summarise many rows into useful metrics.
+
+      ```sql
+      SELECT region, COUNT(*) AS order_count, AVG(total_amount) AS avg_order_value
+      FROM orders
+      GROUP BY region;
+      ```
+
+  - id: joins-and-data-combination
+    title: "Joins and Data Combination"
+    content: |
+      # Joins and Data Combination
+
+      Joins combine related tables to answer richer questions.
+
+      ```sql
+      SELECT o.order_id, c.customer_name
+      FROM orders o
+      INNER JOIN customers c ON o.customer_id = c.customer_id;
+      ```
+
+  - id: window-functions
+    title: "Window Functions"
+    content: |
+      # Window Functions
+
+      Window functions compute values across related rows without collapsing detail.
+
+      ```sql
+      SELECT
+        order_id,
+        customer_id,
+        total_amount,
+        ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) AS recency_rank
+      FROM orders;
+      ```
+
+questions:
+  - id: q-easy-1
+    difficulty: easy
+    text: "Which clause is used to filter rows before aggregation?"
+    answers:
+      - { id: a, text: "HAVING" }
+      - { id: b, text: "WHERE" }
+      - { id: c, text: "ORDER BY" }
+      - { id: d, text: "LIMIT" }
+    correct_answer: b
+    weight: 50
+    feedback: "WHERE filters rows before GROUP BY and aggregation are applied."
+    revision_page_ids: [filtering-and-selection]
+
+  - id: q-easy-2
+    difficulty: easy
+    text: "What does COUNT(*) return?"
+    answers:
+      - { id: a, text: "The number of columns in a table" }
+      - { id: b, text: "The number of non-null values in one chosen column" }
+      - { id: c, text: "The number of rows in the result set" }
+      - { id: d, text: "The sum of all numeric fields" }
+    correct_answer: c
+    weight: 50
+    feedback: "COUNT(*) counts all rows returned by the query."
+    revision_page_ids: [aggregation-and-grouping]
+
+  - id: q-normal-1
+    difficulty: normal
+    text: "Which query correctly returns total sales per product category?"
+    answers:
+      - { id: a, text: "SELECT category, SUM(amount) FROM sales;" }
+      - { id: b, text: "SELECT category, SUM(amount) FROM sales GROUP BY category;" }
+      - { id: c, text: "SELECT SUM(amount) FROM sales ORDER BY category;" }
+      - { id: d, text: "SELECT category FROM sales HAVING SUM(amount);" }
+    correct_answer: b
+    weight: 50
+    feedback: "When selecting a non-aggregated column with SUM, you must GROUP BY that column."
+    revision_page_ids: [aggregation-and-grouping]
+
+  - id: q-normal-2
+    difficulty: normal
+    text: "What is the primary difference between INNER JOIN and LEFT JOIN?"
+    answers:
+      - { id: a, text: "INNER JOIN keeps all left rows, LEFT JOIN keeps only matches" }
+      - { id: b, text: "INNER JOIN returns matching rows only, LEFT JOIN keeps all left rows and matched right rows" }
+      - { id: c, text: "They are identical in all cases" }
+      - { id: d, text: "LEFT JOIN is faster but less accurate" }
+    correct_answer: b
+    weight: 50
+    feedback: "LEFT JOIN preserves all rows from the left table even when no right-side match exists."
+    revision_page_ids: [joins-and-data-combination]
+
+  - id: q-hard-1
+    difficulty: hard
+    text: "Which clause should filter aggregated groups, such as categories with SUM(amount) > 1000?"
+    answers:
+      - { id: a, text: "WHERE" }
+      - { id: b, text: "ORDER BY" }
+      - { id: c, text: "HAVING" }
+      - { id: d, text: "LIMIT" }
+    correct_answer: c
+    weight: 50
+    feedback: "HAVING filters groups after aggregation."
+    revision_page_ids: [aggregation-and-grouping]
+
+  - id: q-hard-2
+    difficulty: hard
+    text: "If a customer has no orders, what happens to that customer in a query using customers LEFT JOIN orders?"
+    answers:
+      - { id: a, text: "The customer row is removed" }
+      - { id: b, text: "The query fails" }
+      - { id: c, text: "The customer appears with NULL values for order columns" }
+      - { id: d, text: "The customer appears only if DISTINCT is used" }
+    correct_answer: c
+    weight: 50
+    feedback: "LEFT JOIN keeps the left row and fills unmatched right columns with NULL."
+    revision_page_ids: [joins-and-data-combination]
+
+  - id: q-expert-1
+    difficulty: expert
+    text: "What does ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC) compute?"
+    answers:
+      - { id: a, text: "A random number for each customer" }
+      - { id: b, text: "A rank of customers by total spending" }
+      - { id: c, text: "A sequence per customer, restarting at 1 for each customer, ordered by most recent order" }
+      - { id: d, text: "A count of all orders in the table" }
+    correct_answer: c
+    weight: 50
+    feedback: "PARTITION BY creates separate numbering per customer, and ORDER BY controls sequence order."
+    revision_page_ids: [window-functions]
+
+  - id: q-expert-2
+    difficulty: expert
+    text: "Why can a window function be preferable to GROUP BY for certain analyses?"
+    answers:
+      - { id: a, text: "Window functions remove duplicate rows automatically" }
+      - { id: b, text: "Window functions preserve row-level detail whilst adding analytical metrics" }
+      - { id: c, text: "Window functions are required for all aggregate calculations" }
+      - { id: d, text: "GROUP BY cannot be used with ORDER BY" }
+    correct_answer: b
+    weight: 50
+    feedback: "GROUP BY collapses rows; window functions keep detail and add per-row analytical values."
+    revision_page_ids: [window-functions, aggregation-and-grouping]
