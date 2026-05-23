@@ -241,7 +241,7 @@ export function TestModePage() {
         passed,
         bestScore: scorePercent,
         bestXpEarned: earned,
-        lastAttemptedAt: new Date().toISOString().slice(0, 10),
+        lastAttemptedAt: new Date().toISOString(),
       });
     },
     [
