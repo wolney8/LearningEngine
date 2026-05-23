@@ -11,7 +11,13 @@ import type { PackageSummary } from "../schemas/package";
 import { fetchPackages } from "../services/api";
 import "./PackageListPage.css";
 
-const VALID_FILTERS: FilterKey[] = ["all", "incomplete", "failed", "completed"];
+const VALID_FILTERS: FilterKey[] = [
+  "all",
+  "incomplete",
+  "failed",
+  "completed",
+  "unavailable",
+];
 
 function parseFilter(value: string | null): FilterKey {
   if (value && (VALID_FILTERS as string[]).includes(value)) {
@@ -47,6 +53,16 @@ export function PackageListPage() {
   const packageIds = useMemo(() => packages.map((p) => p.id), [packages]);
   const progressMap = usePackageProgress(packageIds);
 
+  const availablePackages = useMemo(
+    () => packages.filter((pkg) => pkg.availability === "available"),
+    [packages],
+  );
+
+  const unavailablePackages = useMemo(
+    () => packages.filter((pkg) => pkg.availability === "unavailable"),
+    [packages],
+  );
+
   const updateParams = useCallback(
     (updates: { q?: string; filter?: FilterKey }): void => {
       setSearchParams(
@@ -75,9 +91,14 @@ export function PackageListPage() {
   );
 
   const statusFilteredPackages = useMemo(() => {
-    if (activeFilter === "all") return packages;
-    return packages.filter((pkg) => progressMap.get(pkg.id) === activeFilter);
-  }, [packages, activeFilter, progressMap]);
+    if (activeFilter === "unavailable") {
+      return unavailablePackages;
+    }
+    if (activeFilter === "all") {
+      return availablePackages;
+    }
+    return availablePackages.filter((pkg) => progressMap.get(pkg.id) === activeFilter);
+  }, [activeFilter, availablePackages, unavailablePackages, progressMap]);
 
   const filteredPackages = useMemo(() => {
     if (!query) return statusFilteredPackages;
@@ -92,26 +113,34 @@ export function PackageListPage() {
 
   const filterCounts = useMemo(() => {
     const counts: Record<FilterKey, number> = {
-      all: packages.length,
+      all: availablePackages.length,
       incomplete: 0,
       failed: 0,
       completed: 0,
+      unavailable: unavailablePackages.length,
     };
-    for (const pkg of packages) {
+    for (const pkg of availablePackages) {
       const s = progressMap.get(pkg.id) ?? "incomplete";
       counts[s]++;
     }
     return counts;
-  }, [packages, progressMap]);
+  }, [availablePackages, unavailablePackages, progressMap]);
 
   const filterOptions: FilterOption[] = [
     { key: "all", label: "All", count: filterCounts.all },
     { key: "incomplete", label: "Incomplete", count: filterCounts.incomplete },
     { key: "failed", label: "Failed", count: filterCounts.failed },
     { key: "completed", label: "Completed", count: filterCounts.completed },
+    {
+      key: "unavailable",
+      label: "Unavailable",
+      count: filterCounts.unavailable,
+    },
   ];
 
-  const isFiltered = filteredPackages.length < packages.length;
+  const countBase =
+    activeFilter === "unavailable" ? unavailablePackages : availablePackages;
+  const isFiltered = filteredPackages.length < countBase.length;
 
   function getEmptyMessage(): string {
     if (query) return `No packages match '${query}'`;
@@ -165,7 +194,7 @@ export function PackageListPage() {
 
           {isFiltered && (
             <p className="package-list-page__count" aria-live="polite">
-              Showing {filteredPackages.length} of {packages.length} packages
+              Showing {filteredPackages.length} of {countBase.length} packages
             </p>
           )}
 

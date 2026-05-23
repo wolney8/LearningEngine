@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -12,6 +12,8 @@ from app.models.settings import GameSettings
 from app.services.overrides_loader import (
     OVERRIDES_FILE,
     PackageOverride,
+    derive_enabled_from_availability,
+    resolve_effective_availability,
     save_package_overrides,
 )
 from app.services.settings_loader import SETTINGS_FILE, save_settings
@@ -22,6 +24,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 class PackageOverridePatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    availability: Literal["available", "unavailable", "hidden"] | None = None
     enabled: bool | None = None
     xp_threshold: int | None = Field(default=None, ge=0)
 
@@ -62,6 +65,7 @@ def build_package_summary(
     pkg: Package,
     override: PackageOverride | None,
 ) -> PackageSummary:
+    availability = resolve_effective_availability(override)
     return PackageSummary(
         id=pkg.id,
         title=pkg.title,
@@ -71,7 +75,8 @@ def build_package_summary(
         passing_score=pkg.passing_score,
         page_count=len(pkg.pages),
         question_count=len(pkg.questions),
-        enabled=override.enabled if override else True,
+        availability=availability,
+        enabled=derive_enabled_from_availability(availability),
         xp_threshold=override.xp_threshold if override else None,
     )
 
@@ -134,8 +139,12 @@ async def patch_admin_package(
 
     current = overrides.get(package_id, PackageOverride())
     update_data: dict[str, Any] = {}
-    if "enabled" in body.model_fields_set:
-        update_data["enabled"] = body.enabled
+    if "availability" in body.model_fields_set:
+        update_data["availability"] = body.availability
+        update_data["enabled"] = None
+    elif "enabled" in body.model_fields_set:
+        update_data["availability"] = "available" if body.enabled else "unavailable"
+        update_data["enabled"] = None
     if "xp_threshold" in body.model_fields_set:
         update_data["xp_threshold"] = body.xp_threshold
 

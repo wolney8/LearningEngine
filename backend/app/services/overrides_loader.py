@@ -4,11 +4,14 @@ import logging
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 logger = logging.getLogger(__name__)
+
+Availability = Literal["available", "unavailable", "hidden"]
 
 _DEFAULT_OVERRIDES_FILE = Path(__file__).resolve().parents[2] / "package-overrides.yaml"
 OVERRIDES_FILE = Path(os.getenv("PACKAGE_OVERRIDES_FILE", str(_DEFAULT_OVERRIDES_FILE)))
@@ -17,8 +20,23 @@ OVERRIDES_FILE = Path(os.getenv("PACKAGE_OVERRIDES_FILE", str(_DEFAULT_OVERRIDES
 class PackageOverride(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    enabled: bool = True
+    availability: Availability | None = None
+    enabled: bool | None = None
     xp_threshold: int | None = Field(default=None, ge=0)
+
+
+def resolve_effective_availability(override: PackageOverride | None) -> Availability:
+    if override is None:
+        return "available"
+    if override.availability is not None:
+        return override.availability
+    if override.enabled is False:
+        return "unavailable"
+    return "available"
+
+
+def derive_enabled_from_availability(availability: Availability) -> bool:
+    return availability == "available"
 
 
 class PackageOverridesDocument(BaseModel):

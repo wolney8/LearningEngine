@@ -10,6 +10,8 @@ import {
 } from "../services/api";
 import "./AdminSettingsPage.css";
 
+type Availability = "available" | "unavailable" | "hidden";
+
 export function AdminPackagesPage() {
   const token = useMemo(() => getAdminToken(), []);
   const [packages, setPackages] = useState<PackageSummary[]>([]);
@@ -37,10 +39,10 @@ export function AdminPackagesPage() {
     return <Navigate to="/admin" replace />;
   }
 
-  async function toggleEnabled(pkg: PackageSummary) {
+  async function setAvailability(pkg: PackageSummary, availability: Availability) {
     try {
       const updated = await updateAdminPackage(token, pkg.id, {
-        enabled: !pkg.enabled,
+        availability,
       });
       setPackages((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
@@ -101,9 +103,19 @@ export function AdminPackagesPage() {
                   <small>ID: {pkg.id}</small>
                 </div>
                 <div className="admin-page__inline-actions">
-                  <button type="button" onClick={() => void toggleEnabled(pkg)}>
-                    {pkg.enabled ? "Disable" : "Enable"}
-                  </button>
+                  <label>
+                    Availability
+                    <select
+                      value={pkg.availability}
+                      onChange={(event) =>
+                        void setAvailability(pkg, event.target.value as Availability)
+                      }
+                    >
+                      <option value="available">Available</option>
+                      <option value="unavailable">Unavailable</option>
+                      <option value="hidden">Fully disabled</option>
+                    </select>
+                  </label>
                   <label>
                     XP threshold
                     <input

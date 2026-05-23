@@ -12,20 +12,22 @@ const MOCK_PACKAGES = [
     passing_score: 0.75,
     page_count: 3,
     question_count: 4,
+    availability: "available",
     enabled: true,
     xp_threshold: null,
   },
 ];
 
-const MOCK_DISABLED_PACKAGE = {
-  id: "disabled-package",
-  title: "Disabled Package",
-  description: "This package is disabled by admin.",
+const MOCK_UNAVAILABLE_PACKAGE = {
+  id: "unavailable-package",
+  title: "Unavailable Package",
+  description: "This package is unavailable by admin.",
   version: "1.0.0",
   tags: ["locked"],
   passing_score: 0.75,
   page_count: 1,
   question_count: 1,
+  availability: "unavailable",
   enabled: false,
   xp_threshold: null,
 };
@@ -107,6 +109,9 @@ const SEARCH_FILTER_PACKAGES = [
     passing_score: 0.75,
     page_count: 5,
     question_count: 8,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
   },
   {
     id: "rust-failed",
@@ -117,6 +122,9 @@ const SEARCH_FILTER_PACKAGES = [
     passing_score: 0.75,
     page_count: 4,
     question_count: 6,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
   },
   {
     id: "go-incomplete",
@@ -127,6 +135,35 @@ const SEARCH_FILTER_PACKAGES = [
     passing_score: 0.75,
     page_count: 3,
     question_count: 5,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
+  },
+  {
+    id: "support-unavailable",
+    title: "Support Unavailable Pack",
+    description: "Temporarily unavailable for learners.",
+    version: "1.0.0",
+    tags: ["support"],
+    passing_score: 0.75,
+    page_count: 2,
+    question_count: 2,
+    availability: "unavailable",
+    enabled: false,
+    xp_threshold: null,
+  },
+  {
+    id: "retired-hidden",
+    title: "Retired Hidden Pack",
+    description: "Should not be rendered in learner feed.",
+    version: "1.0.0",
+    tags: ["retired"],
+    passing_score: 0.75,
+    page_count: 2,
+    question_count: 2,
+    availability: "hidden",
+    enabled: false,
+    xp_threshold: null,
   },
 ];
 
@@ -197,7 +234,9 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     const card = getPackageCard(page, packageTitle);
     await expect(card).toBeVisible();
-    await expect(card.getByRole("button", { name: "Start Learning" })).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Start Learning" }),
+    ).toBeVisible();
     await expect(card.getByRole("button", { name: "Take Test" })).toBeVisible();
   });
 
@@ -207,7 +246,7 @@ test.describe("Package Selection Screen", () => {
     await expect(page.getByText("4 questions")).toBeVisible();
   });
 
-  test("disabled packages are greyed and learner actions are disabled", async ({
+  test("unavailable packages are greyed and learner actions are disabled", async ({
     page,
   }) => {
     await page.unrouteAll({ behavior: "wait" });
@@ -215,22 +254,30 @@ test.describe("Package Selection Screen", () => {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify([MOCK_DISABLED_PACKAGE]),
+        body: JSON.stringify([MOCK_UNAVAILABLE_PACKAGE]),
       });
     });
 
     await page.goto("/");
+    await page.getByRole("button", { name: /Unavailable/i }).click();
 
-    const card = getPackageCard(page, MOCK_DISABLED_PACKAGE.title);
+    const card = getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title);
     await expect(card).toBeVisible();
-    await expect(card).toHaveClass(/package-card--disabled/);
-    await expect(card.getByText(/Locked by admin/i)).toBeVisible();
+    await expect(card).toHaveClass(/package-card--unavailable/);
+    await expect(card.locator(".package-card__status")).toHaveText("Unavailable");
+    await expect(card.locator(".package-stats-strip")).toHaveCount(0);
 
-    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
-    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
+    await expect(
+      card.getByRole("button", { name: "Start Learning" }),
+    ).toBeDisabled();
+    await expect(
+      card.getByRole("button", { name: "Take Test" }),
+    ).toBeDisabled();
   });
 
-  test("clicking a card navigates to the package detail URL", async ({ page }) => {
+  test("clicking a card navigates to the package detail URL", async ({
+    page,
+  }) => {
     await page.goto("/");
     const card = getPackageCard(page, packageTitle);
     await card.getByRole("button", { name: "Start Learning" }).click();
@@ -246,7 +293,9 @@ test.describe("Package Selection Screen", () => {
     await expect(page.getByText(/Could not load packages/i)).toBeVisible();
   });
 
-  test("shows empty state when backend returns empty array", async ({ page }) => {
+  test("shows empty state when backend returns empty array", async ({
+    page,
+  }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route("**/packages", (route) => {
       route.fulfill({
@@ -297,7 +346,9 @@ test.describe("Package Selection Screen", () => {
     }
 
     await page.getByRole("button", { name: "Finish" }).click();
-    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Test Complete" }),
+    ).toBeVisible();
 
     await page
       .locator(".test-results__actions")
@@ -311,7 +362,9 @@ test.describe("Package Selection Screen", () => {
     );
 
     await expect(easyCircle).toBeVisible();
-    await expect(easyCircle).toHaveClass(/difficulty-circle--(passed|attempted)/);
+    await expect(easyCircle).toHaveClass(
+      /difficulty-circle--(passed|attempted)/,
+    );
 
     const statsStrip = refreshedCard.locator(".package-stats-strip");
     await expect(statsStrip).toBeVisible();
@@ -319,7 +372,9 @@ test.describe("Package Selection Screen", () => {
     await expect(statsStrip).toContainText(/\d+%/);
   });
 
-  test("difficulty circles expose descriptive aria-label text", async ({ page }) => {
+  test("difficulty circles expose descriptive aria-label text", async ({
+    page,
+  }) => {
     await page.goto("/");
 
     const card = getPackageCard(page, packageTitle);
@@ -328,7 +383,10 @@ test.describe("Package Selection Screen", () => {
       .first();
 
     await expect(notAttemptedCircle).toBeVisible();
-    await expect(notAttemptedCircle).toHaveAttribute("aria-label", /Not attempted/);
+    await expect(notAttemptedCircle).toHaveAttribute(
+      "aria-label",
+      /Not attempted/,
+    );
   });
 });
 
@@ -337,6 +395,8 @@ test.describe("Package search and filter", () => {
     completed: SEARCH_FILTER_PACKAGES[0].title,
     failed: SEARCH_FILTER_PACKAGES[1].title,
     incomplete: SEARCH_FILTER_PACKAGES[2].title,
+    unavailable: SEARCH_FILTER_PACKAGES[3].title,
+    hidden: SEARCH_FILTER_PACKAGES[4].title,
   };
 
   const getPackageCard = (page: Page, title: string) =>
@@ -385,46 +445,71 @@ test.describe("Package search and filter", () => {
 
   test("searches packages by description", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("searchbox", { name: "Search packages" }).fill("goroutines");
+    await page
+      .getByRole("searchbox", { name: "Search packages" })
+      .fill("goroutines");
     await assertVisibleTitles(page, [titles.incomplete]);
   });
 
   test("searches packages by tag", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
+    await page
+      .getByRole("searchbox", { name: "Search packages" })
+      .fill("python");
     await assertVisibleTitles(page, [titles.completed]);
   });
 
-  test("clear button clears query and restores package list", async ({ page }) => {
+  test("clear button clears query and restores package list", async ({
+    page,
+  }) => {
     await page.goto("/");
     const input = page.getByRole("searchbox", { name: "Search packages" });
     await input.fill("rust");
-    await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Clear search" }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(input).toHaveValue("");
-    await assertVisibleTitles(page, Object.values(titles));
+    await assertVisibleTitles(page, [
+      titles.completed,
+      titles.failed,
+      titles.incomplete,
+    ]);
   });
 
   test("updates the q query parameter while typing", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
+    await page
+      .getByRole("searchbox", { name: "Search packages" })
+      .fill("python");
     await expect(page).toHaveURL(/\?q=python/);
   });
 
-  test("prefills and filters when loading with q query parameter", async ({ page }) => {
+  test("prefills and filters when loading with q query parameter", async ({
+    page,
+  }) => {
     await page.goto("/?q=rust");
-    await expect(page.getByRole("searchbox", { name: "Search packages" })).toHaveValue(
-      "rust",
-    );
+    await expect(
+      page.getByRole("searchbox", { name: "Search packages" }),
+    ).toHaveValue("rust");
     await assertVisibleTitles(page, [titles.failed]);
   });
 
   test("renders filter pills with counts", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: /All\s*3/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Failed\s*1/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Incomplete\s*1/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Failed\s*1/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Completed\s*1/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Unavailable\s*1/i }),
+    ).toBeVisible();
   });
 
   test("completed filter shows only completed packages", async ({ page }) => {
@@ -439,10 +524,30 @@ test.describe("Package search and filter", () => {
     await assertVisibleTitles(page, [titles.failed]);
   });
 
-  test("incomplete filter shows only unattempted packages", async ({ page }) => {
+  test("incomplete filter shows only unattempted packages", async ({
+    page,
+  }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /Incomplete/i }).click();
     await assertVisibleTitles(page, [titles.incomplete]);
+  });
+
+  test("unavailable filter shows only unavailable packages", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Unavailable/i }).click();
+    await assertVisibleTitles(page, [titles.unavailable]);
+  });
+
+  test("hidden packages are absent from learner feed", async ({ page }) => {
+    await page.goto("/");
+    await expect(getPackageCard(page, titles.hidden)).toHaveCount(0);
+    await assertVisibleTitles(page, [
+      titles.completed,
+      titles.failed,
+      titles.incomplete,
+    ]);
   });
 
   test("persists active filter in URL", async ({ page }) => {
@@ -456,17 +561,18 @@ test.describe("Package search and filter", () => {
   }) => {
     await page.goto("/?filter=completed");
     await assertVisibleTitles(page, [titles.completed]);
-    await expect(page.getByRole("button", { name: /Completed/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(
+      page.getByRole("button", { name: /Completed/i }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   test("supports combined search and filter with matching and empty states", async ({
     page,
   }) => {
     await page.goto("/");
-    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
+    await page
+      .getByRole("searchbox", { name: "Search packages" })
+      .fill("python");
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [titles.completed]);
 
@@ -475,7 +581,9 @@ test.describe("Package search and filter", () => {
     await expect(page.getByText("No packages match 'python'")).toBeVisible();
   });
 
-  test("shows filtered count text when results are narrowed", async ({ page }) => {
+  test("shows filtered count text when results are narrowed", async ({
+    page,
+  }) => {
     await page.goto("/");
     const filteredCount = page.locator(".package-list-page__count");
 

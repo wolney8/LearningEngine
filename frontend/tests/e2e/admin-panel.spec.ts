@@ -48,6 +48,7 @@ const PACKAGE_LIST = [
     passing_score: 0.75,
     page_count: 2,
     question_count: 4,
+    availability: "available",
     enabled: true,
     xp_threshold: null,
   },
@@ -88,12 +89,21 @@ test.describe("Admin panel", () => {
 
     await page.route(`${API_BASE_URL}/admin/packages/*`, (route) => {
       const patch = route.request().postDataJSON() as {
+        availability?: "available" | "unavailable" | "hidden";
         enabled?: boolean;
         xp_threshold?: number | null;
       };
+      const availability =
+        patch.availability ??
+        (patch.enabled === undefined
+          ? PACKAGE_LIST[0].availability
+          : patch.enabled
+            ? "available"
+            : "unavailable");
       const next = {
         ...PACKAGE_LIST[0],
-        enabled: patch.enabled ?? PACKAGE_LIST[0].enabled,
+        availability,
+        enabled: availability === "available",
         xp_threshold:
           patch.xp_threshold === undefined
             ? PACKAGE_LIST[0].xp_threshold
@@ -142,7 +152,7 @@ test.describe("Admin panel", () => {
     await expect(page.getByText("Settings saved.")).toBeVisible();
   });
 
-  test("packages page toggles enabled state", async ({ page }) => {
+  test("packages page can set hidden then available", async ({ page }) => {
     await page.addInitScript((token) => {
       sessionStorage.setItem("lle_admin_token", token);
     }, ADMIN_TOKEN);
@@ -150,7 +160,23 @@ test.describe("Admin panel", () => {
     await page.goto("/admin/packages");
 
     await expect(page.getByRole("heading", { name: "Admin Packages" })).toBeVisible();
-    await page.getByRole("button", { name: "Disable" }).click();
-    await expect(page.getByRole("button", { name: "Enable" })).toBeVisible();
+    const availabilityControl = page.getByLabel("Availability");
+    await availabilityControl.selectOption("hidden");
+    await expect(availabilityControl).toHaveValue("hidden");
+
+    await availabilityControl.selectOption("available");
+    await expect(availabilityControl).toHaveValue("available");
+  });
+
+  test("packages page can set unavailable", async ({ page }) => {
+    await page.addInitScript((token) => {
+      sessionStorage.setItem("lle_admin_token", token);
+    }, ADMIN_TOKEN);
+
+    await page.goto("/admin/packages");
+
+    const availabilityControl = page.getByLabel("Availability");
+    await availabilityControl.selectOption("unavailable");
+    await expect(availabilityControl).toHaveValue("unavailable");
   });
 });

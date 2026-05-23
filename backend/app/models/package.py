@@ -96,5 +96,11 @@ class PackageSummary(BaseModel):
     passing_score: float
     page_count: int
     question_count: int
+    availability: Literal["available", "unavailable", "hidden"] = "available"
     enabled: bool = True
     xp_threshold: int | None = None
+
+    @model_validator(mode="after")
+    def derive_enabled_from_availability(self) -> "PackageSummary":
+        self.enabled = self.availability == "available"
+        return self

@@ -1,2 +1,8 @@
 version: 1
-packages: {}
+packages:
+  phishing-and-email-security:
+    enabled: true
+    xp_threshold: null
+  sample-demo:
+    enabled: false
+    xp_threshold: null

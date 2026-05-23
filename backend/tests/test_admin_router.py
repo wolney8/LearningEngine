@@ -155,7 +155,7 @@ async def test_admin_package_patch_persists_override_and_merges_public_list(
         patch_response = await client.patch(
             f"/admin/packages/{pkg.id}",
             headers={"X-Admin-Token": "secret-token"},
-            json={"enabled": False, "xp_threshold": 250},
+            json={"availability": "unavailable", "xp_threshold": 250},
         )
 
         public_response = await client.get("/packages")
@@ -164,15 +164,100 @@ async def test_admin_package_patch_persists_override_and_merges_public_list(
     admin_router.OVERRIDES_FILE = original_overrides_file
 
     assert patch_response.status_code == 200
+    assert patch_response.json()["availability"] == "unavailable"
     assert patch_response.json()["enabled"] is False
     assert patch_response.json()["xp_threshold"] == 250
 
     public_item = public_response.json()[0]
+    assert public_item["availability"] == "unavailable"
     assert public_item["enabled"] is False
     assert public_item["xp_threshold"] == 250
 
     saved = yaml.safe_load(
         (tmp_path / "package-overrides.yaml").read_text(encoding="utf-8")
     )
-    assert saved["packages"][pkg.id]["enabled"] is False
+    assert saved["packages"][pkg.id]["availability"] == "unavailable"
     assert saved["packages"][pkg.id]["xp_threshold"] == 250
+
+
+async def test_admin_patch_enabled_false_maps_to_unavailable(tmp_path: Path) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    pkg = _sample_package()
+    packages_cache = {pkg.id: pkg}
+    overrides_cache: dict[str, PackageOverride] = {}
+
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+    app.dependency_overrides[get_package_overrides] = lambda: overrides_cache
+
+    app.state.packages = packages_cache
+    app.state.package_overrides = overrides_cache
+
+    from app.routers import admin as admin_router
+
+    original_overrides_file = admin_router.OVERRIDES_FILE
+    admin_router.OVERRIDES_FILE = tmp_path / "package-overrides.yaml"
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        patch_response = await client.patch(
+            f"/admin/packages/{pkg.id}",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"enabled": False},
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.OVERRIDES_FILE = original_overrides_file
+
+    assert patch_response.status_code == 200
+    assert patch_response.json()["availability"] == "unavailable"
+    assert patch_response.json()["enabled"] is False
+
+
+async def test_admin_patch_availability_overrides_enabled_if_both_sent(
+    tmp_path: Path,
+) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    pkg = _sample_package()
+    packages_cache = {pkg.id: pkg}
+    overrides_cache: dict[str, PackageOverride] = {}
+
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+    app.dependency_overrides[get_package_overrides] = lambda: overrides_cache
+
+    app.state.packages = packages_cache
+    app.state.package_overrides = overrides_cache
+
+    from app.routers import admin as admin_router
+
+    original_overrides_file = admin_router.OVERRIDES_FILE
+    admin_router.OVERRIDES_FILE = tmp_path / "package-overrides.yaml"
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        patch_response = await client.patch(
+            f"/admin/packages/{pkg.id}",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"availability": "hidden", "enabled": True},
+        )
+
+        public_response = await client.get("/packages")
+        admin_response = await client.get(
+            "/admin/packages", headers={"X-Admin-Token": "secret-token"}
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.OVERRIDES_FILE = original_overrides_file
+
+    assert patch_response.status_code == 200
+    assert patch_response.json()["availability"] == "hidden"
+    assert patch_response.json()["enabled"] is False
+
+    assert public_response.status_code == 200
+    assert public_response.json() == []
+
+    assert admin_response.status_code == 200
+    assert admin_response.json()[0]["availability"] == "hidden"

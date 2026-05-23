@@ -124,7 +124,11 @@ export async function fetchAdminPackages(token: string): Promise<PackageSummary[
 export async function updateAdminPackage(
   token: string,
   packageId: string,
-  patch: { enabled?: boolean; xp_threshold?: number | null },
+  patch: {
+    availability?: "available" | "unavailable" | "hidden";
+    enabled?: boolean;
+    xp_threshold?: number | null;
+  },
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
   const response = await fetchWithTimeout(`${BASE_URL}/admin/packages/${encodedId}`, {

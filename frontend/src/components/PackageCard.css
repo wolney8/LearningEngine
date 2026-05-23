@@ -22,10 +22,10 @@
   outline-offset: 2px;
 }
 
-.package-card--disabled {
-  opacity: 0.72;
-  filter: grayscale(0.2);
-  background: #f8fafc;
+.package-card--unavailable {
+  opacity: 0.78;
+  filter: grayscale(1);
+  background: #f1f5f9;
 }
 
 .package-card__header {
@@ -98,7 +98,7 @@
   flex-wrap: wrap;
 }
 
-.package-card__locked-note {
+.package-card__status {
   margin: 0.8rem 0 0;
   color: #334155;
   font-size: 0.9rem;
