@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { PackageCard } from "../components/PackageCard";
 import type { PackageSummary } from "../schemas/package";
@@ -8,7 +7,6 @@ import "./PackageListPage.css";
 import { useStreak } from "../hooks/useStreak";
 
 export function PackageListPage() {
-  const navigate = useNavigate();
   const { dailyStreak } = useStreak();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
   const [status, setStatus] = useState<"loading" | "error" | "loaded">("loading");
@@ -61,11 +59,7 @@ export function PackageListPage() {
       {status === "loaded" && packages.length > 0 && (
         <section className="package-list-page__grid" aria-label="Available packages">
           {packages.map((pkg) => (
-            <PackageCard
-              key={pkg.id}
-              pkg={pkg}
-              onClick={() => navigate(`/packages/${pkg.id}`)}
-            />
+            <PackageCard key={pkg.id} pkg={pkg} />
           ))}
         </section>
       )}

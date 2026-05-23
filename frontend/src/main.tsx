@@ -1,3 +1,4 @@
+import "./index.css";
 import "@fontsource/inter/index.css";
 import "@fontsource/nunito/index.css";
 import React from "react";
