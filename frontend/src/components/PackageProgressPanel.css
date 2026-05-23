@@ -1,0 +1,77 @@
+/* -- Difficulty indicator circles -------------------------------- */
+.difficulty-indicators {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.difficulty-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-family: "Inter", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.875rem;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.difficulty-circle--not-attempted {
+  background-color: var(--colour-surface, #f4f5f7);
+  border: 1px solid var(--colour-border, #e2e8f0);
+  color: var(--colour-text-secondary, #475569);
+}
+
+.difficulty-circle--attempted {
+  background-color: var(--colour-background, #ffffff);
+  border: 2px solid var(--colour-warning, #d97706);
+  color: var(--colour-text-primary, #0f172a);
+}
+
+.difficulty-circle--passed {
+  color: #ffffff;
+  border: none;
+}
+
+.difficulty-circle--passed[data-difficulty="easy"] {
+  background-color: #15803d;
+}
+
+.difficulty-circle--passed[data-difficulty="normal"] {
+  background-color: #4f46e5;
+}
+
+.difficulty-circle--passed[data-difficulty="hard"] {
+  background-color: #b45309;
+}
+
+.difficulty-circle--passed[data-difficulty="expert"] {
+  background-color: #dc2626;
+}
+
+/* -- Stats strip -------------------------------------------------- */
+.package-stats-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.75rem;
+  padding: 6px 10px;
+  background-color: var(--colour-surface, #f4f5f7);
+  border-radius: 8px;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.8125rem;
+  color: var(--colour-text-secondary, #475569);
+}
+
+.package-stats-strip__last-test {
+  /* inherits strip colour */
+}
+
+.package-stats-strip__xp {
+  font-weight: 700;
+  color: var(--colour-text-primary, #0f172a);
+}
