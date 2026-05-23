@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Annotated
+from collections import defaultdict
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -18,6 +19,7 @@ class Page(BaseModel):
 
 class Question(BaseModel):
     id: str = Field(min_length=1)
+    difficulty: Literal["easy", "normal", "hard", "expert"] | None = None
     text: str = Field(min_length=1)
     answers: Annotated[list[Answer], Field(min_length=2, max_length=6)]
     correct_answer: str = Field(min_length=1)
@@ -46,7 +48,7 @@ class Package(BaseModel):
     questions: Annotated[list[Question], Field(min_length=1)]
 
     @model_validator(mode="after")
-    def revision_page_ids_must_exist(self) -> "Package":
+    def validate_package_integrity(self) -> "Package":
         page_ids = {p.id for p in self.pages}
         for question in self.questions:
             for rpid in question.revision_page_ids:
@@ -56,11 +58,32 @@ class Package(BaseModel):
                         f"does not match any page id"
                     )
 
-        total_weight = sum(question.weight for question in self.questions)
-        if abs(total_weight - 100.0) >= 0.01:
+        tagged = [q for q in self.questions if q.difficulty is not None]
+        untagged = [q for q in self.questions if q.difficulty is None]
+
+        if tagged and untagged:
             raise ValueError(
-                f"question weights must sum to 100, got {total_weight:.2f}"
+                "All questions must have a difficulty tag or none must — "
+                f"found {len(tagged)} tagged and {len(untagged)} untagged."
             )
+
+        if tagged:
+            groups: dict[str, float] = defaultdict(float)
+            for question in self.questions:
+                groups[question.difficulty] += question.weight  # type: ignore[index]
+            for difficulty, total in groups.items():
+                if abs(total - 100.0) >= 0.01:
+                    raise ValueError(
+                        "question weights for difficulty "
+                        f"'{difficulty}' must sum to 100, "
+                        f"got {total:.2f}"
+                    )
+        else:
+            total_weight = sum(question.weight for question in self.questions)
+            if abs(total_weight - 100.0) >= 0.01:
+                raise ValueError(
+                    f"question weights must sum to 100, got {total_weight:.2f}"
+                )
         return self
 
 

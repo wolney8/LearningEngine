@@ -112,6 +112,167 @@ const MOCK_TWO_QUESTION_PACKAGE = {
   ],
 };
 
+const MOCK_TAGGED_PACKAGE = {
+  id: "tagged-pkg",
+  title: "Tagged Package",
+  description: "A tagged package",
+  version: "1.0.0",
+  tags: [],
+  passing_score: 0.7,
+  estimated_minutes: 5,
+  pages: [{ id: "p1", title: "Page One", content: "Content" }],
+  questions: [
+    {
+      id: "q-easy-1",
+      text: "Easy question one?",
+      difficulty: "easy",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Easy feedback",
+      revision_page_ids: [],
+    },
+    {
+      id: "q-easy-2",
+      text: "Easy question two?",
+      difficulty: "easy",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Easy feedback",
+      revision_page_ids: [],
+    },
+    {
+      id: "q-expert-1",
+      text: "Expert question one?",
+      difficulty: "expert",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Expert feedback",
+      revision_page_ids: [],
+    },
+    {
+      id: "q-expert-2",
+      text: "Expert question two?",
+      difficulty: "expert",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Expert feedback",
+      revision_page_ids: [],
+    },
+  ],
+};
+
+const MOCK_LEGACY_PACKAGE = {
+  id: "legacy-pkg",
+  title: "Legacy Package",
+  description: "A legacy package",
+  version: "1.0.0",
+  tags: [],
+  passing_score: 0.7,
+  estimated_minutes: 5,
+  pages: [{ id: "p1", title: "Page One", content: "Content" }],
+  questions: [
+    {
+      id: "q-legacy-1",
+      text: "Legacy question one?",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Legacy feedback",
+      revision_page_ids: [],
+    },
+    {
+      id: "q-legacy-2",
+      text: "Legacy question two?",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Legacy feedback",
+      revision_page_ids: [],
+    },
+  ],
+};
+
+const MOCK_HARD_ONLY_PACKAGE = {
+  id: "hard-only-pkg",
+  title: "Hard Only Package",
+  description: "A hard-only package",
+  version: "1.0.0",
+  tags: [],
+  passing_score: 0.7,
+  estimated_minutes: 5,
+  pages: [{ id: "p1", title: "Page One", content: "Content" }],
+  questions: [
+    {
+      id: "q-hard-1",
+      text: "Hard question one?",
+      difficulty: "hard",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Hard feedback",
+      revision_page_ids: [],
+    },
+    {
+      id: "q-hard-2",
+      text: "Hard question two?",
+      difficulty: "hard",
+      answers: [
+        { id: "a", text: "Correct" },
+        { id: "b", text: "Incorrect" },
+      ],
+      correct_answer: "a",
+      weight: 50,
+      feedback: "Hard feedback",
+      revision_page_ids: [],
+    },
+  ],
+};
+
+const toSummary = (pkg: {
+  id: string;
+  title: string;
+  description: string;
+  version: string;
+  tags: string[];
+  passing_score: number;
+  pages: unknown[];
+  questions: unknown[];
+}) => ({
+  id: pkg.id,
+  title: pkg.title,
+  description: pkg.description,
+  version: pkg.version,
+  tags: pkg.tags,
+  passing_score: pkg.passing_score,
+  page_count: pkg.pages.length,
+  question_count: pkg.questions.length,
+});
+
 test.describe("Test Mode", () => {
   test.beforeEach(async ({ page }) => {
     await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
@@ -160,6 +321,107 @@ test.describe("Test Mode", () => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await page.getByRole("button", { name: /Normal/i }).click();
     await expect(page.getByText(/^\d{2}:\d{2}$/)).toBeVisible();
+  });
+
+  test("easy mode only shows easy-tagged questions", async ({ page }) => {
+    await page.route(`${API_BASE_URL}/packages/tagged-pkg`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_TAGGED_PACKAGE),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/packages`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([toSummary(MOCK_TAGGED_PACKAGE)]),
+      });
+    });
+
+    await page.goto("/test/exam/tagged-pkg");
+    await page.getByRole("button", { name: /Easy/i }).click();
+
+    await expect(page.getByText(/Easy question (one|two)\?/)).toBeVisible();
+    await expect(page.getByText("Expert question one?")).toHaveCount(0);
+    await expect(page.getByText("Expert question two?")).toHaveCount(0);
+  });
+
+  test("expert mode only shows expert-tagged questions", async ({ page }) => {
+    await page.route(`${API_BASE_URL}/packages/tagged-pkg`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_TAGGED_PACKAGE),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/packages`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([toSummary(MOCK_TAGGED_PACKAGE)]),
+      });
+    });
+
+    await page.goto("/test/exam/tagged-pkg");
+    await page.getByRole("button", { name: /Expert/i }).click();
+    await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
+
+    await expect(page.getByText(/Expert question (one|two)\?/)).toBeVisible();
+    await expect(page.getByText("Easy question one?")).toHaveCount(0);
+    await expect(page.getByText("Easy question two?")).toHaveCount(0);
+  });
+
+  test("legacy untagged package shows all questions regardless of difficulty", async ({
+    page,
+  }) => {
+    await page.route(`${API_BASE_URL}/packages/legacy-pkg`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_LEGACY_PACKAGE),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/packages`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([toSummary(MOCK_LEGACY_PACKAGE)]),
+      });
+    });
+
+    await page.goto("/test/exam/legacy-pkg");
+    await page.getByRole("button", { name: /Easy/i }).click();
+
+    await expect(page.getByText(/Legacy question (one|two)\?/)).toBeVisible();
+  });
+
+  test("falls back to all questions when chosen difficulty has no tagged questions", async ({
+    page,
+  }) => {
+    await page.route(`${API_BASE_URL}/packages/hard-only-pkg`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_HARD_ONLY_PACKAGE),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/packages`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([toSummary(MOCK_HARD_ONLY_PACKAGE)]),
+      });
+    });
+
+    await page.goto("/test/exam/hard-only-pkg");
+    await page.getByRole("button", { name: /Easy/i }).click();
+
+    await expect(page.getByText(/Hard question (one|two)\?/)).toBeVisible();
   });
 
   test.describe("Phase B behaviour", () => {

@@ -20,8 +20,6 @@ learning management system.
 Generate a complete training package as a structured object.
 
 STRICT CONSTRAINTS:
-- question weights MUST sum to exactly 100 (distribute evenly; last question
-    absorbs rounding remainder)
 - Each question MUST have at least 2 and at most 6 answers
 - correct_answer MUST match one of the answer ids for that question
 - revision_page_ids MUST only reference page ids that exist in the package
@@ -31,6 +29,24 @@ STRICT CONSTRAINTS:
 - All text content should be educational, accurate, and appropriate for the
     specified audience
 - Page content should be written in Markdown with clear headings and examples
+
+QUESTION DIFFICULTY TAGGING:
+- Every question MUST have a `difficulty` field set to exactly one of:
+    "easy", "normal", "hard", or "expert".
+- You MUST generate questions for ALL FOUR difficulty levels.
+- Within each difficulty group, the question weights MUST independently sum to
+    exactly 100.
+  Distribute evenly; the last question in each group absorbs any rounding remainder.
+- Cognitive complexity guidelines:
+    easy:   Basic recall; single-concept, factual questions.
+        e.g. "What keyword is used to define a function?"
+    normal: Understanding; reasoning about how a concept works.
+        e.g. "Why does Python use indentation instead of braces?"
+    hard:   Analysis; synthesis of 2+ concepts, edge cases, unexpected behaviour.
+        e.g. "What is the output of: [x for x in range(5) if x % 2 == 0][3]?"
+    expert: Advanced; nuanced, ambiguous scenarios requiring deep expertise.
+        e.g. "In CPython, why does `is` return True for small integers but not
+        large ones?"
 """
 
 
@@ -68,7 +84,10 @@ async def generate_package(
         f"Create a training package about: {topic}\n"
         f"Target audience: {audience}\n"
         f"Include exactly {num_pages} pages and exactly {num_questions} questions.\n"
-        "Make sure weights sum to exactly 100."
+        "Distribute questions evenly across all four difficulty levels "
+        f"(aim for {num_questions // 4} per group, adjust the last group "
+        f"if {num_questions} is not divisible by 4). "
+        "Within each difficulty group, weights must sum to exactly 100."
     )
 
     try:
