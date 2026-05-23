@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const MOCK_PACKAGES = [
   {
@@ -14,6 +14,13 @@ const MOCK_PACKAGES = [
 ];
 
 test.describe("Package Selection Screen", () => {
+  const packageTitle = MOCK_PACKAGES[0].title;
+
+  const getPackageCard = (page: Page, title: string) =>
+    page
+      .locator("article.package-card")
+      .filter({ has: page.getByRole("heading", { name: new RegExp(title, "i") }) });
+
   test.beforeEach(async ({ page }) => {
     // Default mock: backend returns one package.
     await page.route("**/packages", (route) => {
@@ -34,7 +41,10 @@ test.describe("Package Selection Screen", () => {
 
   test("renders a package card for each mocked package", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("button", { name: /Python Basics/i })).toBeVisible();
+    const card = getPackageCard(page, packageTitle);
+    await expect(card).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeVisible();
   });
 
   test("card shows page and question counts", async ({ page }) => {
@@ -43,9 +53,12 @@ test.describe("Package Selection Screen", () => {
     await expect(page.getByText("4 questions")).toBeVisible();
   });
 
-  test("clicking a card navigates to the package detail URL", async ({ page }) => {
+  test("clicking a card navigates to the package detail URL", async ({
+    page,
+  }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: /Python Basics/i }).click();
+    const card = getPackageCard(page, packageTitle);
+    await card.getByRole("button", { name: "Start Learning" }).click();
     await expect(page).toHaveURL(/\/packages\/python-basics/);
   });
 
@@ -58,7 +71,9 @@ test.describe("Package Selection Screen", () => {
     await expect(page.getByText(/Could not load packages/i)).toBeVisible();
   });
 
-  test("shows empty state when backend returns empty array", async ({ page }) => {
+  test("shows empty state when backend returns empty array", async ({
+    page,
+  }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route("**/packages", (route) => {
       route.fulfill({

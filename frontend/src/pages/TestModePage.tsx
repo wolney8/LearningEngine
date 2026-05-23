@@ -1,0 +1,608 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useBlocker, useNavigate, useParams } from "react-router-dom";
+import { QuestionCard } from "../components/QuestionCard";
+import { TestNavigator } from "../components/TestNavigator";
+import { TestResultsScreen } from "../components/TestResultsScreen";
+import { useAttempts } from "../hooks/useAttempts";
+import { useCountdown } from "../hooks/useCountdown";
+import { useFirstCompletion } from "../hooks/useFirstCompletion";
+import { useStreak } from "../hooks/useStreak";
+import { useXP } from "../hooks/useXP";
+import type { Package, Question } from "../schemas/package";
+import { fetchPackage } from "../services/api";
+import {
+  DIFFICULTY_LABEL,
+  DIFFICULTY_XP_MULTIPLIER,
+  type Difficulty,
+  SECONDS_PER_QUESTION,
+} from "../types/difficulty";
+import { shuffleArray } from "../utils/randomise";
+import "./TestModePage.css";
+
+type LoadingPhase = { kind: "loading" };
+type ErrorPhase = { kind: "error"; message: string };
+type DifficultySelectPhase = { kind: "difficulty-select"; pkg: Package };
+type HardExpertWarningPhase = {
+  kind: "hard-expert-warning";
+  pkg: Package;
+  difficulty: Difficulty;
+};
+type InProgressPhase = {
+  kind: "in-progress";
+  pkg: Package;
+  shuffledQuestions: Question[];
+  currentIndex: number;
+  answers: Record<string, string | null>;
+  flagged: Set<string>;
+  difficulty: Difficulty;
+  totalSeconds: number;
+};
+type CompletePhase = {
+  kind: "complete";
+  pkg: Package;
+  shuffledQuestions: Question[];
+  answers: Record<string, string | null>;
+  difficulty: Difficulty;
+  weightScore: number;
+  passed: boolean;
+  xpEarned: number;
+  attemptNumber: number;
+  wasFirstCompletion: boolean;
+  timedOut: boolean;
+};
+
+type TestPhase =
+  | LoadingPhase
+  | ErrorPhase
+  | DifficultySelectPhase
+  | HardExpertWarningPhase
+  | InProgressPhase
+  | CompletePhase;
+
+export function TestModePage() {
+  const [phase, setPhase] = useState<TestPhase>({ kind: "loading" });
+  const [submitWarning, setSubmitWarning] = useState<
+    "zero-answer" | "few-answer" | null
+  >(null);
+
+  const { id = "" } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { attemptNumber, recordAttempt } = useAttempts(`test_${id}`);
+  const { isFirstCompletion, markCompleted } = useFirstCompletion(`test_${id}`);
+  const { addXP, subtractXP } = useXP();
+  const { markPractised } = useStreak();
+
+  const inProgress = phase.kind === "in-progress" ? phase : null;
+  const { timeRemaining } = useCountdown(
+    inProgress?.totalSeconds ?? 0,
+    phase.kind === "in-progress",
+  );
+  const countdownArmedRef = useRef(false);
+  const exitPenaltyAppliedRef = useRef(false);
+
+  const applyExitPenalty = useCallback((): void => {
+    if (exitPenaltyAppliedRef.current) return;
+    exitPenaltyAppliedRef.current = true;
+    subtractXP(50);
+    recordAttempt();
+  }, [recordAttempt, subtractXP]);
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      phase.kind === "in-progress" &&
+      (phase.difficulty === "hard" || phase.difficulty === "expert") &&
+      currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setPhase({ kind: "loading" });
+
+    fetchPackage(id)
+      .then((pkg) => {
+        if (!cancelled) {
+          setPhase({ kind: "difficulty-select", pkg });
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (
+          err instanceof Error &&
+          (err.message.includes("404") ||
+            err.message.toLowerCase().includes("not found"))
+        ) {
+          navigate("/");
+          return;
+        }
+        setPhase({ kind: "error", message: "Failed to load package." });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate]);
+
+  const startExam = useCallback((pkg: Package, difficulty: Difficulty): void => {
+    const shuffled = shuffleArray(pkg.questions).map((q) => ({
+      ...q,
+      answers: shuffleArray(q.answers),
+    }));
+    const totalSeconds = SECONDS_PER_QUESTION[difficulty] * shuffled.length;
+
+    setPhase({
+      kind: "in-progress",
+      pkg,
+      shuffledQuestions: shuffled,
+      currentIndex: 0,
+      answers: {},
+      flagged: new Set(),
+      difficulty,
+      totalSeconds,
+    });
+  }, []);
+
+  const handleSelectDifficulty = useCallback(
+    (difficulty: Difficulty): void => {
+      if (phase.kind !== "difficulty-select") return;
+
+      if (difficulty === "hard" || difficulty === "expert") {
+        setPhase({ kind: "hard-expert-warning", pkg: phase.pkg, difficulty });
+        return;
+      }
+
+      startExam(phase.pkg, difficulty);
+    },
+    [phase, startExam],
+  );
+
+  const handleSubmit = useCallback(
+    (
+      timedOut: boolean,
+      options?: { bypassWarning?: boolean; applyFewAnswerPenalty?: boolean },
+    ): void => {
+      if (phase.kind !== "in-progress") return;
+
+      const { shuffledQuestions, answers, difficulty, pkg } = phase;
+      const answeredCount = Object.keys(answers).filter(
+        (questionId) =>
+          answers[questionId] !== null && answers[questionId] !== undefined,
+      ).length;
+
+      if (!options?.bypassWarning) {
+        if (answeredCount === 0) {
+          setSubmitWarning("zero-answer");
+          return;
+        }
+
+        if ((difficulty === "hard" || difficulty === "expert") && answeredCount <= 1) {
+          setSubmitWarning("few-answer");
+          return;
+        }
+      }
+
+      setSubmitWarning(null);
+
+      if (options?.applyFewAnswerPenalty) {
+        subtractXP(50);
+      }
+
+      const weightScore = shuffledQuestions.reduce(
+        (sum, q) => (answers[q.id] === q.correct_answer ? sum + q.weight : sum),
+        0,
+      );
+      const correctCount = shuffledQuestions.filter(
+        (q) => answers[q.id] === q.correct_answer,
+      ).length;
+      const passed = weightScore >= pkg.passing_score * 100;
+      const minimumAnswerGateApplies =
+        (difficulty === "easy" || difficulty === "normal") && correctCount < 2;
+
+      const attemptMults: Record<number, number> = { 1: 1.0, 2: 0.5, 3: 0.25 };
+      const diffMult = DIFFICULTY_XP_MULTIPLIER[difficulty];
+      const mult = (attemptMults[attemptNumber] ?? 0) * diffMult;
+      let earned = minimumAnswerGateApplies ? 0 : Math.round(weightScore * mult);
+      const wasFirst = isFirstCompletion;
+      const awardFirstCompletionBonus = wasFirst && !minimumAnswerGateApplies;
+
+      recordAttempt();
+      if (awardFirstCompletionBonus) {
+        markCompleted();
+        earned += 20;
+      }
+
+      if (!minimumAnswerGateApplies) {
+        addXP(earned);
+      }
+      markPractised();
+
+      setPhase({
+        kind: "complete",
+        pkg,
+        shuffledQuestions,
+        answers,
+        difficulty,
+        weightScore,
+        passed,
+        xpEarned: earned,
+        attemptNumber,
+        wasFirstCompletion: awardFirstCompletionBonus,
+        timedOut,
+      });
+    },
+    [
+      addXP,
+      attemptNumber,
+      isFirstCompletion,
+      markCompleted,
+      markPractised,
+      phase,
+      recordAttempt,
+      subtractXP,
+    ],
+  );
+
+  useEffect(() => {
+    if (phase.kind !== "in-progress") {
+      countdownArmedRef.current = false;
+      return;
+    }
+
+    if (timeRemaining > 0) {
+      countdownArmedRef.current = true;
+      return;
+    }
+
+    if (timeRemaining === 0 && countdownArmedRef.current) {
+      handleSubmit(true, { bypassWarning: true });
+    }
+  }, [handleSubmit, phase.kind, timeRemaining]);
+
+  useEffect(() => {
+    if (phase.kind !== "in-progress") {
+      exitPenaltyAppliedRef.current = false;
+      return;
+    }
+
+    if (phase.difficulty !== "hard" && phase.difficulty !== "expert") {
+      exitPenaltyAppliedRef.current = false;
+    }
+  }, [phase]);
+
+  useEffect(() => {
+    if (
+      blocker.state !== "blocked" ||
+      phase.kind !== "in-progress" ||
+      (phase.difficulty !== "hard" && phase.difficulty !== "expert")
+    ) {
+      return;
+    }
+
+    applyExitPenalty();
+    blocker.proceed();
+  }, [applyExitPenalty, blocker, phase]);
+
+  useEffect(() => {
+    if (
+      phase.kind !== "in-progress" ||
+      (phase.difficulty !== "hard" && phase.difficulty !== "expert")
+    ) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      applyExitPenalty();
+      event.preventDefault();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [applyExitPenalty, phase]);
+
+  if (phase.kind === "loading") {
+    return (
+      <main className="test-mode-page" aria-busy="true" aria-live="polite">
+        <p>Loading test mode...</p>
+      </main>
+    );
+  }
+
+  if (phase.kind === "error") {
+    return (
+      <main className="test-mode-page">
+        <p>{phase.message}</p>
+        <button type="button" onClick={() => navigate("/")}>
+          Back to packages
+        </button>
+      </main>
+    );
+  }
+
+  if (phase.kind === "difficulty-select") {
+    const { pkg } = phase;
+
+    return (
+      <main className="test-mode-page">
+        <header className="test-mode-page__header">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="test-mode-page__back"
+          >
+            ← Back to packages
+          </button>
+          <h1>{pkg.title}</h1>
+          <p>Choose your difficulty to begin the timed exam.</p>
+        </header>
+
+        <div className="test-mode-page__difficulty-grid">
+          {(["easy", "normal", "hard", "expert"] as Difficulty[]).map((d) => (
+            <button
+              key={d}
+              type="button"
+              className={`test-mode-page__difficulty-card test-mode-page__difficulty-card--${d}`}
+              onClick={() => handleSelectDifficulty(d)}
+            >
+              <span className="test-mode-page__difficulty-label">
+                {DIFFICULTY_LABEL[d]}
+              </span>
+              <span className="test-mode-page__difficulty-timer">
+                {SECONDS_PER_QUESTION[d]}s per question
+              </span>
+              <span className="test-mode-page__difficulty-xp">
+                ×{DIFFICULTY_XP_MULTIPLIER[d]} XP
+              </span>
+            </button>
+          ))}
+        </div>
+      </main>
+    );
+  }
+
+  if (phase.kind === "hard-expert-warning") {
+    const { pkg, difficulty } = phase;
+
+    return (
+      <main className="test-mode-page">
+        <header className="test-mode-page__header">
+          <button
+            type="button"
+            onClick={() => setPhase({ kind: "difficulty-select", pkg })}
+            className="test-mode-page__back"
+          >
+            ← Back to difficulties
+          </button>
+          <h1>{pkg.title}</h1>
+        </header>
+
+        <section className="test-mode-page__warning-callout" aria-live="polite">
+          <h2>⚠ {DIFFICULTY_LABEL[difficulty]} Mode</h2>
+          <p>
+            If you leave or cancel this exam mid-way, you will automatically fail and
+            lose 50 XP.
+          </p>
+          <div className="test-mode-page__warning-actions">
+            <button
+              type="button"
+              className="test-mode-page__btn test-mode-page__btn--finish"
+              onClick={() => startExam(pkg, difficulty)}
+            >
+              Confirm — Start Exam
+            </button>
+            <button
+              type="button"
+              className="test-mode-page__btn"
+              onClick={() => setPhase({ kind: "difficulty-select", pkg })}
+            >
+              Choose a different difficulty
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (phase.kind === "in-progress") {
+    const currentQuestion = phase.shuffledQuestions[phase.currentIndex];
+    const selectedAnswerId = phase.answers[currentQuestion.id] ?? null;
+
+    const answeredIndexes = new Set<number>();
+    phase.shuffledQuestions.forEach((question, index) => {
+      if (phase.answers[question.id]) {
+        answeredIndexes.add(index);
+      }
+    });
+
+    const flaggedIndexes = new Set<number>();
+    phase.shuffledQuestions.forEach((question, index) => {
+      if (phase.flagged.has(question.id)) {
+        flaggedIndexes.add(index);
+      }
+    });
+
+    const unansweredCount = phase.shuffledQuestions.length - answeredIndexes.size;
+    const isLastQuestion = phase.currentIndex === phase.shuffledQuestions.length - 1;
+
+    return (
+      <main className="test-mode-page">
+        <header className="test-mode-page__header test-mode-page__header--compact">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="test-mode-page__back"
+          >
+            ← Back to packages
+          </button>
+          <h1>{phase.pkg.title}</h1>
+        </header>
+
+        <TestNavigator
+          questionCount={phase.shuffledQuestions.length}
+          currentIndex={phase.currentIndex}
+          answeredIndexes={answeredIndexes}
+          flaggedIndexes={flaggedIndexes}
+          timeRemaining={timeRemaining}
+          onNavigate={(index) =>
+            setPhase((prev) =>
+              prev.kind === "in-progress" ? { ...prev, currentIndex: index } : prev,
+            )
+          }
+        />
+
+        <QuestionCard
+          question={currentQuestion}
+          questionIndex={phase.currentIndex}
+          questionCount={phase.shuffledQuestions.length}
+          selectedAnswerId={selectedAnswerId}
+          isFlagged={phase.flagged.has(currentQuestion.id)}
+          onSelectAnswer={(answerId) =>
+            setPhase((prev) =>
+              prev.kind === "in-progress"
+                ? {
+                    ...prev,
+                    answers: {
+                      ...prev.answers,
+                      [currentQuestion.id]: answerId,
+                    },
+                  }
+                : prev,
+            )
+          }
+          onToggleFlag={() =>
+            setPhase((prev) => {
+              if (prev.kind !== "in-progress") return prev;
+              const nextFlagged = new Set(prev.flagged);
+              if (nextFlagged.has(currentQuestion.id)) {
+                nextFlagged.delete(currentQuestion.id);
+              } else {
+                nextFlagged.add(currentQuestion.id);
+              }
+              return { ...prev, flagged: nextFlagged };
+            })
+          }
+        />
+
+        <footer className="test-mode-page__actions">
+          <button
+            className="test-mode-page__btn"
+            type="button"
+            onClick={() =>
+              setPhase((prev) =>
+                prev.kind === "in-progress"
+                  ? {
+                      ...prev,
+                      currentIndex: Math.max(0, prev.currentIndex - 1),
+                    }
+                  : prev,
+              )
+            }
+            disabled={phase.currentIndex === 0}
+          >
+            Previous
+          </button>
+
+          {isLastQuestion ? (
+            <button
+              className="test-mode-page__btn test-mode-page__btn--finish"
+              type="button"
+              onClick={() => handleSubmit(false)}
+            >
+              Finish
+            </button>
+          ) : (
+            <button
+              className="test-mode-page__btn"
+              type="button"
+              onClick={() =>
+                setPhase((prev) =>
+                  prev.kind === "in-progress"
+                    ? {
+                        ...prev,
+                        currentIndex: Math.min(
+                          prev.shuffledQuestions.length - 1,
+                          prev.currentIndex + 1,
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              disabled={phase.currentIndex >= phase.shuffledQuestions.length - 1}
+            >
+              Next
+            </button>
+          )}
+
+          {submitWarning && (
+            <div className="test-mode-page__submit-warning" role="alert">
+              <p>
+                {submitWarning === "zero-answer"
+                  ? "You haven't answered any questions — are you sure you want to submit?"
+                  : "You've answered very few questions. Submitting will deduct 50 XP. Continue?"}
+              </p>
+              <div className="test-mode-page__submit-warning-actions">
+                <button
+                  type="button"
+                  className="test-mode-page__btn test-mode-page__btn--finish"
+                  onClick={() => {
+                    const warningKind = submitWarning;
+                    setSubmitWarning(null);
+                    handleSubmit(false, {
+                      bypassWarning: true,
+                      applyFewAnswerPenalty: warningKind === "few-answer",
+                    });
+                  }}
+                >
+                  {submitWarning === "few-answer" ? "Continue" : "Submit anyway"}
+                </button>
+                <button
+                  type="button"
+                  className="test-mode-page__btn"
+                  onClick={() => setSubmitWarning(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {unansweredCount > 0 && (
+            <span className="test-mode-page__unanswered">
+              ({unansweredCount} unanswered)
+            </span>
+          )}
+        </footer>
+      </main>
+    );
+  }
+
+  return (
+    <main className="test-mode-page">
+      <header className="test-mode-page__header test-mode-page__header--compact">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="test-mode-page__back"
+        >
+          ← Back to packages
+        </button>
+        <h1>{phase.pkg.title}</h1>
+      </header>
+
+      <TestResultsScreen
+        questions={phase.shuffledQuestions}
+        answers={phase.answers}
+        weightScore={phase.weightScore}
+        passed={phase.passed}
+        passingScore={phase.pkg.passing_score}
+        difficulty={phase.difficulty}
+        xpEarned={phase.xpEarned}
+        attemptNumber={phase.attemptNumber}
+        isFirstCompletion={phase.wasFirstCompletion}
+        timedOut={phase.timedOut}
+        onRetry={() => setPhase({ kind: "difficulty-select", pkg: phase.pkg })}
+        onBack={() => navigate("/")}
+      />
+    </main>
+  );
+}

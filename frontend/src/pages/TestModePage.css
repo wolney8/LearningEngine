@@ -1,0 +1,163 @@
+.test-mode-page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 1.2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.test-mode-page__header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.test-mode-page__header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.test-mode-page__header p {
+  margin: 0;
+  color: #475569;
+}
+
+.test-mode-page__header--compact {
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+}
+
+.test-mode-page__back {
+  justify-self: start;
+  min-height: 44px;
+  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  padding: 0.45rem 0.8rem;
+}
+
+.test-mode-page__difficulty-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.test-mode-page__difficulty-card {
+  min-height: 140px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+  text-align: left;
+  padding: 0.9rem;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.test-mode-page__difficulty-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgb(15 23 42 / 0.1);
+}
+
+.test-mode-page__difficulty-card--easy {
+  background: #ecfdf5;
+  border-color: #86efac;
+}
+
+.test-mode-page__difficulty-card--normal {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.test-mode-page__difficulty-card--hard {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.test-mode-page__difficulty-card--expert {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.test-mode-page__difficulty-label {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.test-mode-page__difficulty-timer,
+.test-mode-page__difficulty-xp {
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.test-mode-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.test-mode-page__btn {
+  min-height: 44px;
+  border-radius: 9999px;
+  border: 1px solid #4f46e5;
+  background: #ffffff;
+  color: #312e81;
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+}
+
+.test-mode-page__btn--finish {
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.test-mode-page__warning-callout {
+  background: #fef3c7;
+  border-left: 4px solid #b45309;
+  color: #374151;
+  border-radius: 12px;
+  padding: 1rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.test-mode-page__warning-callout h2,
+.test-mode-page__warning-callout p {
+  margin: 0;
+}
+
+.test-mode-page__warning-actions,
+.test-mode-page__submit-warning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.test-mode-page__submit-warning {
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  color: #78350f;
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  display: grid;
+  gap: 0.55rem;
+  flex: 1 1 100%;
+}
+
+.test-mode-page__submit-warning p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.test-mode-page__unanswered {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 740px) {
+  .test-mode-page__difficulty-grid {
+    grid-template-columns: 1fr;
+  }
+}
