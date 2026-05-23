@@ -20,7 +20,11 @@ function writeXP(value: number): void {
   }
 }
 
-export function useXP(): { xp: number; addXP: (amount: number) => void } {
+export function useXP(): {
+  xp: number;
+  addXP: (amount: number) => void;
+  subtractXP: (amount: number) => void;
+} {
   const [xp, setXP] = useState<number>(readXP);
 
   function addXP(amount: number): void {
@@ -31,5 +35,14 @@ export function useXP(): { xp: number; addXP: (amount: number) => void } {
     });
   }
 
-  return { xp, addXP };
+  function subtractXP(amount: number): void {
+    setXP(() => {
+      const current = readXP();
+      const next = Math.max(0, current - amount);
+      writeXP(next);
+      return next;
+    });
+  }
+
+  return { xp, addXP, subtractXP };
 }

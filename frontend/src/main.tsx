@@ -3,14 +3,19 @@ import "@fontsource/inter/index.css";
 import "@fontsource/nunito/index.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { RouterProvider, createBrowserRouter } from "react-router-dom";
 
 import App from "./App";
 
+const router = createBrowserRouter([
+  {
+    path: "*",
+    element: <App />,
+  },
+]);
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <RouterProvider router={router} />
   </React.StrictMode>,
 );

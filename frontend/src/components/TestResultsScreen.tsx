@@ -3,10 +3,7 @@ import { useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import type { Question } from "../schemas/package";
 import type { Difficulty } from "../types/difficulty";
-import {
-  DIFFICULTY_LABEL,
-  DIFFICULTY_XP_MULTIPLIER,
-} from "../types/difficulty";
+import { DIFFICULTY_LABEL, DIFFICULTY_XP_MULTIPLIER } from "../types/difficulty";
 import "./TestResultsScreen.css";
 
 interface TestResultsScreenProps {
@@ -33,7 +30,6 @@ function getAnswerText(question: Question, answerId: string | null): string {
 export function TestResultsScreen({
   questions,
   answers,
-  weightScore,
   passed,
   passingScore,
   difficulty,
@@ -50,11 +46,14 @@ export function TestResultsScreen({
     headingRef.current?.focus();
   }, []);
 
-  const roundedScore = Math.round(weightScore);
-  const scoreStyle = { "--score": `${roundedScore}%` } as CSSProperties;
   const correctCount = questions.filter(
     (q) => answers[q.id] === q.correct_answer,
   ).length;
+  const roundedScore =
+    questions.length === 0
+      ? 0
+      : Math.min(Math.round((correctCount / questions.length) * 100), 100);
+  const scoreStyle = { "--score": `${roundedScore}%` } as CSSProperties;
 
   return (
     <section className="test-results" aria-label="Test results">
@@ -97,8 +96,7 @@ export function TestResultsScreen({
 
       <div className="test-results__badges">
         <span className="test-results__badge">
-          {DIFFICULTY_LABEL[difficulty]} x{DIFFICULTY_XP_MULTIPLIER[difficulty]}{" "}
-          XP
+          {DIFFICULTY_LABEL[difficulty]} x{DIFFICULTY_XP_MULTIPLIER[difficulty]} XP
         </span>
 
         {xpEarned > 0 && (
@@ -134,10 +132,7 @@ export function TestResultsScreen({
             const selected = answers[question.id] ?? null;
             const isCorrect = selected === question.correct_answer;
             const selectedText = getAnswerText(question, selected);
-            const correctText = getAnswerText(
-              question,
-              question.correct_answer,
-            );
+            const correctText = getAnswerText(question, question.correct_answer);
 
             return (
               <li key={question.id} className="test-results__review-item">

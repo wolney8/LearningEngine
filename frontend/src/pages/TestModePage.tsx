@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useBlocker, useNavigate, useParams } from "react-router-dom";
 import { QuestionCard } from "../components/QuestionCard";
 import { TestNavigator } from "../components/TestNavigator";
 import { TestResultsScreen } from "../components/TestResultsScreen";
@@ -22,6 +22,11 @@ import "./TestModePage.css";
 type LoadingPhase = { kind: "loading" };
 type ErrorPhase = { kind: "error"; message: string };
 type DifficultySelectPhase = { kind: "difficulty-select"; pkg: Package };
+type HardExpertWarningPhase = {
+  kind: "hard-expert-warning";
+  pkg: Package;
+  difficulty: Difficulty;
+};
 type InProgressPhase = {
   kind: "in-progress";
   pkg: Package;
@@ -50,17 +55,21 @@ type TestPhase =
   | LoadingPhase
   | ErrorPhase
   | DifficultySelectPhase
+  | HardExpertWarningPhase
   | InProgressPhase
   | CompletePhase;
 
 export function TestModePage() {
   const [phase, setPhase] = useState<TestPhase>({ kind: "loading" });
+  const [submitWarning, setSubmitWarning] = useState<
+    "zero-answer" | "few-answer" | null
+  >(null);
 
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { attemptNumber, recordAttempt } = useAttempts(`test_${id}`);
   const { isFirstCompletion, markCompleted } = useFirstCompletion(`test_${id}`);
-  const { addXP } = useXP();
+  const { addXP, subtractXP } = useXP();
   const { markPractised } = useStreak();
 
   const inProgress = phase.kind === "in-progress" ? phase : null;
@@ -69,6 +78,21 @@ export function TestModePage() {
     phase.kind === "in-progress",
   );
   const countdownArmedRef = useRef(false);
+  const exitPenaltyAppliedRef = useRef(false);
+
+  const applyExitPenalty = useCallback((): void => {
+    if (exitPenaltyAppliedRef.current) return;
+    exitPenaltyAppliedRef.current = true;
+    subtractXP(50);
+    recordAttempt();
+  }, [recordAttempt, subtractXP]);
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      phase.kind === "in-progress" &&
+      (phase.difficulty === "hard" || phase.difficulty === "expert") &&
+      currentLocation.pathname !== nextLocation.pathname,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -98,56 +122,97 @@ export function TestModePage() {
     };
   }, [id, navigate]);
 
-  const handleStartExam = useCallback(
+  const startExam = useCallback((pkg: Package, difficulty: Difficulty): void => {
+    const shuffled = shuffleArray(pkg.questions).map((q) => ({
+      ...q,
+      answers: shuffleArray(q.answers),
+    }));
+    const totalSeconds = SECONDS_PER_QUESTION[difficulty] * shuffled.length;
+
+    setPhase({
+      kind: "in-progress",
+      pkg,
+      shuffledQuestions: shuffled,
+      currentIndex: 0,
+      answers: {},
+      flagged: new Set(),
+      difficulty,
+      totalSeconds,
+    });
+  }, []);
+
+  const handleSelectDifficulty = useCallback(
     (difficulty: Difficulty): void => {
       if (phase.kind !== "difficulty-select") return;
 
-      const pkg = phase.pkg;
-      const shuffled = shuffleArray(pkg.questions).map((q) => ({
-        ...q,
-        answers: shuffleArray(q.answers),
-      }));
-      const totalSeconds = SECONDS_PER_QUESTION[difficulty] * shuffled.length;
+      if (difficulty === "hard" || difficulty === "expert") {
+        setPhase({ kind: "hard-expert-warning", pkg: phase.pkg, difficulty });
+        return;
+      }
 
-      setPhase({
-        kind: "in-progress",
-        pkg,
-        shuffledQuestions: shuffled,
-        currentIndex: 0,
-        answers: {},
-        flagged: new Set(),
-        difficulty,
-        totalSeconds,
-      });
+      startExam(phase.pkg, difficulty);
     },
-    [phase],
+    [phase, startExam],
   );
 
   const handleSubmit = useCallback(
-    (timedOut: boolean): void => {
+    (
+      timedOut: boolean,
+      options?: { bypassWarning?: boolean; applyFewAnswerPenalty?: boolean },
+    ): void => {
       if (phase.kind !== "in-progress") return;
 
       const { shuffledQuestions, answers, difficulty, pkg } = phase;
+      const answeredCount = Object.keys(answers).filter(
+        (questionId) =>
+          answers[questionId] !== null && answers[questionId] !== undefined,
+      ).length;
+
+      if (!options?.bypassWarning) {
+        if (answeredCount === 0) {
+          setSubmitWarning("zero-answer");
+          return;
+        }
+
+        if ((difficulty === "hard" || difficulty === "expert") && answeredCount <= 1) {
+          setSubmitWarning("few-answer");
+          return;
+        }
+      }
+
+      setSubmitWarning(null);
+
+      if (options?.applyFewAnswerPenalty) {
+        subtractXP(50);
+      }
+
       const weightScore = shuffledQuestions.reduce(
-        (sum, q) =>
-          answers[q.id] === q.correct_answer ? sum + q.weight * 100 : sum,
+        (sum, q) => (answers[q.id] === q.correct_answer ? sum + q.weight : sum),
         0,
       );
+      const correctCount = shuffledQuestions.filter(
+        (q) => answers[q.id] === q.correct_answer,
+      ).length;
       const passed = weightScore >= pkg.passing_score * 100;
+      const minimumAnswerGateApplies =
+        (difficulty === "easy" || difficulty === "normal") && correctCount < 2;
 
       const attemptMults: Record<number, number> = { 1: 1.0, 2: 0.5, 3: 0.25 };
       const diffMult = DIFFICULTY_XP_MULTIPLIER[difficulty];
       const mult = (attemptMults[attemptNumber] ?? 0) * diffMult;
-      let earned = Math.round(weightScore * mult);
+      let earned = minimumAnswerGateApplies ? 0 : Math.round(weightScore * mult);
       const wasFirst = isFirstCompletion;
+      const awardFirstCompletionBonus = wasFirst && !minimumAnswerGateApplies;
 
       recordAttempt();
-      if (wasFirst) {
+      if (awardFirstCompletionBonus) {
         markCompleted();
         earned += 20;
       }
 
-      addXP(earned);
+      if (!minimumAnswerGateApplies) {
+        addXP(earned);
+      }
       markPractised();
 
       setPhase({
@@ -160,7 +225,7 @@ export function TestModePage() {
         passed,
         xpEarned: earned,
         attemptNumber,
-        wasFirstCompletion: wasFirst,
+        wasFirstCompletion: awardFirstCompletionBonus,
         timedOut,
       });
     },
@@ -172,6 +237,7 @@ export function TestModePage() {
       markPractised,
       phase,
       recordAttempt,
+      subtractXP,
     ],
   );
 
@@ -187,9 +253,52 @@ export function TestModePage() {
     }
 
     if (timeRemaining === 0 && countdownArmedRef.current) {
-      handleSubmit(true);
+      handleSubmit(true, { bypassWarning: true });
     }
   }, [handleSubmit, phase.kind, timeRemaining]);
+
+  useEffect(() => {
+    if (phase.kind !== "in-progress") {
+      exitPenaltyAppliedRef.current = false;
+      return;
+    }
+
+    if (phase.difficulty !== "hard" && phase.difficulty !== "expert") {
+      exitPenaltyAppliedRef.current = false;
+    }
+  }, [phase]);
+
+  useEffect(() => {
+    if (
+      blocker.state !== "blocked" ||
+      phase.kind !== "in-progress" ||
+      (phase.difficulty !== "hard" && phase.difficulty !== "expert")
+    ) {
+      return;
+    }
+
+    applyExitPenalty();
+    blocker.proceed();
+  }, [applyExitPenalty, blocker, phase]);
+
+  useEffect(() => {
+    if (
+      phase.kind !== "in-progress" ||
+      (phase.difficulty !== "hard" && phase.difficulty !== "expert")
+    ) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      applyExitPenalty();
+      event.preventDefault();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [applyExitPenalty, phase]);
 
   if (phase.kind === "loading") {
     return (
@@ -233,7 +342,7 @@ export function TestModePage() {
               key={d}
               type="button"
               className={`test-mode-page__difficulty-card test-mode-page__difficulty-card--${d}`}
-              onClick={() => handleStartExam(d)}
+              onClick={() => handleSelectDifficulty(d)}
             >
               <span className="test-mode-page__difficulty-label">
                 {DIFFICULTY_LABEL[d]}
@@ -247,6 +356,49 @@ export function TestModePage() {
             </button>
           ))}
         </div>
+      </main>
+    );
+  }
+
+  if (phase.kind === "hard-expert-warning") {
+    const { pkg, difficulty } = phase;
+
+    return (
+      <main className="test-mode-page">
+        <header className="test-mode-page__header">
+          <button
+            type="button"
+            onClick={() => setPhase({ kind: "difficulty-select", pkg })}
+            className="test-mode-page__back"
+          >
+            ← Back to difficulties
+          </button>
+          <h1>{pkg.title}</h1>
+        </header>
+
+        <section className="test-mode-page__warning-callout" aria-live="polite">
+          <h2>⚠ {DIFFICULTY_LABEL[difficulty]} Mode</h2>
+          <p>
+            If you leave or cancel this exam mid-way, you will automatically fail and
+            lose 50 XP.
+          </p>
+          <div className="test-mode-page__warning-actions">
+            <button
+              type="button"
+              className="test-mode-page__btn test-mode-page__btn--finish"
+              onClick={() => startExam(pkg, difficulty)}
+            >
+              Confirm — Start Exam
+            </button>
+            <button
+              type="button"
+              className="test-mode-page__btn"
+              onClick={() => setPhase({ kind: "difficulty-select", pkg })}
+            >
+              Choose a different difficulty
+            </button>
+          </div>
+        </section>
       </main>
     );
   }
@@ -269,8 +421,8 @@ export function TestModePage() {
       }
     });
 
-    const unansweredCount =
-      phase.shuffledQuestions.length - answeredIndexes.size;
+    const unansweredCount = phase.shuffledQuestions.length - answeredIndexes.size;
+    const isLastQuestion = phase.currentIndex === phase.shuffledQuestions.length - 1;
 
     return (
       <main className="test-mode-page">
@@ -293,9 +445,7 @@ export function TestModePage() {
           timeRemaining={timeRemaining}
           onNavigate={(index) =>
             setPhase((prev) =>
-              prev.kind === "in-progress"
-                ? { ...prev, currentIndex: index }
-                : prev,
+              prev.kind === "in-progress" ? { ...prev, currentIndex: index } : prev,
             )
           }
         />
@@ -335,6 +485,7 @@ export function TestModePage() {
 
         <footer className="test-mode-page__actions">
           <button
+            className="test-mode-page__btn"
             type="button"
             onClick={() =>
               setPhase((prev) =>
@@ -351,29 +502,69 @@ export function TestModePage() {
             Previous
           </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              setPhase((prev) =>
-                prev.kind === "in-progress"
-                  ? {
-                      ...prev,
-                      currentIndex: Math.min(
-                        prev.shuffledQuestions.length - 1,
-                        prev.currentIndex + 1,
-                      ),
-                    }
-                  : prev,
-              )
-            }
-            disabled={phase.currentIndex >= phase.shuffledQuestions.length - 1}
-          >
-            Next
-          </button>
+          {isLastQuestion ? (
+            <button
+              className="test-mode-page__btn test-mode-page__btn--finish"
+              type="button"
+              onClick={() => handleSubmit(false)}
+            >
+              Finish
+            </button>
+          ) : (
+            <button
+              className="test-mode-page__btn"
+              type="button"
+              onClick={() =>
+                setPhase((prev) =>
+                  prev.kind === "in-progress"
+                    ? {
+                        ...prev,
+                        currentIndex: Math.min(
+                          prev.shuffledQuestions.length - 1,
+                          prev.currentIndex + 1,
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              disabled={phase.currentIndex >= phase.shuffledQuestions.length - 1}
+            >
+              Next
+            </button>
+          )}
 
-          <button type="button" onClick={() => handleSubmit(false)}>
-            Submit
-          </button>
+          {submitWarning && (
+            <div className="test-mode-page__submit-warning" role="alert">
+              <p>
+                {submitWarning === "zero-answer"
+                  ? "You haven't answered any questions — are you sure you want to submit?"
+                  : "You've answered very few questions. Submitting will deduct 50 XP. Continue?"}
+              </p>
+              <div className="test-mode-page__submit-warning-actions">
+                <button
+                  type="button"
+                  className="test-mode-page__btn test-mode-page__btn--finish"
+                  onClick={() => {
+                    const warningKind = submitWarning;
+                    setSubmitWarning(null);
+                    handleSubmit(false, {
+                      bypassWarning: true,
+                      applyFewAnswerPenalty: warningKind === "few-answer",
+                    });
+                  }}
+                >
+                  {submitWarning === "few-answer" ? "Continue" : "Submit anyway"}
+                </button>
+                <button
+                  type="button"
+                  className="test-mode-page__btn"
+                  onClick={() => setSubmitWarning(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {unansweredCount > 0 && (
             <span className="test-mode-page__unanswered">

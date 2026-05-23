@@ -81,6 +81,37 @@ const MOCK_FULL_PACKAGE = {
   ],
 };
 
+const MOCK_TWO_QUESTION_PACKAGE = {
+  ...MOCK_FULL_PACKAGE,
+  question_count: 2,
+  questions: [
+    {
+      id: "q1",
+      text: "What is Python?",
+      answers: [
+        { id: "a1", text: "A programming language" },
+        { id: "a2", text: "A snake" },
+      ],
+      correct_answer: "a1",
+      weight: 50,
+      feedback: "Python is indeed a programming language.",
+      revision_page_ids: [],
+    },
+    {
+      id: "q2",
+      text: "What do variables do?",
+      answers: [
+        { id: "b1", text: "Store data" },
+        { id: "b2", text: "Delete data" },
+      ],
+      correct_answer: "b1",
+      weight: 50,
+      feedback: "Variables store data values.",
+      revision_page_ids: [],
+    },
+  ],
+};
+
 test.describe("Test Mode", () => {
   test.beforeEach(async ({ page }) => {
     await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
@@ -104,9 +135,7 @@ test.describe("Test Mode", () => {
     page,
   }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
-    await expect(
-      page.getByRole("heading", { name: "Python Basics" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
     await expect(
       page.getByText("Choose your difficulty to begin the timed exam."),
     ).toBeVisible();
@@ -120,14 +149,10 @@ test.describe("Test Mode", () => {
     await expect(page.getByRole("button", { name: /Expert/i })).toBeVisible();
   });
 
-  test("selecting Normal difficulty shows exam view with timer", async ({
-    page,
-  }) => {
+  test("selecting Normal difficulty shows exam view with timer", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await page.getByRole("button", { name: /Normal/i }).click();
-    await expect(
-      page.getByLabel(/minutes .* seconds remaining/i),
-    ).toBeVisible();
+    await expect(page.getByLabel(/minutes .* seconds remaining/i)).toBeVisible();
     await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
   });
 
@@ -137,9 +162,118 @@ test.describe("Test Mode", () => {
     await expect(page.getByText(/^\d{2}:\d{2}$/)).toBeVisible();
   });
 
-  test("clicking an answer marks the question dot as answered", async ({
-    page,
-  }) => {
+  test.describe("Phase B behaviour", () => {
+    test("score percentage never exceeds 100%", async ({ page }) => {
+      await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_TWO_QUESTION_PACKAGE),
+        });
+      });
+
+      await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await page.getByRole("button", { name: /Normal/i }).click();
+
+      await page.locator(".question-card__answer").first().click();
+      await page.getByRole("button", { name: "Next" }).click();
+      await page.getByRole("button", { name: "Finish" }).click();
+
+      await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
+      const scoreText = await page.locator(".test-results__score").textContent();
+      expect(scoreText).toMatch(/^\d{1,3}%$/);
+
+      const scoreValue = Number(scoreText?.replace("%", ""));
+      expect(scoreValue).toBeLessThanOrEqual(100);
+    });
+
+    test('"Finish" appears on the last question and "Next" does not', async ({
+      page,
+    }) => {
+      await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await page.getByRole("button", { name: /Easy/i }).click();
+
+      await page.getByRole("button", { name: /Question 4,/i }).click();
+      await expect(page.getByRole("button", { name: "Finish" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Next" })).toBeHidden();
+    });
+
+    test('"Next" appears on non-last questions and "Finish" does not', async ({
+      page,
+    }) => {
+      await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await page.getByRole("button", { name: /Easy/i }).click();
+
+      await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Finish" })).toBeHidden();
+    });
+
+    test("zero-answer submit warning appears and can be cancelled", async ({
+      page,
+    }) => {
+      await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await page.getByRole("button", { name: /Easy/i }).click();
+
+      await page.getByRole("button", { name: /Question 4,/i }).click();
+      await page.getByRole("button", { name: "Finish" }).click();
+      await expect(
+        page.getByText("You haven't answered any questions", { exact: false }),
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: "Cancel" }).click();
+      await expect(
+        page.getByText("You haven't answered any questions", { exact: false }),
+      ).toHaveCount(0);
+      await expect(page.getByText(/Question 4 of 4/i)).toBeVisible();
+    });
+
+    test("Hard difficulty shows pre-start warning phase", async ({ page }) => {
+      await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await page.getByRole("button", { name: /Hard/i }).click();
+
+      await expect(page.locator(".test-mode-page__warning-callout")).toBeVisible();
+      await expect(page.getByText(/If you leave or cancel/i)).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Confirm — Start Exam" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Choose a different difficulty" }),
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: "Choose a different difficulty" }).click();
+
+      await expect(
+        page.getByText("Choose your difficulty to begin the timed exam."),
+      ).toBeVisible();
+      await expect(page.locator(".test-mode-page__difficulty-card")).toHaveCount(4);
+    });
+
+    test("confirming Hard difficulty starts exam", async ({ page }) => {
+      await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await page.getByRole("button", { name: /Hard/i }).click();
+      await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
+
+      await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
+      await expect(page.getByLabel(/minutes .* seconds remaining/i)).toBeVisible();
+    });
+
+    test("few-answer Hard warning mentions 50 XP deduction", async ({ page }) => {
+      await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await page.getByRole("button", { name: /Hard/i }).click();
+      await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
+
+      await page.locator(".question-card__answer").first().click();
+      await page.getByRole("button", { name: /Question 4,/i }).click();
+      await page.getByRole("button", { name: "Finish" }).click();
+
+      await expect(page.getByText(/deduct 50 XP/i)).toBeVisible();
+      await page.getByRole("button", { name: "Cancel" }).click();
+      await expect(page.getByText(/deduct 50 XP/i)).toHaveCount(0);
+      await expect(page.getByText(/Question 4 of 4/i)).toBeVisible();
+    });
+  });
+
+  test("clicking an answer marks the question dot as answered", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await page.getByRole("button", { name: /Normal/i }).click();
 
@@ -155,9 +289,7 @@ test.describe("Test Mode", () => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await page.getByRole("button", { name: /Normal/i }).click();
 
-    await page
-      .getByRole("button", { name: /Flag question for review/i })
-      .click();
+    await page.getByRole("button", { name: /Flag question for review/i }).click();
     await page.getByRole("button", { name: "Question 2, unanswered" }).click();
 
     await expect(
@@ -173,9 +305,7 @@ test.describe("Test Mode", () => {
     await expect(page.getByText("Question 2 of 4")).toBeVisible();
   });
 
-  test("previous answer is preserved when navigating back", async ({
-    page,
-  }) => {
+  test("previous answer is preserved when navigating back", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await page.getByRole("button", { name: /Normal/i }).click();
 
@@ -184,9 +314,7 @@ test.describe("Test Mode", () => {
     await firstAnswer.click();
 
     await page.getByRole("button", { name: "Question 2, unanswered" }).click();
-    await page
-      .getByRole("button", { name: /Question 1, (current|answered)/i })
-      .click();
+    await page.getByRole("button", { name: /Question 1, (current|answered)/i }).click();
 
     await expect(
       page.getByRole("button", {
@@ -196,7 +324,7 @@ test.describe("Test Mode", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  test("clicking submit after answering all questions shows results screen", async ({
+  test("clicking finish after answering all questions shows results screen", async ({
     page,
   }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
@@ -207,12 +335,14 @@ test.describe("Test Mode", () => {
         .getByRole("button", { name: new RegExp(`Question ${index + 1}`) })
         .click();
       await page.locator(".question-card__answer").first().click();
+
+      if (index < 3) {
+        await page.getByRole("button", { name: "Next" }).click();
+      }
     }
 
-    await page.getByRole("button", { name: "Submit" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Test Complete" }),
-    ).toBeVisible();
+    await page.getByRole("button", { name: "Finish" }).click();
+    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
   });
 
   test("results screen shows score percentage", async ({ page }) => {
@@ -224,15 +354,17 @@ test.describe("Test Mode", () => {
         .getByRole("button", { name: new RegExp(`Question ${index + 1}`) })
         .click();
       await page.locator(".question-card__answer").first().click();
+
+      if (index < 3) {
+        await page.getByRole("button", { name: "Next" }).click();
+      }
     }
 
-    await page.getByRole("button", { name: "Submit" }).click();
+    await page.getByRole("button", { name: "Finish" }).click();
     await expect(page.locator(".test-results__score")).toContainText(/\d+%/);
   });
 
-  test("timer expiry auto-submits exam and shows results screen", async ({
-    page,
-  }) => {
+  test("timer expiry auto-submits exam and shows results screen", async ({ page }) => {
     const shortTimerPackage = {
       ...MOCK_FULL_PACKAGE,
       questions: [MOCK_FULL_PACKAGE.questions[0]],
@@ -248,19 +380,16 @@ test.describe("Test Mode", () => {
 
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await page.getByRole("button", { name: /Expert/i }).click();
+    await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
     await expect(page.getByText("00:10")).toBeVisible();
 
-    await expect(
-      page.getByRole("heading", { name: "Time's Up!" }),
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(
-      page.getByText("Time's up - exam auto-submitted"),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Time's Up!" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText("Time's up - exam auto-submitted")).toBeVisible();
   });
 
-  test("navigating to nonexistent package redirects to home", async ({
-    page,
-  }) => {
+  test("navigating to nonexistent package redirects to home", async ({ page }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route(`${API_BASE_URL}/packages/nonexistent`, (route) => {
       route.fulfill({
