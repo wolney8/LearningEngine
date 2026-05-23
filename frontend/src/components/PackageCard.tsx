@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
 
+import { useTestResults } from "../hooks/useTestResults";
 import type { PackageSummary } from "../schemas/package";
+import { PackageProgressPanel } from "./PackageProgressPanel";
 import "./PackageCard.css";
 
 interface PackageCardProps {
@@ -9,6 +11,7 @@ interface PackageCardProps {
 
 export function PackageCard({ pkg }: PackageCardProps) {
   const navigate = useNavigate();
+  const { results } = useTestResults(pkg.id);
   const passingScorePercent = Math.round(pkg.passing_score * 100);
 
   return (
@@ -36,6 +39,8 @@ export function PackageCard({ pkg }: PackageCardProps) {
             ))}
           </ul>
         )}
+
+        <PackageProgressPanel results={results} />
       </div>
 
       <div className="package-card__actions">

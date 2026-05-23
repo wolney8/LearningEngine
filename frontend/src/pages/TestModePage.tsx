@@ -7,6 +7,7 @@ import { useAttempts } from "../hooks/useAttempts";
 import { useCountdown } from "../hooks/useCountdown";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
 import { useStreak } from "../hooks/useStreak";
+import { useTestResults } from "../hooks/useTestResults";
 import { useXP } from "../hooks/useXP";
 import type { Package, Question } from "../schemas/package";
 import { fetchPackage } from "../services/api";
@@ -71,6 +72,7 @@ export function TestModePage() {
   const { isFirstCompletion, markCompleted } = useFirstCompletion(`test_${id}`);
   const { addXP, subtractXP } = useXP();
   const { markPractised } = useStreak();
+  const { saveResult } = useTestResults(id);
 
   const inProgress = phase.kind === "in-progress" ? phase : null;
   const { timeRemaining } = useCountdown(
@@ -228,6 +230,19 @@ export function TestModePage() {
         wasFirstCompletion: awardFirstCompletionBonus,
         timedOut,
       });
+
+      const totalPossibleWeight = shuffledQuestions.reduce((s, q) => s + q.weight, 0);
+      const scorePercent =
+        totalPossibleWeight > 0
+          ? Math.round((weightScore / totalPossibleWeight) * 100)
+          : 0;
+
+      saveResult(difficulty, {
+        passed,
+        bestScore: scorePercent,
+        bestXpEarned: earned,
+        lastAttemptedAt: new Date().toISOString().slice(0, 10),
+      });
     },
     [
       addXP,
@@ -237,6 +252,7 @@ export function TestModePage() {
       markPractised,
       phase,
       recordAttempt,
+      saveResult,
       subtractXP,
     ],
   );
