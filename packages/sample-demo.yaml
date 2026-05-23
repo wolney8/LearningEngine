@@ -56,61 +56,220 @@ pages:
       ```
 
 questions:
-  - id: q1
+  # easy
+  - id: q-easy-1
+    difficulty: easy
     text: "What keyword is used to define a function in Python?"
     answers:
-      - id: a
-        text: "func"
-      - id: b
-        text: "def"
-      - id: c
-        text: "function"
-      - id: d
-        text: "define"
+      - { id: a, text: "func" }
+      - { id: b, text: "def" }
+      - { id: c, text: "function" }
+      - { id: d, text: "define" }
     correct_answer: b
     weight: 25
-    feedback: "In Python, functions are defined using the `def` keyword."
-    revision_page_ids:
-      - functions
+    feedback: "Functions are defined using the `def` keyword."
+    revision_page_ids: [functions]
 
-  - id: q2
+  - id: q-easy-2
+    difficulty: easy
     text: "Which of the following is a valid Python boolean literal?"
     answers:
-      - id: a
-        text: "true"
-      - id: b
-        text: "TRUE"
-      - id: c
-        text: "True"
-      - id: d
-        text: "1 == 1"
+      - { id: a, text: "true" }
+      - { id: b, text: "TRUE" }
+      - { id: c, text: "True" }
+      - { id: d, text: "1 == 1" }
     correct_answer: c
     weight: 25
-    feedback: "Python boolean literals are `True` and `False` (capitalised)."
-    revision_page_ids:
-      - variables
+    feedback: "Python boolean literals are `True` and `False`."
+    revision_page_ids: [variables]
 
-  - id: q3
+  - id: q-easy-3
+    difficulty: easy
     text: "How do you add an item to the end of a Python list?"
     answers:
-      - id: a
-        text: "list.add(item)"
-      - id: b
-        text: "list.append(item)"
+      - { id: a, text: "list.add(item)" }
+      - { id: b, text: "list.append(item)" }
+      - { id: c, text: "list.push(item)" }
+      - { id: d, text: "list.insert(item)" }
     correct_answer: b
     weight: 25
     feedback: "The `append()` method adds an item to the end of a list."
-    revision_page_ids:
-      - lists
-      - functions
+    revision_page_ids: [lists]
 
-  - id: q4
+  - id: q-easy-4
+    difficulty: easy
     text: "What is the index of the first element in a Python list?"
     answers:
-      - id: a
-        text: "0"
-      - id: b
-        text: "1"
+      - { id: a, text: "0" }
+      - { id: b, text: "1" }
+      - { id: c, text: "-1" }
+      - { id: d, text: "None" }
     correct_answer: a
     weight: 25
-    feedback: "Python uses zero-based indexing, so the first element is at index 0."
+    feedback: "Python uses zero-based indexing."
+    revision_page_ids: [lists]
+
+  # normal
+  - id: q-normal-1
+    difficulty: normal
+    text: "What does a function's `return` statement do if no value is specified?"
+    answers:
+      - { id: a, text: "Returns 0" }
+      - { id: b, text: "Returns None" }
+      - { id: c, text: "Raises an error" }
+      - { id: d, text: "Returns False" }
+    correct_answer: b
+    weight: 25
+    feedback: "A bare `return` (or no return at all) implicitly returns `None`."
+    revision_page_ids: [functions]
+
+  - id: q-normal-2
+    difficulty: normal
+    text: "Why is Python described as dynamically typed?"
+    answers:
+      - { id: a, text: "You can change variable types at runtime" }
+      - { id: b, text: "It compiles faster than static languages" }
+      - { id: c, text: "It uses type annotations" }
+      - { id: d, text: "Variables cannot change type" }
+    correct_answer: a
+    weight: 25
+    feedback: "In Python the type of a variable is determined at runtime and can change."
+    revision_page_ids: [variables]
+
+  - id: q-normal-3
+    difficulty: normal
+    text: "What happens when you access an index beyond the end of a list?"
+    answers:
+      - { id: a, text: "Returns None" }
+      - { id: b, text: "Returns the last element" }
+      - { id: c, text: "Raises an IndexError" }
+      - { id: d, text: "Wraps around to index 0" }
+    correct_answer: c
+    weight: 25
+    feedback: "Python raises `IndexError` for out-of-range indices."
+    revision_page_ids: [lists]
+
+  - id: q-normal-4
+    difficulty: normal
+    text: "What is the purpose of a default parameter value in a function?"
+    answers:
+      - { id: a, text: "It makes the parameter required" }
+      - { id: b, text: "It allows the caller to omit the argument" }
+      - { id: c, text: "It restricts the parameter to that value only" }
+      - {
+          id: d,
+          text: "It prevents the function from being called with arguments",
+        }
+    correct_answer: b
+    weight: 25
+    feedback: "Default values mean the caller can omit that argument; the default is used instead."
+    revision_page_ids: [functions]
+
+  # hard
+  - id: q-hard-1
+    difficulty: hard
+    text: "What does `items[-1]` return for a non-empty list?"
+    answers:
+      - { id: a, text: "The first element" }
+      - { id: b, text: "The last element" }
+      - { id: c, text: "Raises IndexError" }
+      - { id: d, text: "None" }
+    correct_answer: b
+    weight: 25
+    feedback: "Negative indices count from the end; -1 is the last element."
+    revision_page_ids: [lists]
+
+  - id: q-hard-2
+    difficulty: hard
+    text: "What is the result of `len([]) == False` in Python?"
+    answers:
+      - { id: a, text: "True" }
+      - { id: b, text: "False" }
+      - { id: c, text: "TypeError" }
+      - { id: d, text: "None" }
+    correct_answer: a
+    weight: 25
+    feedback: "`len([])` is 0; in Python `0 == False` is `True` because `bool` is a subclass of `int`."
+    revision_page_ids: [lists, variables]
+
+  - id: q-hard-3
+    difficulty: hard
+    text: "What happens if you use a mutable default argument in a Python function definition?"
+    answers:
+      - { id: a, text: "A new list is created on each call" }
+      - { id: b, text: "The same list object is shared across all calls" }
+      - { id: c, text: "Python raises a TypeError" }
+      - { id: d, text: "The argument is automatically copied" }
+    correct_answer: b
+    weight: 25
+    feedback: "Default argument objects are created once at function definition time and reused, which is a common Python gotcha."
+    revision_page_ids: [functions]
+
+  - id: q-hard-4
+    difficulty: hard
+    text: "Which expression correctly creates a shallow copy of a list `x`?"
+    answers:
+      - { id: a, text: "y = x" }
+      - { id: b, text: "y = x[:]" }
+      - { id: c, text: "y = list.copy" }
+      - { id: d, text: "y = x.deepcopy()" }
+    correct_answer: b
+    weight: 25
+    feedback: "`x[:]` creates a new list with the same top-level elements; `y = x` is just another reference."
+    revision_page_ids: [lists]
+
+  # expert
+  - id: q-expert-1
+    difficulty: expert
+    text: "In CPython, why does `a = 256; b = 256; a is b` evaluate to `True` but `a = 1000; b = 1000; a is b` may not?"
+    answers:
+      - { id: a, text: "CPython interns small integers in the range -5 to 256" }
+      - { id: b, text: "Large integers are always stored on the heap" }
+      - { id: c, text: "The `is` operator compares values for integers" }
+      - { id: d, text: "This behaviour is undefined for all integers" }
+    correct_answer: a
+    weight: 25
+    feedback: "CPython caches integers from -5 to 256; outside that range each literal creates a new object."
+    revision_page_ids: [variables]
+
+  - id: q-expert-2
+    difficulty: expert
+    text: "What does `(lambda f: f(f))(lambda f: lambda n: 1 if n <= 1 else n * f(f)(n-1))(5)` evaluate to?"
+    answers:
+      - { id: a, text: "120" }
+      - { id: b, text: "24" }
+      - { id: c, text: "RecursionError" }
+      - { id: d, text: "None" }
+    correct_answer: a
+    weight: 25
+    feedback: "This is the Y-combinator pattern implementing factorial via self-application; factorial(5) = 120."
+    revision_page_ids: [functions]
+
+  - id: q-expert-3
+    difficulty: expert
+    text: "When are closures over loop variables in Python most likely to produce unexpected results?"
+    answers:
+      - {
+          id: a,
+          text: "When the loop variable is captured by reference and read after the loop finishes",
+        }
+      - { id: b, text: "When the loop uses enumerate()" }
+      - { id: c, text: "When the list is empty" }
+      - { id: d, text: "When functions are defined at module scope" }
+    correct_answer: a
+    weight: 25
+    feedback: "Python closures capture the variable binding, not its value. All lambdas in a loop share the same loop variable and see its final value."
+    revision_page_ids: [functions, lists]
+
+  - id: q-expert-4
+    difficulty: expert
+    text: "What is the time complexity of `list.append()` in CPython's dynamic array implementation?"
+    answers:
+      - { id: a, text: "O(n)" }
+      - { id: b, text: "O(log n)" }
+      - { id: c, text: "O(1) amortised" }
+      - { id: d, text: "O(n²)" }
+    correct_answer: c
+    weight: 25
+    feedback: "CPython's list over-allocates capacity, so individual appends are O(n) occasionally but O(1) amortised."
+    revision_page_ids: [lists]

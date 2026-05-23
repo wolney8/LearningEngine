@@ -59,7 +59,7 @@ def test_valid_package_loads_from_yaml():
     package = Package.model_validate(data)
     assert package.id == "sample-demo"
     assert len(package.pages) == 3
-    assert len(package.questions) == 4
+    assert len(package.questions) == 16
     assert isinstance(package.pages[0], Page)
     assert isinstance(package.questions[0], Question)
     assert isinstance(package.questions[0].answers[0], Answer)
@@ -78,6 +78,136 @@ def test_tags_default_to_empty_list():
 def test_revision_page_ids_default_empty():
     pkg = Package.model_validate(_minimal_package())
     assert pkg.questions[0].revision_page_ids == []
+
+
+def test_difficulty_field_defaults_to_none():
+    """Question without difficulty key parses; .difficulty is None."""
+    pkg = Package.model_validate(_minimal_package())
+    assert pkg.questions[0].difficulty is None
+
+
+def test_valid_tagged_package_all_groups_sum_to_100():
+    """Package with 4 questions (one per difficulty, weight=100 each).
+
+    Validates successfully.
+    """
+    data = _minimal_package(
+        questions=[
+            _minimal_question(id="q-easy", difficulty="easy", weight=100),
+            _minimal_question(id="q-normal", difficulty="normal", weight=100),
+            _minimal_question(id="q-hard", difficulty="hard", weight=100),
+            _minimal_question(id="q-expert", difficulty="expert", weight=100),
+        ]
+    )
+
+    pkg = Package.model_validate(data)
+    assert len(pkg.questions) == 4
+    assert {q.difficulty for q in pkg.questions} == {"easy", "normal", "hard", "expert"}
+
+
+def test_mixed_tagged_untagged_raises():
+    """2 questions: one with difficulty='easy', one without → ValidationError."""
+    data = _minimal_package(
+        questions=[
+            _minimal_question(id="q-tagged", difficulty="easy", weight=100),
+            _minimal_question(id="q-untagged", weight=100),
+        ]
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        Package.model_validate(data)
+
+    msg = str(exc.value)
+    assert "difficulty" in msg
+    assert "tagged" in msg
+    assert "untagged" in msg
+
+
+def test_tagged_group_weights_not_summing_to_100_raises():
+    """Easy group weights sum to 90 → ValidationError mentioning 'easy'."""
+    data = _minimal_package(
+        questions=[
+            _minimal_question(id="q-easy-a", difficulty="easy", weight=50),
+            _minimal_question(id="q-easy-b", difficulty="easy", weight=40),
+            _minimal_question(id="q-normal", difficulty="normal", weight=100),
+        ]
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        Package.model_validate(data)
+
+    msg = str(exc.value)
+    assert "easy" in msg
+    assert "sum to 100" in msg
+
+
+def test_multiple_questions_per_group_sum_correctly():
+    """2 easy (w=60, w=40) + 2 normal (w=70, w=30) → passes validation."""
+    data = _minimal_package(
+        questions=[
+            _minimal_question(id="q-easy-a", difficulty="easy", weight=60),
+            _minimal_question(id="q-easy-b", difficulty="easy", weight=40),
+            _minimal_question(id="q-normal-a", difficulty="normal", weight=70),
+            _minimal_question(id="q-normal-b", difficulty="normal", weight=30),
+        ]
+    )
+
+    pkg = Package.model_validate(data)
+    assert len(pkg.questions) == 4
+
+
+def test_tagged_group_with_wrong_sum_raises():
+    """2 hard questions with weights 50 + 40 = 90 → ValidationError."""
+    data = _minimal_package(
+        questions=[
+            _minimal_question(id="q-hard-a", difficulty="hard", weight=50),
+            _minimal_question(id="q-hard-b", difficulty="hard", weight=40),
+            _minimal_question(id="q-easy", difficulty="easy", weight=100),
+        ]
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        Package.model_validate(data)
+
+    msg = str(exc.value)
+    assert "hard" in msg
+    assert "sum to 100" in msg
+
+
+def test_legacy_package_no_tags_still_passes():
+    """Existing single-question package (weight=100, no difficulty) → validates."""
+    pkg = Package.model_validate(_minimal_package())
+    assert pkg.questions[0].difficulty is None
+
+
+def test_tagged_package_invalid_difficulty_value_raises():
+    """difficulty='medium' (not in Literal) → ValidationError."""
+    data = _minimal_package(
+        questions=[_minimal_question(id="q-medium", difficulty="medium", weight=100)]
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        Package.model_validate(data)
+
+    msg = str(exc.value)
+    assert "difficulty" in msg
+    assert "easy" in msg
+    assert "normal" in msg
+    assert "hard" in msg
+    assert "expert" in msg
+
+
+def test_sample_yaml_loads_after_migration():
+    """Reload sample-demo.yaml and assert migration expectations.
+
+    The package should contain 16 questions and all must have difficulty set.
+    """
+    with open(SAMPLE_YAML) as f:
+        data = yaml.safe_load(f)
+
+    package = Package.model_validate(data)
+    assert len(package.questions) == 16
+    assert all(question.difficulty is not None for question in package.questions)
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ export const QuestionSchema = z
   .object({
     id: z.string().min(1),
     text: z.string().min(1),
+    difficulty: z.enum(["easy", "normal", "hard", "expert"]).nullable().optional(),
     answers: z.array(AnswerSchema).min(2).max(6),
     correct_answer: z.string().min(1),
     weight: z.number().positive(),

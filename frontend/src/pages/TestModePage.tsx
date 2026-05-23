@@ -125,7 +125,24 @@ export function TestModePage() {
   }, [id, navigate]);
 
   const startExam = useCallback((pkg: Package, difficulty: Difficulty): void => {
-    const shuffled = shuffleArray(pkg.questions).map((q) => ({
+    const isTaggedPackage = pkg.questions.some((q) => q.difficulty != null);
+
+    let pool: typeof pkg.questions;
+    if (isTaggedPackage) {
+      const filtered = pkg.questions.filter((q) => q.difficulty === difficulty);
+      if (filtered.length === 0) {
+        console.warn(
+          `[TestModePage] No questions tagged "${difficulty}" in package "${pkg.id}". Falling back to full question set.`,
+        );
+        pool = pkg.questions;
+      } else {
+        pool = filtered;
+      }
+    } else {
+      pool = pkg.questions;
+    }
+
+    const shuffled = shuffleArray(pool).map((q) => ({
       ...q,
       answers: shuffleArray(q.answers),
     }));
@@ -192,10 +209,14 @@ export function TestModePage() {
         (sum, q) => (answers[q.id] === q.correct_answer ? sum + q.weight : sum),
         0,
       );
+      const totalPossibleWeight = shuffledQuestions.reduce((s, q) => s + q.weight, 0);
       const correctCount = shuffledQuestions.filter(
         (q) => answers[q.id] === q.correct_answer,
       ).length;
-      const passed = weightScore >= pkg.passing_score * 100;
+      const passed =
+        totalPossibleWeight > 0
+          ? weightScore / totalPossibleWeight >= phase.pkg.passing_score
+          : false;
       const minimumAnswerGateApplies =
         (difficulty === "easy" || difficulty === "normal") && correctCount < 2;
 
@@ -231,7 +252,6 @@ export function TestModePage() {
         timedOut,
       });
 
-      const totalPossibleWeight = shuffledQuestions.reduce((s, q) => s + q.weight, 0);
       const scorePercent =
         totalPossibleWeight > 0
           ? Math.round((weightScore / totalPossibleWeight) * 100)
