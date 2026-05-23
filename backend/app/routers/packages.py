@@ -4,6 +4,11 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.models.package import Package, PackageSummary
 from app.services.ai_generator import AIGenerationError, generate_package
+from app.services.overrides_loader import (
+    PackageOverride,
+    derive_enabled_from_availability,
+    resolve_effective_availability,
+)
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
@@ -34,23 +39,40 @@ def get_packages_cache(request: Request) -> dict[str, Package]:
     return request.app.state.packages
 
 
+def get_package_overrides(request: Request) -> dict[str, PackageOverride]:
+    """Dependency — extracts package overrides from app.state."""
+    return request.app.state.package_overrides
+
+
 @router.get("", response_model=list[PackageSummary])
 async def list_packages(
     cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
 ) -> list[PackageSummary]:
-    return [
-        PackageSummary(
-            id=pkg.id,
-            title=pkg.title,
-            description=pkg.description,
-            version=pkg.version,
-            tags=pkg.tags,
-            passing_score=pkg.passing_score,
-            page_count=len(pkg.pages),
-            question_count=len(pkg.questions),
+    items: list[PackageSummary] = []
+    for pkg in cache.values():
+        override = overrides.get(pkg.id)
+        availability = resolve_effective_availability(override)
+        if availability == "hidden":
+            continue
+
+        items.append(
+            PackageSummary(
+                id=pkg.id,
+                title=pkg.title,
+                description=pkg.description,
+                version=pkg.version,
+                tags=pkg.tags,
+                passing_score=pkg.passing_score,
+                page_count=len(pkg.pages),
+                question_count=len(pkg.questions),
+                availability=availability,
+                enabled=derive_enabled_from_availability(availability),
+                xp_threshold=override.xp_threshold if override else None,
+            )
         )
-        for pkg in cache.values()
-    ]
+
+    return items
 
 
 @router.post("/validate", response_model=ValidateResponse)
@@ -99,8 +121,16 @@ async def generate_package_endpoint(body: GenerateRequest) -> GenerateResponse:
 async def get_package(
     package_id: str,
     cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
 ) -> Package:
     pkg = cache.get(package_id)
     if pkg is None:
         raise HTTPException(status_code=404, detail="Package not found")
+
+    availability = resolve_effective_availability(overrides.get(package_id))
+    if availability == "hidden":
+        raise HTTPException(status_code=404, detail="Package not found")
+    if availability == "unavailable":
+        raise HTTPException(status_code=403, detail="Package is unavailable")
+
     return pkg

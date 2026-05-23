@@ -13,9 +13,13 @@ export function PackageCard({ pkg }: PackageCardProps) {
   const navigate = useNavigate();
   const { results } = useTestResults(pkg.id);
   const passingScorePercent = Math.round(pkg.passing_score * 100);
+  const isUnavailable = pkg.availability === "unavailable";
+  const isActionEnabled = pkg.availability === "available";
 
   return (
-    <article className="package-card">
+    <article
+      className={`package-card ${isUnavailable ? "package-card--unavailable" : ""}`.trim()}
+    >
       <div className="package-card__content">
         <div className="package-card__header">
           <h2 className="package-card__title">{pkg.title}</h2>
@@ -40,7 +44,9 @@ export function PackageCard({ pkg }: PackageCardProps) {
           </ul>
         )}
 
-        <PackageProgressPanel results={results} />
+        {isUnavailable && <p className="package-card__status">Unavailable</p>}
+
+        {!isUnavailable && <PackageProgressPanel results={results} />}
       </div>
 
       <div className="package-card__actions">
@@ -48,6 +54,8 @@ export function PackageCard({ pkg }: PackageCardProps) {
           type="button"
           className="package-card__btn package-card__btn--primary"
           onClick={() => navigate(`/packages/${pkg.id}`)}
+          disabled={!isActionEnabled}
+          aria-disabled={!isActionEnabled}
         >
           Start Learning
         </button>
@@ -55,6 +63,8 @@ export function PackageCard({ pkg }: PackageCardProps) {
           type="button"
           className="package-card__btn package-card__btn--secondary"
           onClick={() => navigate(`/test/exam/${pkg.id}`)}
+          disabled={!isActionEnabled}
+          aria-disabled={!isActionEnabled}
         >
           Take Test
         </button>

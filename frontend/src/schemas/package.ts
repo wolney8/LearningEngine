@@ -58,15 +58,25 @@ export type Page = z.infer<typeof PageSchema>;
 export type Question = z.infer<typeof QuestionSchema>;
 export type Package = z.infer<typeof PackageSchema>;
 
-export const PackageSummarySchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().min(1),
-  version: z.string().regex(/^\d+\.\d+\.\d+$/),
-  tags: z.array(z.string()).default([]),
-  passing_score: z.number().min(0).max(1),
-  page_count: z.number().int().nonnegative(),
-  question_count: z.number().int().nonnegative(),
-});
+export const PackageAvailabilitySchema = z.enum(["available", "unavailable", "hidden"]);
+
+export const PackageSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/),
+    tags: z.array(z.string()).default([]),
+    passing_score: z.number().min(0).max(1),
+    page_count: z.number().int().nonnegative(),
+    question_count: z.number().int().nonnegative(),
+    availability: PackageAvailabilitySchema.default("available"),
+    enabled: z.boolean().default(true),
+    xp_threshold: z.number().int().nonnegative().nullable().default(null),
+  })
+  .transform((summary) => ({
+    ...summary,
+    enabled: summary.availability === "available",
+  }));
 
 export type PackageSummary = z.infer<typeof PackageSummarySchema>;

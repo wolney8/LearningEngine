@@ -6,7 +6,8 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.models.package import Package
-from app.routers.packages import get_packages_cache
+from app.routers.packages import get_package_overrides, get_packages_cache
+from app.services.overrides_loader import PackageOverride
 
 # ---------------------------------------------------------------------------
 # Shared fixture data
@@ -47,7 +48,9 @@ SAMPLE_PACKAGE = Package.model_validate(_SAMPLE_DATA)
 @pytest.fixture
 async def client_with_package():
     cache = {"sample-demo": SAMPLE_PACKAGE}
+    overrides: dict[str, PackageOverride] = {}
     app.dependency_overrides[get_packages_cache] = lambda: cache
+    app.dependency_overrides[get_package_overrides] = lambda: overrides
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -58,6 +61,7 @@ async def client_with_package():
 @pytest.fixture
 async def client_empty():
     app.dependency_overrides[get_packages_cache] = lambda: {}
+    app.dependency_overrides[get_package_overrides] = lambda: {}
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -91,6 +95,8 @@ async def test_list_packages_shape_is_summary(client_with_package: AsyncClient) 
     item = response.json()[0]
     assert "page_count" in item
     assert "question_count" in item
+    assert item["availability"] == "available"
+    assert item["enabled"] is True
     assert "pages" not in item
     assert "questions" not in item
 
@@ -132,6 +138,48 @@ async def test_get_package_unknown_id_returns_404(
 async def test_get_package_empty_cache_returns_404(client_empty: AsyncClient) -> None:
     response = await client_empty.get("/packages/sample-demo")
     assert response.status_code == 404
+
+
+async def test_list_packages_excludes_hidden(client_with_package: AsyncClient) -> None:
+    app.dependency_overrides[get_package_overrides] = lambda: {
+        "sample-demo": PackageOverride(availability="hidden")
+    }
+    response = await client_with_package.get("/packages")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_list_packages_includes_unavailable_with_flag(
+    client_with_package: AsyncClient,
+) -> None:
+    app.dependency_overrides[get_package_overrides] = lambda: {
+        "sample-demo": PackageOverride(availability="unavailable")
+    }
+    response = await client_with_package.get("/packages")
+    assert response.status_code == 200
+    item = response.json()[0]
+    assert item["availability"] == "unavailable"
+    assert item["enabled"] is False
+
+
+async def test_get_package_hidden_returns_404(client_with_package: AsyncClient) -> None:
+    app.dependency_overrides[get_package_overrides] = lambda: {
+        "sample-demo": PackageOverride(availability="hidden")
+    }
+    response = await client_with_package.get("/packages/sample-demo")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Package not found"}
+
+
+async def test_get_package_unavailable_returns_403(
+    client_with_package: AsyncClient,
+) -> None:
+    app.dependency_overrides[get_package_overrides] = lambda: {
+        "sample-demo": PackageOverride(availability="unavailable")
+    }
+    response = await client_with_package.get("/packages/sample-demo")
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Package is unavailable"}
 
 
 # ---------------------------------------------------------------------------
