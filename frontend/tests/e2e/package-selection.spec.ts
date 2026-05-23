@@ -12,8 +12,23 @@ const MOCK_PACKAGES = [
     passing_score: 0.75,
     page_count: 3,
     question_count: 4,
+    enabled: true,
+    xp_threshold: null,
   },
 ];
+
+const MOCK_DISABLED_PACKAGE = {
+  id: "disabled-package",
+  title: "Disabled Package",
+  description: "This package is disabled by admin.",
+  version: "1.0.0",
+  tags: ["locked"],
+  passing_score: 0.75,
+  page_count: 1,
+  question_count: 1,
+  enabled: false,
+  xp_threshold: null,
+};
 
 const MOCK_FULL_PACKAGE = {
   id: "python-basics",
@@ -190,6 +205,29 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await expect(page.getByText("3 pages")).toBeVisible();
     await expect(page.getByText("4 questions")).toBeVisible();
+  });
+
+  test("disabled packages are greyed and learner actions are disabled", async ({
+    page,
+  }) => {
+    await page.unrouteAll({ behavior: "wait" });
+    await page.route("**/packages", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_DISABLED_PACKAGE]),
+      });
+    });
+
+    await page.goto("/");
+
+    const card = getPackageCard(page, MOCK_DISABLED_PACKAGE.title);
+    await expect(card).toBeVisible();
+    await expect(card).toHaveClass(/package-card--disabled/);
+    await expect(card.getByText(/Locked by admin/i)).toBeVisible();
+
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
   });
 
   test("clicking a card navigates to the package detail URL", async ({ page }) => {

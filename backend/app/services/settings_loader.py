@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import yaml
 from pydantic import ValidationError
@@ -35,3 +36,17 @@ def load_settings(settings_file: Path = SETTINGS_FILE) -> GameSettings:
 
     logger.info("Loaded game settings from %s", settings_file)
     return settings
+
+
+def save_settings(settings: GameSettings, settings_file: Path = SETTINGS_FILE) -> None:
+    """Persist validated game settings atomically to avoid partial writes."""
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=settings_file.parent, delete=False
+    ) as temp_file:
+        temp_path = Path(temp_file.name)
+        yaml.safe_dump(settings.model_dump(mode="json"), temp_file, sort_keys=False)
+
+    temp_path.replace(settings_file)
+    logger.info("Saved game settings to %s", settings_file)

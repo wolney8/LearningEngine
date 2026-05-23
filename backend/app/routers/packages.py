@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.models.package import Package, PackageSummary
 from app.services.ai_generator import AIGenerationError, generate_package
+from app.services.overrides_loader import PackageOverride
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
@@ -34,9 +35,15 @@ def get_packages_cache(request: Request) -> dict[str, Package]:
     return request.app.state.packages
 
 
+def get_package_overrides(request: Request) -> dict[str, PackageOverride]:
+    """Dependency — extracts package overrides from app.state."""
+    return request.app.state.package_overrides
+
+
 @router.get("", response_model=list[PackageSummary])
 async def list_packages(
     cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
 ) -> list[PackageSummary]:
     return [
         PackageSummary(
@@ -48,6 +55,8 @@ async def list_packages(
             passing_score=pkg.passing_score,
             page_count=len(pkg.pages),
             question_count=len(pkg.questions),
+            enabled=overrides.get(pkg.id, PackageOverride()).enabled,
+            xp_threshold=overrides.get(pkg.id, PackageOverride()).xp_threshold,
         )
         for pkg in cache.values()
     ]

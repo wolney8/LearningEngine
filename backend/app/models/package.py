@@ -96,3 +96,5 @@ class PackageSummary(BaseModel):
     passing_score: float
     page_count: int
     question_count: int
+    enabled: bool = True
+    xp_threshold: int | None = None

@@ -1,4 +1,7 @@
 import { Route, Routes } from "react-router-dom";
+import { AdminGuard } from "./components/AdminGuard";
+import { AdminPackagesPage } from "./pages/AdminPackagesPage";
+import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { LessonPage } from "./pages/LessonPage";
 import { PackageListPage } from "./pages/PackageListPage";
 import { TestModePage } from "./pages/TestModePage";
@@ -7,6 +10,9 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<PackageListPage />} />
+      <Route path="/admin" element={<AdminGuard />} />
+      <Route path="/admin/settings" element={<AdminSettingsPage />} />
+      <Route path="/admin/packages" element={<AdminPackagesPage />} />
       <Route path="/packages/:id" element={<LessonPage />} />
       <Route path="/test/exam/:id" element={<TestModePage />} />
       {/* TODO Phase 6+: /test/practice/:id - Practice Mode */}

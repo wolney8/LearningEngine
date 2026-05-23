@@ -1,0 +1,71 @@
+.admin-guard {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: radial-gradient(circle at 0% 0%, rgba(79, 70, 229, 0.16), transparent 45%),
+    radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.22), transparent 40%),
+    #f8fafc;
+}
+
+.admin-guard__panel {
+  width: min(28rem, 100%);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+.admin-guard__panel h1 {
+  margin: 0;
+  color: #1e1b4b;
+}
+
+.admin-guard__lead {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  color: #334155;
+}
+
+.admin-guard__form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.admin-guard__form label {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.admin-guard__form input {
+  min-height: 44px;
+  border: 1px solid #94a3b8;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 1rem;
+}
+
+.admin-guard__form button {
+  min-height: 44px;
+  border: none;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: #4f46e5;
+}
+
+.admin-guard__form button:disabled {
+  opacity: 0.6;
+}
+
+.admin-guard__error {
+  margin-top: 0.75rem;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.admin-guard__back-link {
+  margin-top: 1rem;
+}

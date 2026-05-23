@@ -67,6 +67,8 @@ export const PackageSummarySchema = z.object({
   passing_score: z.number().min(0).max(1),
   page_count: z.number().int().nonnegative(),
   question_count: z.number().int().nonnegative(),
+  enabled: z.boolean().default(true),
+  xp_threshold: z.number().int().nonnegative().nullable().default(null),
 });
 
 export type PackageSummary = z.infer<typeof PackageSummarySchema>;

@@ -13,9 +13,12 @@ export function PackageCard({ pkg }: PackageCardProps) {
   const navigate = useNavigate();
   const { results } = useTestResults(pkg.id);
   const passingScorePercent = Math.round(pkg.passing_score * 100);
+  const isEnabled = pkg.enabled;
 
   return (
-    <article className="package-card">
+    <article
+      className={`package-card ${isEnabled ? "" : "package-card--disabled"}`.trim()}
+    >
       <div className="package-card__content">
         <div className="package-card__header">
           <h2 className="package-card__title">{pkg.title}</h2>
@@ -40,6 +43,12 @@ export function PackageCard({ pkg }: PackageCardProps) {
           </ul>
         )}
 
+        {!isEnabled && (
+          <p className="package-card__locked-note">
+            Locked by admin. This package is currently unavailable.
+          </p>
+        )}
+
         <PackageProgressPanel results={results} />
       </div>
 
@@ -48,6 +57,8 @@ export function PackageCard({ pkg }: PackageCardProps) {
           type="button"
           className="package-card__btn package-card__btn--primary"
           onClick={() => navigate(`/packages/${pkg.id}`)}
+          disabled={!isEnabled}
+          aria-disabled={!isEnabled}
         >
           Start Learning
         </button>
@@ -55,6 +66,8 @@ export function PackageCard({ pkg }: PackageCardProps) {
           type="button"
           className="package-card__btn package-card__btn--secondary"
           onClick={() => navigate(`/test/exam/${pkg.id}`)}
+          disabled={!isEnabled}
+          aria-disabled={!isEnabled}
         >
           Take Test
         </button>
