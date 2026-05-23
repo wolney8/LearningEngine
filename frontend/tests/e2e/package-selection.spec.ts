@@ -82,6 +82,64 @@ const MOCK_FULL_PACKAGE = {
   ],
 };
 
+const SEARCH_FILTER_PACKAGES = [
+  {
+    id: "python-completed",
+    title: "Python Completed Path",
+    description: "A finished package for advanced Python learners.",
+    version: "1.0.0",
+    tags: ["python", "advanced"],
+    passing_score: 0.75,
+    page_count: 5,
+    question_count: 8,
+  },
+  {
+    id: "rust-failed",
+    title: "Rust Retry Track",
+    description: "Focused drills for memory-safe systems programming.",
+    version: "1.0.0",
+    tags: ["rust", "systems"],
+    passing_score: 0.75,
+    page_count: 4,
+    question_count: 6,
+  },
+  {
+    id: "go-incomplete",
+    title: "Go Starter Kit",
+    description: "Learn goroutines and concurrency fundamentals.",
+    version: "1.0.0",
+    tags: ["golang", "concurrency"],
+    passing_score: 0.75,
+    page_count: 3,
+    question_count: 5,
+  },
+];
+
+const SEEDED_TEST_RESULTS = {
+  "lle_test_results_python-completed": JSON.stringify({
+    easy: {
+      passed: true,
+      bestScore: 100,
+      bestXpEarned: 80,
+      lastAttemptedAt: "2026-05-20",
+    },
+  }),
+  "lle_test_results_rust-failed": JSON.stringify({
+    easy: {
+      passed: false,
+      bestScore: 45,
+      bestXpEarned: 15,
+      lastAttemptedAt: "2026-05-21",
+    },
+    medium: {
+      passed: false,
+      bestScore: 40,
+      bestXpEarned: 12,
+      lastAttemptedAt: "2026-05-21",
+    },
+  }),
+};
+
 test.describe("Package Selection Screen", () => {
   const packageTitle = MOCK_PACKAGES[0].title;
 
@@ -233,5 +291,160 @@ test.describe("Package Selection Screen", () => {
 
     await expect(notAttemptedCircle).toBeVisible();
     await expect(notAttemptedCircle).toHaveAttribute("aria-label", /Not attempted/);
+  });
+});
+
+test.describe("Package search and filter", () => {
+  const titles = {
+    completed: SEARCH_FILTER_PACKAGES[0].title,
+    failed: SEARCH_FILTER_PACKAGES[1].title,
+    incomplete: SEARCH_FILTER_PACKAGES[2].title,
+  };
+
+  const getPackageCard = (page: Page, title: string) =>
+    page.locator("article.package-card").filter({
+      has: page.getByRole("heading", { name: new RegExp(title, "i") }),
+    });
+
+  const assertVisibleTitles = async (page: Page, expectedTitles: string[]) => {
+    const cards = page.locator("article.package-card");
+    await expect(cards).toHaveCount(expectedTitles.length);
+    for (const title of expectedTitles) {
+      await expect(getPackageCard(page, title)).toBeVisible();
+    }
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((seed) => {
+      localStorage.clear();
+      for (const [key, value] of Object.entries(seed)) {
+        localStorage.setItem(key, value);
+      }
+    }, SEEDED_TEST_RESULTS);
+
+    await page.route("**/packages", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(SEARCH_FILTER_PACKAGES),
+      });
+    });
+  });
+
+  test("renders a usable search input", async ({ page }) => {
+    await page.goto("/");
+    const input = page.getByRole("searchbox", { name: "Search packages" });
+    await expect(input).toBeVisible();
+    await input.fill("python");
+    await expect(input).toHaveValue("python");
+  });
+
+  test("searches packages by title", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("Rust");
+    await assertVisibleTitles(page, [titles.failed]);
+  });
+
+  test("searches packages by description", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("goroutines");
+    await assertVisibleTitles(page, [titles.incomplete]);
+  });
+
+  test("searches packages by tag", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
+    await assertVisibleTitles(page, [titles.completed]);
+  });
+
+  test("clear button clears query and restores package list", async ({ page }) => {
+    await page.goto("/");
+    const input = page.getByRole("searchbox", { name: "Search packages" });
+    await input.fill("rust");
+    await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
+    await page.getByRole("button", { name: "Clear search" }).click();
+    await expect(input).toHaveValue("");
+    await assertVisibleTitles(page, Object.values(titles));
+  });
+
+  test("updates the q query parameter while typing", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
+    await expect(page).toHaveURL(/\?q=python/);
+  });
+
+  test("prefills and filters when loading with q query parameter", async ({ page }) => {
+    await page.goto("/?q=rust");
+    await expect(page.getByRole("searchbox", { name: "Search packages" })).toHaveValue(
+      "rust",
+    );
+    await assertVisibleTitles(page, [titles.failed]);
+  });
+
+  test("renders filter pills with counts", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: /All\s*3/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Failed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+  });
+
+  test("completed filter shows only completed packages", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Completed/i }).click();
+    await assertVisibleTitles(page, [titles.completed]);
+  });
+
+  test("failed filter shows only failed packages", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Failed/i }).click();
+    await assertVisibleTitles(page, [titles.failed]);
+  });
+
+  test("incomplete filter shows only unattempted packages", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Incomplete/i }).click();
+    await assertVisibleTitles(page, [titles.incomplete]);
+  });
+
+  test("persists active filter in URL", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Failed/i }).click();
+    await expect(page).toHaveURL(/\?filter=failed/);
+  });
+
+  test("applies filter when loading page with filter query parameter", async ({
+    page,
+  }) => {
+    await page.goto("/?filter=completed");
+    await assertVisibleTitles(page, [titles.completed]);
+    await expect(page.getByRole("button", { name: /Completed/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  test("supports combined search and filter with matching and empty states", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
+    await page.getByRole("button", { name: /Completed/i }).click();
+    await assertVisibleTitles(page, [titles.completed]);
+
+    await page.getByRole("button", { name: /Failed/i }).click();
+    await expect(page.locator("article.package-card")).toHaveCount(0);
+    await expect(page.getByText("No packages match 'python'")).toBeVisible();
+  });
+
+  test("shows filtered count text when results are narrowed", async ({ page }) => {
+    await page.goto("/");
+    const filteredCount = page.locator(".package-list-page__count");
+
+    await page.getByRole("button", { name: /Failed/i }).click();
+    await expect(filteredCount).toHaveText("Showing 1 of 3 packages");
+
+    await page.getByRole("button", { name: /All/i }).click();
+    await expect(filteredCount).toHaveCount(0);
   });
 });
