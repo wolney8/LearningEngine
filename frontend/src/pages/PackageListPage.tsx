@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { PackageCard } from "../components/PackageCard";
 import { PackageFilterBar } from "../components/PackageFilterBar";
@@ -151,6 +151,11 @@ export function PackageListPage() {
     <main className="package-list-page">
       <h1>Local Learning Engine</h1>
       <p className="package-list-page__subtitle">Pick a package to start learning</p>
+      <p className="package-list-page__auth-links">
+        <Link to="/login">Sign in</Link>
+        <span aria-hidden="true">|</span>
+        <Link to="/register">Create account</Link>
+      </p>
       {dailyStreak > 0 && (
         <p
           className="package-list-page__streak"

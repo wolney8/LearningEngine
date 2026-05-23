@@ -20,6 +20,25 @@
   font-weight: 400;
 }
 
+.package-list-page__auth-links {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: -1.25rem 0 1.25rem;
+  font-family: "Inter", sans-serif;
+  font-size: 0.95rem;
+}
+
+.package-list-page__auth-links a {
+  color: #4338ca;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.package-list-page__auth-links a:hover {
+  text-decoration: underline;
+}
+
 .package-list-page__streak {
   font-family: "Nunito", sans-serif;
   font-weight: 700;

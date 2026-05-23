@@ -10,6 +10,9 @@ dependencies = [
     "pyyaml",
     "pydantic-ai[google]>=0.2",
     "python-dotenv>=1.0",
+    "sqlmodel==0.0.27",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
 ]
 
 [project.optional-dependencies]

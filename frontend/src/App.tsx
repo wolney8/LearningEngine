@@ -3,13 +3,17 @@ import { AdminGuard } from "./components/AdminGuard";
 import { AdminPackagesPage } from "./pages/AdminPackagesPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { LessonPage } from "./pages/LessonPage";
+import { LoginPage } from "./pages/LoginPage";
 import { PackageListPage } from "./pages/PackageListPage";
+import { RegisterPage } from "./pages/RegisterPage";
 import { TestModePage } from "./pages/TestModePage";
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<PackageListPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/admin" element={<AdminGuard />} />
       <Route path="/admin/settings" element={<AdminSettingsPage />} />
       <Route path="/admin/packages" element={<AdminPackagesPage />} />

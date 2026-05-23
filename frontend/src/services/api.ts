@@ -1,4 +1,16 @@
 import { z } from "zod";
+import {
+  AuthResponseSchema,
+  LoginRequestSchema,
+  RegisterRequestSchema,
+  UserSchema,
+} from "../schemas/auth";
+import type {
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  User,
+} from "../schemas/auth";
 import { PackageSchema, PackageSummarySchema } from "../schemas/package";
 import type { Package, PackageSummary } from "../schemas/package";
 import { SettingsSchema } from "../schemas/settings";
@@ -7,6 +19,7 @@ import type { Settings } from "../schemas/settings";
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const TIMEOUT_MS = 10_000;
 const ADMIN_TOKEN_KEY = "lle_admin_token";
+const AUTH_TOKEN_KEY = "lle_auth_token";
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
@@ -59,6 +72,12 @@ function getAdminHeaders(token: string): HeadersInit {
   };
 }
 
+function getAuthHeaders(token: string): HeadersInit {
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 export function getAdminToken(): string | null {
   return sessionStorage.getItem(ADMIN_TOKEN_KEY);
 }
@@ -69,6 +88,66 @@ export function setAdminToken(token: string): void {
 
 export function clearAdminToken(): void {
   sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+}
+
+export function getAuthToken(): string | null {
+  return sessionStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  sessionStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
+  const parsed = RegisterRequestSchema.parse(payload);
+  const response = await fetchWithTimeout(`${BASE_URL}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(parsed),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Registration failed (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AuthResponseSchema.parse(data);
+}
+
+export async function loginUser(payload: LoginRequest): Promise<AuthResponse> {
+  const parsed = LoginRequestSchema.parse(payload);
+  const response = await fetchWithTimeout(`${BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(parsed),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Login failed (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AuthResponseSchema.parse(data);
+}
+
+export async function fetchCurrentUser(token: string): Promise<User> {
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me`, {
+    headers: getAuthHeaders(token),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Could not fetch current user (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return UserSchema.parse(data);
 }
 
 export async function validateAdminToken(token: string): Promise<boolean> {
