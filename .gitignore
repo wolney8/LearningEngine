@@ -35,3 +35,6 @@ Thumbs.db
 # Test artefacts
 playwright-report/
 test-results/
+
+# Local backend database artefacts
+backend/data/lle.db
