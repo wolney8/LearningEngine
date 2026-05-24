@@ -7,8 +7,19 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Session, select
 
-from app.models.user import User, UserTestResult
+from app.models.package import Package, PackageSummary
+from app.models.user import User, UserLibraryItem, UserTestResult
+from app.routers.packages import (
+    build_package_summary,
+    get_package_overrides,
+    get_packages_cache,
+    list_visible_package_summaries,
+)
 from app.services.db import get_session
+from app.services.overrides_loader import (
+    PackageOverride,
+    resolve_effective_availability,
+)
 from app.services.security import decode_access_token
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -58,6 +69,10 @@ class UserStreakResponse(BaseModel):
     last_practised_date: date | None
 
 
+class UserCatalogueItemResponse(PackageSummary):
+    selected: bool
+
+
 def _to_test_result_response(result: UserTestResult) -> UserTestResultResponse:
     return UserTestResultResponse(
         package_id=result.package_id,
@@ -71,6 +86,18 @@ def _to_test_result_response(result: UserTestResult) -> UserTestResultResponse:
 
 def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def _read_selected_package_ids_for_user(
+    session: Session,
+    user_id: int,
+) -> set[str]:
+    rows = session.exec(
+        select(UserLibraryItem.package_id)
+        .where(UserLibraryItem.user_id == user_id)
+        .order_by(UserLibraryItem.package_id)
+    ).all()
+    return set(rows)
 
 
 def get_current_user(
@@ -190,6 +217,67 @@ async def read_my_progress(
         .order_by(UserTestResult.package_id)
     ).all()
     return [_to_test_result_response(result) for result in results]
+
+
+@router.get("/me/library", response_model=list[PackageSummary])
+async def read_my_library(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
+) -> list[PackageSummary]:
+    user_id = current_user.id
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Current user has no id",
+        )
+
+    selected_package_ids = session.exec(
+        select(UserLibraryItem.package_id)
+        .where(UserLibraryItem.user_id == user_id)
+        .order_by(UserLibraryItem.package_id)
+    ).all()
+
+    summaries: list[PackageSummary] = []
+    for package_id in selected_package_ids:
+        pkg = cache.get(package_id)
+        if pkg is None:
+            continue
+
+        override = overrides.get(package_id)
+        availability = resolve_effective_availability(override)
+        if availability == "hidden":
+            continue
+
+        summaries.append(build_package_summary(pkg, override))
+
+    return summaries
+
+
+@router.get("/me/catalogue", response_model=list[UserCatalogueItemResponse])
+async def read_my_catalogue(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
+) -> list[UserCatalogueItemResponse]:
+    user_id = current_user.id
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Current user has no id",
+        )
+
+    selected_package_ids = _read_selected_package_ids_for_user(session, user_id)
+    visible_summaries = list_visible_package_summaries(cache, overrides)
+    return [
+        UserCatalogueItemResponse(
+            **summary.model_dump(),
+            selected=summary.id in selected_package_ids,
+        )
+        for summary in visible_summaries
+    ]
 
 
 @router.post("/me/progress/{package_id}", response_model=UserTestResultResponse)

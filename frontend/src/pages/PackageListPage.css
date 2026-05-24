@@ -71,6 +71,38 @@
   margin: -1.5rem 0 1.5rem;
 }
 
+.package-list-page__scope-toggle {
+  display: inline-flex;
+  gap: 0.35rem;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 0.25rem;
+  margin: -0.5rem 0 1.25rem;
+}
+
+.package-list-page__scope-button {
+  border: none;
+  background: transparent;
+  color: #3730a3;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-family: "Inter", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.package-list-page__scope-button[data-active="true"] {
+  background: #4338ca;
+  color: #ffffff;
+}
+
+.package-list-page__scope-button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
 .package-list-page__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

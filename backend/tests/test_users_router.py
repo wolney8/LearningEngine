@@ -7,7 +7,88 @@ from httpx import ASGITransport, AsyncClient
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.main import app
+from app.models.package import Package
+from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
+from app.services.overrides_loader import PackageOverride
+
+_PACKAGE_SAMPLE = Package.model_validate(
+    {
+        "id": "sample-demo",
+        "title": "Sample Demo Package",
+        "description": "Available package for users route tests.",
+        "version": "1.0.0",
+        "tags": ["demo"],
+        "passing_score": 0.75,
+        "pages": [{"id": "p1", "title": "Page 1", "content": "Content."}],
+        "questions": [
+            {
+                "id": "q1",
+                "text": "Question?",
+                "answers": [
+                    {"id": "a", "text": "Yes"},
+                    {"id": "b", "text": "No"},
+                ],
+                "correct_answer": "a",
+                "weight": 100.0,
+                "feedback": "Correct.",
+                "revision_page_ids": ["p1"],
+            }
+        ],
+    }
+)
+
+_PACKAGE_UNAVAILABLE = Package.model_validate(
+    {
+        "id": "unavailable-demo",
+        "title": "Unavailable Demo Package",
+        "description": "Unavailable package for users route tests.",
+        "version": "1.0.0",
+        "tags": ["demo"],
+        "passing_score": 0.75,
+        "pages": [{"id": "p1", "title": "Page 1", "content": "Content."}],
+        "questions": [
+            {
+                "id": "q1",
+                "text": "Question?",
+                "answers": [
+                    {"id": "a", "text": "Yes"},
+                    {"id": "b", "text": "No"},
+                ],
+                "correct_answer": "a",
+                "weight": 100.0,
+                "feedback": "Correct.",
+                "revision_page_ids": ["p1"],
+            }
+        ],
+    }
+)
+
+_PACKAGE_HIDDEN = Package.model_validate(
+    {
+        "id": "hidden-demo",
+        "title": "Hidden Demo Package",
+        "description": "Hidden package for users route tests.",
+        "version": "1.0.0",
+        "tags": ["demo"],
+        "passing_score": 0.75,
+        "pages": [{"id": "p1", "title": "Page 1", "content": "Content."}],
+        "questions": [
+            {
+                "id": "q1",
+                "text": "Question?",
+                "answers": [
+                    {"id": "a", "text": "Yes"},
+                    {"id": "b", "text": "No"},
+                ],
+                "correct_answer": "a",
+                "weight": 100.0,
+                "feedback": "Correct.",
+                "revision_page_ids": ["p1"],
+            }
+        ],
+    }
+)
 
 
 @pytest.fixture
@@ -23,7 +104,19 @@ async def users_client(tmp_path):
         with Session(engine) as session:
             yield session
 
+    package_cache = {
+        "sample-demo": _PACKAGE_SAMPLE,
+        "unavailable-demo": _PACKAGE_UNAVAILABLE,
+        "hidden-demo": _PACKAGE_HIDDEN,
+    }
+    package_overrides = {
+        "unavailable-demo": PackageOverride(availability="unavailable"),
+        "hidden-demo": PackageOverride(availability="hidden"),
+    }
+
     app.dependency_overrides[get_session] = session_override
+    app.dependency_overrides[get_packages_cache] = lambda: package_cache
+    app.dependency_overrides[get_package_overrides] = lambda: package_overrides
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -101,6 +194,110 @@ async def test_users_progress_returns_empty_for_new_user(
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+async def test_users_library_returns_selected_visible_summaries(
+    users_client: AsyncClient,
+) -> None:
+    register = await users_client.post(
+        "/auth/register",
+        json={
+            "username": "library-user",
+            "email": "library-user@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo", "unavailable-demo"],
+        },
+    )
+    assert register.status_code == 200
+    token = register.json()["access_token"]
+
+    response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+
+    body = response.json()
+    assert [item["id"] for item in body] == ["sample-demo", "unavailable-demo"]
+    assert body[0]["availability"] == "available"
+    assert body[0]["enabled"] is True
+    assert body[1]["availability"] == "unavailable"
+    assert body[1]["enabled"] is False
+
+
+async def test_users_library_requires_auth(users_client: AsyncClient) -> None:
+    response = await users_client.get("/users/me/library")
+    assert response.status_code == 401
+
+
+async def test_users_library_is_isolated_per_user(users_client: AsyncClient) -> None:
+    register_one = await users_client.post(
+        "/auth/register",
+        json={
+            "username": "library-user-one",
+            "email": "library-user-one@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo"],
+        },
+    )
+    assert register_one.status_code == 200
+    token_one = register_one.json()["access_token"]
+
+    token_two = await _register_user_and_get_token(
+        users_client,
+        username="library-user-two",
+        email="library-user-two@example.com",
+    )
+
+    first_user_response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token_one}"},
+    )
+    second_user_response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token_two}"},
+    )
+
+    assert first_user_response.status_code == 200
+    assert [item["id"] for item in first_user_response.json()] == ["sample-demo"]
+    assert second_user_response.status_code == 200
+    assert second_user_response.json() == []
+
+
+async def test_users_catalogue_returns_visible_packages_with_selected_flag(
+    users_client: AsyncClient,
+) -> None:
+    register = await users_client.post(
+        "/auth/register",
+        json={
+            "username": "catalogue-user",
+            "email": "catalogue-user@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo"],
+        },
+    )
+    assert register.status_code == 200
+    token = register.json()["access_token"]
+
+    response = await users_client.get(
+        "/users/me/catalogue",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+
+    by_id = {item["id"]: item for item in response.json()}
+    assert set(by_id.keys()) == {"sample-demo", "unavailable-demo"}
+    assert by_id["sample-demo"]["selected"] is True
+    assert by_id["sample-demo"]["availability"] == "available"
+    assert by_id["sample-demo"]["enabled"] is True
+    assert by_id["unavailable-demo"]["selected"] is False
+    assert by_id["unavailable-demo"]["availability"] == "unavailable"
+    assert by_id["unavailable-demo"]["enabled"] is False
+
+
+async def test_users_catalogue_requires_auth(users_client: AsyncClient) -> None:
+    response = await users_client.get("/users/me/catalogue")
+    assert response.status_code == 401
 
 
 async def test_users_progress_upserts_latest_result_for_package(

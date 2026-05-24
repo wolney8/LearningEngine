@@ -9,8 +9,10 @@ import { useAuth } from "../hooks/useAuth";
 import { usePackageProgress } from "../hooks/usePackageProgress";
 import { useStreak } from "../hooks/useStreak";
 import type { PackageSummary } from "../schemas/package";
-import { fetchPackages } from "../services/api";
+import { fetchMyCatalogue, fetchMyLibrary, fetchPackages } from "../services/api";
 import "./PackageListPage.css";
+
+type PackageScope = "library" | "catalogue";
 
 const VALID_FILTERS: FilterKey[] = [
   "all",
@@ -28,11 +30,16 @@ function parseFilter(value: string | null): FilterKey {
 }
 
 export function PackageListPage() {
-  const { status: authStatus, user, logout } = useAuth();
+  const { status: authStatus, token, user, logout } = useAuth();
   const { dailyStreak } = useStreak();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
   const [status, setStatus] = useState<"loading" | "error" | "loaded">("loading");
+  const [authenticatedScope, setAuthenticatedScope] = useState<PackageScope>("library");
   const [searchParams, setSearchParams] = useSearchParams();
+  const isAuthenticated = authStatus === "authenticated" && Boolean(token);
+  const effectiveScope: PackageScope = isAuthenticated
+    ? authenticatedScope
+    : "catalogue";
 
   const query = searchParams.get("q") ?? "";
   const activeFilter = parseFilter(searchParams.get("filter"));
@@ -40,13 +47,23 @@ export function PackageListPage() {
   const loadPackages = useCallback(async () => {
     setStatus("loading");
     try {
-      const fetched = await fetchPackages();
+      const fetched = isAuthenticated
+        ? effectiveScope === "library"
+          ? await fetchMyLibrary(token as string)
+          : await fetchMyCatalogue(token as string)
+        : await fetchPackages();
       setPackages(fetched);
       setStatus("loaded");
     } catch {
       setStatus("error");
     }
-  }, []);
+  }, [effectiveScope, isAuthenticated, token]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setAuthenticatedScope("library");
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     void loadPackages();
@@ -152,7 +169,11 @@ export function PackageListPage() {
   return (
     <main className="package-list-page">
       <h1>Local Learning Engine</h1>
-      <p className="package-list-page__subtitle">Pick a package to start learning</p>
+      <p className="package-list-page__subtitle">
+        {isAuthenticated && effectiveScope === "library"
+          ? "Your selected courses"
+          : "Pick a package to start learning"}
+      </p>
       {authStatus === "authenticated" && user ? (
         <p className="package-list-page__auth-links" aria-live="polite">
           <span className="package-list-page__auth-user">
@@ -183,6 +204,29 @@ export function PackageListPage() {
         </p>
       )}
 
+      {isAuthenticated && (
+        <div className="package-list-page__scope-toggle" aria-label="Package scope">
+          <button
+            type="button"
+            className="package-list-page__scope-button"
+            data-active={effectiveScope === "library"}
+            aria-pressed={effectiveScope === "library"}
+            onClick={() => setAuthenticatedScope("library")}
+          >
+            My Library
+          </button>
+          <button
+            type="button"
+            className="package-list-page__scope-button"
+            data-active={effectiveScope === "catalogue"}
+            aria-pressed={effectiveScope === "catalogue"}
+            onClick={() => setAuthenticatedScope("catalogue")}
+          >
+            Full catalogue
+          </button>
+        </div>
+      )}
+
       {status === "loading" && (
         <p aria-live="polite" aria-busy="true">
           Loading packages…
@@ -198,7 +242,13 @@ export function PackageListPage() {
         </>
       )}
 
-      {status === "loaded" && packages.length === 0 && <p>No packages available.</p>}
+      {status === "loaded" && packages.length === 0 && (
+        <p>
+          {isAuthenticated && effectiveScope === "library"
+            ? "Your library is empty. Switch to Full catalogue to browse all courses."
+            : "No packages available."}
+        </p>
+      )}
 
       {status === "loaded" && packages.length > 0 && (
         <>

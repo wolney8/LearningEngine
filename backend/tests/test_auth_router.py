@@ -5,7 +5,36 @@ from httpx import ASGITransport, AsyncClient
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.main import app
+from app.models.package import Package
+from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
+from app.services.overrides_loader import PackageOverride
+
+_SAMPLE_PACKAGE = Package.model_validate(
+    {
+        "id": "sample-demo",
+        "title": "Sample Demo Package",
+        "description": "A demo package for auth tests.",
+        "version": "1.0.0",
+        "tags": ["demo"],
+        "passing_score": 0.75,
+        "pages": [{"id": "p1", "title": "Page 1", "content": "Content."}],
+        "questions": [
+            {
+                "id": "q1",
+                "text": "Question?",
+                "answers": [
+                    {"id": "a", "text": "Yes"},
+                    {"id": "b", "text": "No"},
+                ],
+                "correct_answer": "a",
+                "weight": 100.0,
+                "feedback": "Correct.",
+                "revision_page_ids": ["p1"],
+            }
+        ],
+    }
+)
 
 
 @pytest.fixture
@@ -21,7 +50,12 @@ async def auth_client(tmp_path):
         with Session(engine) as session:
             yield session
 
+    package_cache = {"sample-demo": _SAMPLE_PACKAGE}
+    package_overrides: dict[str, PackageOverride] = {}
+
     app.dependency_overrides[get_session] = session_override
+    app.dependency_overrides[get_packages_cache] = lambda: package_cache
+    app.dependency_overrides[get_package_overrides] = lambda: package_overrides
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -92,6 +126,75 @@ async def test_register_rejects_duplicate_email(auth_client: AsyncClient) -> Non
     )
     assert second.status_code == 409
     assert second.json() == {"detail": "Email is already registered"}
+
+
+async def test_register_accepts_selected_package_ids_and_deduplicates(
+    auth_client: AsyncClient,
+) -> None:
+    response = await auth_client.post(
+        "/auth/register",
+        json={
+            "username": "selected-user",
+            "email": "selected-user@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo", "sample-demo"],
+        },
+    )
+    assert response.status_code == 200
+
+    token = response.json()["access_token"]
+    library_response = await auth_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert library_response.status_code == 200
+    assert [item["id"] for item in library_response.json()] == ["sample-demo"]
+
+
+async def test_register_rejects_unknown_selected_package_ids(
+    auth_client: AsyncClient,
+) -> None:
+    response = await auth_client.post(
+        "/auth/register",
+        json={
+            "username": "unknown-selected",
+            "email": "unknown-selected@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["missing-package"],
+        },
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["message"] == (
+        "selected_package_ids contains unknown or hidden package ids"
+    )
+    assert detail["invalid_package_ids"] == ["missing-package"]
+
+
+async def test_register_rejects_hidden_selected_package_ids(
+    auth_client: AsyncClient,
+) -> None:
+    app.dependency_overrides[get_package_overrides] = lambda: {
+        "sample-demo": PackageOverride(availability="hidden")
+    }
+
+    response = await auth_client.post(
+        "/auth/register",
+        json={
+            "username": "hidden-selected",
+            "email": "hidden-selected@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo"],
+        },
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["message"] == (
+        "selected_package_ids contains unknown or hidden package ids"
+    )
+    assert detail["invalid_package_ids"] == ["sample-demo"]
 
 
 async def test_login_works_with_username(auth_client: AsyncClient) -> None:

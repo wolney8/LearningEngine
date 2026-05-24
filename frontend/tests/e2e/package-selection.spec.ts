@@ -234,9 +234,7 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     const card = getPackageCard(page, packageTitle);
     await expect(card).toBeVisible();
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeVisible();
     await expect(card.getByRole("button", { name: "Take Test" })).toBeVisible();
   });
 
@@ -264,22 +262,14 @@ test.describe("Package Selection Screen", () => {
     const card = getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title);
     await expect(card).toBeVisible();
     await expect(card).toHaveClass(/package-card--unavailable/);
-    await expect(card.locator(".package-card__status")).toHaveText(
-      "Unavailable",
-    );
+    await expect(card.locator(".package-card__status")).toHaveText("Unavailable");
     await expect(card.locator(".package-stats-strip")).toHaveCount(0);
 
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeDisabled();
-    await expect(
-      card.getByRole("button", { name: "Take Test" }),
-    ).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
   });
 
-  test("clicking a card navigates to the package detail URL", async ({
-    page,
-  }) => {
+  test("clicking a card navigates to the package detail URL", async ({ page }) => {
     await page.goto("/");
     const card = getPackageCard(page, packageTitle);
     await card.getByRole("button", { name: "Start Learning" }).click();
@@ -295,9 +285,7 @@ test.describe("Package Selection Screen", () => {
     await expect(page.getByText(/Could not load packages/i)).toBeVisible();
   });
 
-  test("shows empty state when backend returns empty array", async ({
-    page,
-  }) => {
+  test("shows empty state when backend returns empty array", async ({ page }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route("**/packages", (route) => {
       route.fulfill({
@@ -348,9 +336,7 @@ test.describe("Package Selection Screen", () => {
     }
 
     await page.getByRole("button", { name: "Finish" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Test Complete" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
 
     await page
       .locator(".test-results__actions")
@@ -364,9 +350,7 @@ test.describe("Package Selection Screen", () => {
     );
 
     await expect(easyCircle).toBeVisible();
-    await expect(easyCircle).toHaveClass(
-      /difficulty-circle--(passed|attempted)/,
-    );
+    await expect(easyCircle).toHaveClass(/difficulty-circle--(passed|attempted)/);
 
     const statsStrip = refreshedCard.locator(".package-stats-strip");
     await expect(statsStrip).toBeVisible();
@@ -374,9 +358,7 @@ test.describe("Package Selection Screen", () => {
     await expect(statsStrip).toContainText(/\d+%/);
   });
 
-  test("difficulty circles expose descriptive aria-label text", async ({
-    page,
-  }) => {
+  test("difficulty circles expose descriptive aria-label text", async ({ page }) => {
     await page.goto("/");
 
     const card = getPackageCard(page, packageTitle);
@@ -385,10 +367,7 @@ test.describe("Package Selection Screen", () => {
       .first();
 
     await expect(notAttemptedCircle).toBeVisible();
-    await expect(notAttemptedCircle).toHaveAttribute(
-      "aria-label",
-      /Not attempted/,
-    );
+    await expect(notAttemptedCircle).toHaveAttribute("aria-label", /Not attempted/);
   });
 
   test("anonymous users see streak from localStorage", async ({ page }) => {
@@ -440,10 +419,102 @@ test.describe("Package Selection Screen", () => {
       });
     });
 
+    await page.route(`${API_BASE_URL}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_PACKAGES),
+      });
+    });
+
     await page.goto("/");
 
     await expect(page.getByText("🔥 6 days streak")).toBeVisible();
     await expect(page.getByText("🔥 1 day streak")).toHaveCount(0);
+  });
+
+  test("authenticated users default to My Library and can switch to Full catalogue", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 77,
+      username: "library-user",
+      email: "library-user@example.com",
+      role: "student",
+      xp: 0,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "library-token");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 0,
+          last_practised_date: null,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_PACKAGES[0]]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/catalogue`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_PACKAGES[0], MOCK_UNAVAILABLE_PACKAGE]),
+      });
+    });
+
+    await page.goto("/");
+
+    await expect(page.getByRole("button", { name: "My Library" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(getPackageCard(page, MOCK_PACKAGES[0].title)).toBeVisible();
+
+    await page.getByRole("button", { name: "Full catalogue" }).click();
+    await expect(page.getByRole("button", { name: "Full catalogue" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await page.getByRole("button", { name: /Unavailable/i }).click();
+    await expect(getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title)).toBeVisible();
+  });
+
+  test("anonymous users keep global catalogue behaviour without scope toggle", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "My Library" })).toHaveCount(0);
+    await expect(getPackageCard(page, MOCK_PACKAGES[0].title)).toBeVisible();
   });
 });
 
@@ -511,29 +582,21 @@ test.describe("Package search and filter", () => {
 
   test("searches packages by description", async ({ page }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("goroutines");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("goroutines");
     await assertVisibleTitles(page, [titles.incomplete]);
   });
 
   test("searches packages by tag", async ({ page }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await assertVisibleTitles(page, [titles.completed]);
   });
 
-  test("clear button clears query and restores package list", async ({
-    page,
-  }) => {
+  test("clear button clears query and restores package list", async ({ page }) => {
     await page.goto("/");
     const input = page.getByRole("searchbox", { name: "Search packages" });
     await input.fill("rust");
-    await expect(
-      page.getByRole("button", { name: "Clear search" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(input).toHaveValue("");
     await assertVisibleTitles(page, [
@@ -545,37 +608,25 @@ test.describe("Package search and filter", () => {
 
   test("updates the q query parameter while typing", async ({ page }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await expect(page).toHaveURL(/\?q=python/);
   });
 
-  test("prefills and filters when loading with q query parameter", async ({
-    page,
-  }) => {
+  test("prefills and filters when loading with q query parameter", async ({ page }) => {
     await page.goto("/?q=rust");
-    await expect(
-      page.getByRole("searchbox", { name: "Search packages" }),
-    ).toHaveValue("rust");
+    await expect(page.getByRole("searchbox", { name: "Search packages" })).toHaveValue(
+      "rust",
+    );
     await assertVisibleTitles(page, [titles.failed]);
   });
 
   test("renders filter pills with counts", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("button", { name: /All\s*3/i })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Incomplete\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Failed\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Completed\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Unavailable\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Failed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Unavailable\s*1/i })).toBeVisible();
   });
 
   test("completed filter shows only completed packages", async ({ page }) => {
@@ -590,17 +641,13 @@ test.describe("Package search and filter", () => {
     await assertVisibleTitles(page, [titles.failed]);
   });
 
-  test("incomplete filter shows only unattempted packages", async ({
-    page,
-  }) => {
+  test("incomplete filter shows only unattempted packages", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /Incomplete/i }).click();
     await assertVisibleTitles(page, [titles.incomplete]);
   });
 
-  test("unavailable filter shows only unavailable packages", async ({
-    page,
-  }) => {
+  test("unavailable filter shows only unavailable packages", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /Unavailable/i }).click();
     await assertVisibleTitles(page, [titles.unavailable]);
@@ -627,18 +674,17 @@ test.describe("Package search and filter", () => {
   }) => {
     await page.goto("/?filter=completed");
     await assertVisibleTitles(page, [titles.completed]);
-    await expect(
-      page.getByRole("button", { name: /Completed/i }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /Completed/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   test("supports combined search and filter with matching and empty states", async ({
     page,
   }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [titles.completed]);
 
@@ -647,9 +693,7 @@ test.describe("Package search and filter", () => {
     await expect(page.getByText("No packages match 'python'")).toBeVisible();
   });
 
-  test("shows filtered count text when results are narrowed", async ({
-    page,
-  }) => {
+  test("shows filtered count text when results are narrowed", async ({ page }) => {
     await page.goto("/");
     const filteredCount = page.locator(".package-list-page__count");
 
@@ -660,9 +704,7 @@ test.describe("Package search and filter", () => {
     await expect(filteredCount).toHaveCount(0);
   });
 
-  test("anonymous users keep localStorage-derived package status", async ({
-    page,
-  }) => {
+  test("anonymous users keep localStorage-derived package status", async ({ page }) => {
     await page.route(`${API_BASE_URL}/users/me/progress**`, (route) => {
       route.fulfill({ status: 500, body: "Should not be called" });
     });
@@ -743,6 +785,30 @@ test.describe("Package search and filter", () => {
       });
     });
 
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(AUTH_USER),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([authPackage]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/catalogue`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([authPackage]),
+      });
+    });
+
     await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
       route.fulfill({
         status: 200,
@@ -754,20 +820,17 @@ test.describe("Package search and filter", () => {
       });
     });
 
-    await page.route(
-      `${API_BASE_URL}/users/me/streak/mark-practised`,
-      (route) => {
-        streakCount += 1;
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            streak_count: streakCount,
-            last_practised_date: "2026-05-24",
-          }),
-        });
-      },
-    );
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakCount += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: streakCount,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
 
     await page.route("**/packages", (route) => {
       route.fulfill({
@@ -817,9 +880,7 @@ test.describe("Package search and filter", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.getByRole("button", { name: /Incomplete\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
     await page.getByRole("button", { name: /Incomplete/i }).click();
     await assertVisibleTitles(page, [authPackage.title]);
 
@@ -833,9 +894,7 @@ test.describe("Package search and filter", () => {
       .getByRole("button", { name: "Back to packages", exact: true })
       .click();
 
-    await expect(
-      page.getByRole("button", { name: /Completed\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [authPackage.title]);
   });

@@ -44,10 +44,29 @@ def get_package_overrides(request: Request) -> dict[str, PackageOverride]:
     return request.app.state.package_overrides
 
 
-@router.get("", response_model=list[PackageSummary])
-async def list_packages(
-    cache: dict[str, Package] = Depends(get_packages_cache),
-    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
+def build_package_summary(
+    pkg: Package,
+    override: PackageOverride | None,
+) -> PackageSummary:
+    availability = resolve_effective_availability(override)
+    return PackageSummary(
+        id=pkg.id,
+        title=pkg.title,
+        description=pkg.description,
+        version=pkg.version,
+        tags=pkg.tags,
+        passing_score=pkg.passing_score,
+        page_count=len(pkg.pages),
+        question_count=len(pkg.questions),
+        availability=availability,
+        enabled=derive_enabled_from_availability(availability),
+        xp_threshold=override.xp_threshold if override else None,
+    )
+
+
+def list_visible_package_summaries(
+    cache: dict[str, Package],
+    overrides: dict[str, PackageOverride],
 ) -> list[PackageSummary]:
     items: list[PackageSummary] = []
     for pkg in cache.values():
@@ -55,24 +74,16 @@ async def list_packages(
         availability = resolve_effective_availability(override)
         if availability == "hidden":
             continue
-
-        items.append(
-            PackageSummary(
-                id=pkg.id,
-                title=pkg.title,
-                description=pkg.description,
-                version=pkg.version,
-                tags=pkg.tags,
-                passing_score=pkg.passing_score,
-                page_count=len(pkg.pages),
-                question_count=len(pkg.questions),
-                availability=availability,
-                enabled=derive_enabled_from_availability(availability),
-                xp_threshold=override.xp_threshold if override else None,
-            )
-        )
-
+        items.append(build_package_summary(pkg, override))
     return items
+
+
+@router.get("", response_model=list[PackageSummary])
+async def list_packages(
+    cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
+) -> list[PackageSummary]:
+    return list_visible_package_summaries(cache, overrides)
 
 
 @router.post("/validate", response_model=ValidateResponse)

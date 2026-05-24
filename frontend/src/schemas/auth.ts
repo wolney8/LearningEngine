@@ -24,6 +24,7 @@ export const RegisterRequestSchema = z.object({
   username: z.string().min(3),
   email: z.string().email(),
   password: z.string().min(8),
+  selected_package_ids: z.array(z.string().min(1)).default([]),
 });
 
 export type User = z.infer<typeof UserSchema>;
