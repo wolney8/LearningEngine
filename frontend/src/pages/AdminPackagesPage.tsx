@@ -38,10 +38,11 @@ export function AdminPackagesPage() {
   if (!token) {
     return <Navigate to="/admin" replace />;
   }
+  const adminToken = token;
 
   async function setAvailability(pkg: PackageSummary, availability: Availability) {
     try {
-      const updated = await updateAdminPackage(token, pkg.id, {
+      const updated = await updateAdminPackage(adminToken, pkg.id, {
         availability,
       });
       setPackages((current) =>
@@ -59,7 +60,7 @@ export function AdminPackagesPage() {
     }
 
     try {
-      const updated = await updateAdminPackage(token, pkg.id, {
+      const updated = await updateAdminPackage(adminToken, pkg.id, {
         xp_threshold: parsed,
       });
       setPackages((current) =>

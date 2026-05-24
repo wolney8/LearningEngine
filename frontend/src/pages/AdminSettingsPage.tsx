@@ -130,6 +130,7 @@ export function AdminSettingsPage() {
   if (!token) {
     return <Navigate to="/admin" replace />;
   }
+  const adminToken = token;
 
   async function handleSave() {
     if (!settings) {
@@ -139,7 +140,7 @@ export function AdminSettingsPage() {
     setStatus("saving");
     setMessage("");
     try {
-      const updated = await updateAdminSettings(token, settings);
+      const updated = await updateAdminSettings(adminToken, settings);
       setSettings(updated);
       setStatus("ready");
       setMessage("Settings saved.");

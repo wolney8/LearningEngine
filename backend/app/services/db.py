@@ -19,7 +19,7 @@ engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 
 def init_db() -> None:
     # Ensure metadata includes the User table before creating schema.
-    from app.models.user import User  # noqa: F401
+    from app.models.user import User, UserTestResult  # noqa: F401
 
     if DATABASE_URL.startswith("sqlite"):
         sqlite_path = DATABASE_URL.replace("sqlite:///", "", 1)

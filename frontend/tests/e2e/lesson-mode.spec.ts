@@ -298,4 +298,210 @@ test.describe("Lesson Mode", () => {
 
     await expect(page.getByText("+35 XP bonus")).toBeVisible();
   });
+
+  test("authenticated lesson mode uses server metadata and skips localStorage metadata keys", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 78,
+      username: "lesson-meta-user",
+      email: "lesson-meta-user@example.com",
+      role: "student",
+      xp: 110,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+    const progressRow = {
+      package_id: MOCK_PACKAGE_ID,
+      latest_weighted_score: 0.4,
+      completed: true,
+      attempt_count: 1,
+      first_completed_at: "2026-05-23T08:30:00Z",
+      updated_at: "2026-05-23T08:30:00Z",
+    };
+
+    let capturedAttemptCount: number | null = null;
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "lesson-meta-auth-token");
+      localStorage.removeItem("lle_attempt_python-basics");
+      localStorage.removeItem("lle_completed_python-basics");
+      localStorage.removeItem("lle_daily_streak");
+      localStorage.removeItem("lle_last_active");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([progressRow]),
+      });
+    });
+
+    await page.route(
+      `${API_BASE_URL}/users/me/progress/${MOCK_PACKAGE_ID}`,
+      async (route) => {
+        const payload = route.request().postDataJSON() as {
+          latest_weighted_score: number;
+          completed: boolean;
+          attempt_count?: number;
+        };
+        capturedAttemptCount = payload.attempt_count ?? null;
+
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ...progressRow,
+            latest_weighted_score: payload.latest_weighted_score,
+            completed: payload.completed,
+            attempt_count: payload.attempt_count ?? progressRow.attempt_count,
+            updated_at: "2026-05-24T11:00:00Z",
+          }),
+        });
+      },
+    );
+
+    await page.route(`${API_BASE_URL}/users/me/xp`, (route) => {
+      if (route.request().method() === "GET") {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ xp: authUser.xp }),
+        });
+        return;
+      }
+
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ xp: 120 }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 4,
+          last_practised_date: "2026-05-23",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 5,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+
+    await expect.poll(() => capturedAttemptCount).toBe(2);
+    await expect(page.getByText("Reduced XP (×0.5)")).toBeVisible();
+    await expect(page.getByText("+20 XP bonus")).toHaveCount(0);
+
+    const localMetadata = await page.evaluate(() => ({
+      attempt: localStorage.getItem("lle_attempt_python-basics"),
+      firstCompletion: localStorage.getItem("lle_completed_python-basics"),
+    }));
+    expect(localMetadata.attempt).toBeNull();
+    expect(localMetadata.firstCompletion).toBeNull();
+  });
+
+  test("authenticated lesson completion marks streak via backend endpoint", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 77,
+      username: "lesson-auth-user",
+      email: "lesson-auth-user@example.com",
+      role: "student",
+      xp: 120,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+    let streakMarkCalls = 0;
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "lesson-auth-token");
+      localStorage.removeItem("lle_daily_streak");
+      localStorage.removeItem("lle_last_active");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/xp`, (route) => {
+      if (route.request().method() === "GET") {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ xp: authUser.xp }),
+        });
+        return;
+      }
+
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ xp: 140 }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 5,
+          last_practised_date: "2026-05-23",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakMarkCalls += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 6,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+
+    await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+    await expect.poll(() => streakMarkCalls).toBe(1);
+  });
 });

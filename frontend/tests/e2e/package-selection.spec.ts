@@ -369,9 +369,73 @@ test.describe("Package Selection Screen", () => {
     await expect(notAttemptedCircle).toBeVisible();
     await expect(notAttemptedCircle).toHaveAttribute("aria-label", /Not attempted/);
   });
+
+  test("anonymous users see streak from localStorage", async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("lle_daily_streak", "3");
+      localStorage.setItem("lle_last_active", "2026-05-24");
+    });
+
+    await page.goto("/");
+
+    await expect(page.getByText("🔥 3 days streak")).toBeVisible();
+    await expect(page.getByLabel("3 day streak")).toBeVisible();
+  });
+
+  test("authenticated users load streak from backend instead of localStorage", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 51,
+      username: "streak-auth-user",
+      email: "streak-auth-user@example.com",
+      role: "student",
+      xp: 0,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "streak-auth-token");
+      localStorage.setItem("lle_daily_streak", "1");
+      localStorage.setItem("lle_last_active", "2026-05-24");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 6,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.goto("/");
+
+    await expect(page.getByText("🔥 6 days streak")).toBeVisible();
+    await expect(page.getByText("🔥 1 day streak")).toHaveCount(0);
+  });
 });
 
 test.describe("Package search and filter", () => {
+  const AUTH_USER = {
+    id: 101,
+    username: "learner-progress",
+    email: "learner-progress@example.com",
+    role: "student",
+    xp: 0,
+    created_at: "2026-05-23T00:00:00Z",
+  };
+
   const titles = {
     completed: SEARCH_FILTER_PACKAGES[0].title,
     failed: SEARCH_FILTER_PACKAGES[1].title,
@@ -546,5 +610,176 @@ test.describe("Package search and filter", () => {
 
     await page.getByRole("button", { name: /All/i }).click();
     await expect(filteredCount).toHaveCount(0);
+  });
+
+  test("anonymous users keep localStorage-derived package status", async ({ page }) => {
+    await page.route(`${API_BASE_URL}/users/me/progress**`, (route) => {
+      route.fulfill({ status: 500, body: "Should not be called" });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: /Completed/i }).click();
+    await assertVisibleTitles(page, [titles.completed]);
+  });
+
+  test("authenticated users persist and reload package status from backend progress", async ({
+    page,
+  }) => {
+    const authPackage = {
+      id: "auth-progress-pkg",
+      title: "Auth Progress Package",
+      description: "Server-backed status package",
+      version: "1.0.0",
+      tags: ["auth"],
+      passing_score: 0.75,
+      page_count: 1,
+      question_count: 1,
+      availability: "available",
+      enabled: true,
+      xp_threshold: null,
+    };
+
+    let progressRows: Array<{
+      package_id: string;
+      latest_weighted_score: number;
+      completed: boolean;
+      attempt_count: number;
+      first_completed_at: string | null;
+      updated_at: string;
+    }> = [];
+    let streakCount = 2;
+
+    const oneQuestionPackage = {
+      id: authPackage.id,
+      title: authPackage.title,
+      description: authPackage.description,
+      version: authPackage.version,
+      tags: authPackage.tags,
+      passing_score: authPackage.passing_score,
+      pages: [{ id: "p-1", title: "Intro", content: "Start here" }],
+      questions: [
+        {
+          id: "q-1",
+          text: "Which answer is correct?",
+          answers: [
+            { id: "a-1", text: "Correct Option" },
+            { id: "a-2", text: "Wrong Option" },
+          ],
+          correct_answer: "a-1",
+          weight: 1,
+          feedback: "Correct Option is right.",
+          revision_page_ids: [],
+        },
+      ],
+    };
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-progress-bridge",
+          token_type: "bearer",
+          user: AUTH_USER,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(progressRows),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: streakCount,
+          last_practised_date: "2026-05-23",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakCount += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: streakCount,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.route("**/packages", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([authPackage]),
+      });
+    });
+
+    await page.route(
+      `${API_BASE_URL}/users/me/progress/${authPackage.id}`,
+      async (route) => {
+        const payload = route.request().postDataJSON() as {
+          latest_weighted_score: number;
+        };
+
+        const updated = {
+          package_id: authPackage.id,
+          latest_weighted_score: payload.latest_weighted_score,
+          completed: true,
+          attempt_count: 1,
+          first_completed_at: "2026-05-23T12:00:00Z",
+          updated_at: "2026-05-23T12:00:00Z",
+        };
+
+        progressRows = [updated];
+
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(updated),
+        });
+      },
+    );
+
+    await page.route(`${API_BASE_URL}/packages/${authPackage.id}`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(oneQuestionPackage),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("learner-progress");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
+    await page.getByRole("button", { name: /Incomplete/i }).click();
+    await assertVisibleTitles(page, [authPackage.title]);
+
+    const card = getPackageCard(page, authPackage.title);
+    await card.getByRole("button", { name: "Take Test" }).click();
+    await page.getByRole("button", { name: /Easy/i }).click();
+    await page.getByRole("button", { name: "Correct Option" }).click();
+    await page.getByRole("button", { name: "Finish" }).click();
+    await page
+      .locator(".test-results__actions")
+      .getByRole("button", { name: "Back to packages", exact: true })
+      .click();
+
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+    await page.getByRole("button", { name: /Completed/i }).click();
+    await assertVisibleTitles(page, [authPackage.title]);
   });
 });

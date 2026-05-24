@@ -651,6 +651,126 @@ test.describe("Test Mode", () => {
     await expect(page.getByText("Time's up - exam auto-submitted")).toBeVisible();
   });
 
+  test("authenticated test mode uses server attempt metadata and skips localStorage metadata keys", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 88,
+      username: "test-user",
+      email: "test-user@example.com",
+      role: "student",
+      xp: 10,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+    const progressRow = {
+      package_id: MOCK_PACKAGE_ID,
+      latest_weighted_score: 0.5,
+      completed: true,
+      attempt_count: 2,
+      first_completed_at: "2026-05-23T09:00:00Z",
+      updated_at: "2026-05-23T09:00:00Z",
+    };
+
+    let capturedAttemptCount: number | null = null;
+    let streakMarkCalls = 0;
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "test-mode-auth-token");
+      localStorage.removeItem("lle_attempt_test_python-basics");
+      localStorage.removeItem("lle_completed_test_python-basics");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([progressRow]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 2,
+          last_practised_date: "2026-05-23",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakMarkCalls += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 3,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.route(
+      `${API_BASE_URL}/users/me/progress/${MOCK_PACKAGE_ID}`,
+      async (route) => {
+        const payload = route.request().postDataJSON() as {
+          latest_weighted_score: number;
+          completed: boolean;
+          attempt_count?: number;
+        };
+        capturedAttemptCount = payload.attempt_count ?? null;
+
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ...progressRow,
+            latest_weighted_score: payload.latest_weighted_score,
+            completed: payload.completed,
+            attempt_count: payload.attempt_count ?? progressRow.attempt_count,
+            updated_at: "2026-05-24T10:00:00Z",
+          }),
+        });
+      },
+    );
+
+    await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Easy/i }).click();
+
+    for (let index = 0; index < 4; index++) {
+      await page
+        .getByRole("button", { name: new RegExp(`Question ${index + 1}`) })
+        .click();
+      await page.locator(".question-card__answer").first().click();
+
+      if (index < 3) {
+        await page.getByRole("button", { name: "Next" }).click();
+      }
+    }
+
+    await page.getByRole("button", { name: "Finish" }).click();
+    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
+
+    await expect.poll(() => capturedAttemptCount).toBe(3);
+    await expect.poll(() => streakMarkCalls).toBe(1);
+
+    const localMetadata = await page.evaluate(() => ({
+      attempt: localStorage.getItem("lle_attempt_test_python-basics"),
+      firstCompletion: localStorage.getItem("lle_completed_test_python-basics"),
+    }));
+    expect(localMetadata.attempt).toBeNull();
+    expect(localMetadata.firstCompletion).toBeNull();
+  });
+
   test("navigating to nonexistent package redirects to home", async ({ page }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route(`${API_BASE_URL}/packages/nonexistent`, (route) => {
