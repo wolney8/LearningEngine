@@ -340,8 +340,20 @@ async def deselect_my_library_package(
             UserLibraryItem.package_id == normalised_package_id,
         )
     ).first()
+    existing_result = session.exec(
+        select(UserTestResult).where(
+            UserTestResult.user_id == user_id,
+            UserTestResult.package_id == normalised_package_id,
+        )
+    ).first()
+
     if existing_item is not None:
         session.delete(existing_item)
+
+    if existing_result is not None:
+        session.delete(existing_result)
+
+    if existing_item is not None or existing_result is not None:
         session.commit()
 
     return _build_catalogue_item_response(

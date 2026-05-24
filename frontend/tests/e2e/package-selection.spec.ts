@@ -505,8 +505,18 @@ test.describe("Package Selection Screen", () => {
       "aria-pressed",
       "true",
     );
-    await page.getByRole("button", { name: /Unavailable/i }).click();
-    await expect(getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title)).toBeVisible();
+
+    const availableCard = getPackageCard(page, MOCK_PACKAGES[0].title);
+    const unavailableCard = getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title);
+    await expect(availableCard).toBeVisible();
+    await expect(unavailableCard).toBeVisible();
+    await expect(
+      availableCard.getByRole("button", { name: "Start Learning" }),
+    ).toHaveCount(0);
+    await expect(availableCard.getByRole("button", { name: "Take Test" })).toHaveCount(
+      0,
+    );
+    await expect(availableCard.locator(".package-progress-panel")).toHaveCount(0);
   });
 
   test("anonymous users keep global catalogue behaviour without scope toggle", async ({
@@ -1101,7 +1111,9 @@ test.describe("Library management — authenticated users", () => {
     await expect.poll(() => putCalled).toBe(true);
   });
 
-  test("library view shows Remove button for each course", async ({ page }) => {
+  test("library view shows top-right remove control for each course", async ({
+    page,
+  }) => {
     await seedAuthSession(page);
 
     await page.route(`${LM_API}/users/me/library`, (route) => {
@@ -1115,13 +1127,21 @@ test.describe("Library management — authenticated users", () => {
     await page.goto("/");
 
     const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
-    await expect(card.getByRole("button", { name: /Remove/i })).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: /Remove from library/i }),
+    ).toBeVisible();
   });
 
   test("clicking Remove calls DELETE /users/me/library/:id and reloads", async ({
     page,
   }) => {
     let deleteCalled = false;
+    let removePromptSeen = false;
+
+    page.on("dialog", async (dialog) => {
+      removePromptSeen = true;
+      await dialog.accept();
+    });
 
     await seedAuthSession(page);
 
@@ -1156,9 +1176,11 @@ test.describe("Library management — authenticated users", () => {
     await page.goto("/");
 
     const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
-    await card.getByRole("button", { name: /Remove/i }).click();
+    await card.getByRole("button", { name: /Remove from library/i }).click();
 
+    await expect.poll(() => removePromptSeen).toBe(true);
     await expect.poll(() => deleteCalled).toBe(true);
+    await expect(page.getByText(/Progress was reset/i)).toBeVisible();
   });
 
   test("library view does not show Add to Library buttons", async ({ page }) => {
@@ -1189,10 +1211,12 @@ test.describe("Library management — authenticated users", () => {
     await page.goto("/");
 
     await expect(page.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Remove/i })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /Remove from library/i }),
+    ).toHaveCount(0);
   });
 
-  test("unavailable packages in catalogue show Add to Library but Start Learning and Take Test remain disabled", async ({
+  test("unavailable packages in catalogue show Add to Library without learner launch actions", async ({
     page,
   }) => {
     await seedAuthSession(page);
@@ -1219,8 +1243,9 @@ test.describe("Library management — authenticated users", () => {
 
     const card = getCard(page, LM_PACKAGE_UNAVAILABLE_UNSELECTED.title);
     await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
-    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
-    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Take Test" })).toHaveCount(0);
+    await expect(card.locator(".package-progress-panel")).toHaveCount(0);
   });
 
   test("unavailable packages in library show Remove but Start Learning and Take Test remain disabled", async ({
@@ -1240,7 +1265,9 @@ test.describe("Library management — authenticated users", () => {
     await page.getByRole("button", { name: /Unavailable/i }).click();
 
     const card = getCard(page, LM_PACKAGE_UNAVAILABLE_UNSELECTED.title);
-    await expect(card.getByRole("button", { name: /Remove/i })).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: /Remove from library/i }),
+    ).toBeVisible();
     await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
     await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
   });

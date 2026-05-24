@@ -429,6 +429,53 @@ async def test_users_library_deselect_is_idempotent_when_absent(
     assert response.json()["selected"] is False
 
 
+async def test_users_library_deselect_resets_progress_for_removed_package(
+    users_client: AsyncClient,
+) -> None:
+    register = await users_client.post(
+        "/auth/register",
+        json={
+            "username": "library-remove-resets-progress",
+            "email": "library-remove-resets-progress@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo", "unavailable-demo"],
+        },
+    )
+    assert register.status_code == 200
+    token = register.json()["access_token"]
+
+    sample_progress = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"latest_weighted_score": 0.8, "completed": True},
+    )
+    assert sample_progress.status_code == 200
+
+    unavailable_progress = await users_client.post(
+        "/users/me/progress/unavailable-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"latest_weighted_score": 0.35, "completed": False},
+    )
+    assert unavailable_progress.status_code == 200
+
+    response = await users_client.delete(
+        "/users/me/library/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["selected"] is False
+
+    progress_response = await users_client.get(
+        "/users/me/progress",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert progress_response.status_code == 200
+    assert [item["package_id"] for item in progress_response.json()] == [
+        "unavailable-demo"
+    ]
+
+
 async def test_users_library_selection_requires_auth(users_client: AsyncClient) -> None:
     response = await users_client.put("/users/me/library/sample-demo")
     assert response.status_code == 401

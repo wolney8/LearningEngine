@@ -39,6 +39,7 @@ export function PackageListPage() {
   const { status: authStatus, token, user, logout } = useAuth();
   const { dailyStreak } = useStreak();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
+  const [libraryNotice, setLibraryNotice] = useState("");
   const [status, setStatus] = useState<"loading" | "error" | "loaded">("loading");
   const [authenticatedScope, setAuthenticatedScope] = useState<PackageScope>("library");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -116,14 +117,25 @@ export function PackageListPage() {
   );
 
   const statusFilteredPackages = useMemo(() => {
+    const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
+
     if (activeFilter === "unavailable") {
       return unavailablePackages;
     }
     if (activeFilter === "all") {
-      return availablePackages;
+      return includeUnavailableInAll
+        ? [...availablePackages, ...unavailablePackages]
+        : availablePackages;
     }
     return availablePackages.filter((pkg) => progressMap.get(pkg.id) === activeFilter);
-  }, [activeFilter, availablePackages, unavailablePackages, progressMap]);
+  }, [
+    activeFilter,
+    availablePackages,
+    unavailablePackages,
+    progressMap,
+    isAuthenticated,
+    effectiveScope,
+  ]);
 
   const filteredPackages = useMemo(() => {
     if (!query) return statusFilteredPackages;
@@ -137,8 +149,11 @@ export function PackageListPage() {
   }, [statusFilteredPackages, query]);
 
   const filterCounts = useMemo(() => {
+    const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
     const counts: Record<FilterKey, number> = {
-      all: availablePackages.length,
+      all: includeUnavailableInAll
+        ? availablePackages.length + unavailablePackages.length
+        : availablePackages.length,
       incomplete: 0,
       failed: 0,
       completed: 0,
@@ -149,7 +164,13 @@ export function PackageListPage() {
       counts[s]++;
     }
     return counts;
-  }, [availablePackages, unavailablePackages, progressMap]);
+  }, [
+    availablePackages,
+    unavailablePackages,
+    progressMap,
+    isAuthenticated,
+    effectiveScope,
+  ]);
 
   const filterOptions: FilterOption[] = [
     { key: "all", label: "All", count: filterCounts.all },
@@ -163,8 +184,14 @@ export function PackageListPage() {
     },
   ];
 
+  const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
+
   const countBase =
-    activeFilter === "unavailable" ? unavailablePackages : availablePackages;
+    activeFilter === "unavailable"
+      ? unavailablePackages
+      : activeFilter === "all" && includeUnavailableInAll
+        ? [...availablePackages, ...unavailablePackages]
+        : availablePackages;
   const isFiltered = filteredPackages.length < countBase.length;
 
   function getEmptyMessage(): string {
@@ -258,6 +285,12 @@ export function PackageListPage() {
 
       {status === "loaded" && packages.length > 0 && (
         <>
+          {libraryNotice && (
+            <output className="package-list-page__notice" aria-live="polite">
+              {libraryNotice}
+            </output>
+          )}
+
           <div className="package-list-page__controls">
             <PackageSearchBar
               value={query}
@@ -288,9 +321,15 @@ export function PackageListPage() {
                 <PackageCard
                   key={pkg.id}
                   pkg={pkg}
+                  variant={
+                    isAuthenticated && effectiveScope === "catalogue"
+                      ? "catalogue"
+                      : "learning"
+                  }
                   onAdd={
                     isAuthenticated && effectiveScope === "catalogue" && !pkg.selected
                       ? async () => {
+                          setLibraryNotice("");
                           await addToLibrary(token as string, pkg.id);
                           await loadPackages();
                         }
@@ -299,7 +338,17 @@ export function PackageListPage() {
                   onRemove={
                     isAuthenticated && effectiveScope === "library"
                       ? async () => {
+                          const confirmed = window.confirm(
+                            `Remove '${pkg.title}' from My Library? This will reset your progress for this package.`,
+                          );
+                          if (!confirmed) {
+                            return;
+                          }
+
                           await removeFromLibrary(token as string, pkg.id);
+                          setLibraryNotice(
+                            `Removed '${pkg.title}' from My Library. Progress was reset.`,
+                          );
                           await loadPackages();
                         }
                       : undefined
