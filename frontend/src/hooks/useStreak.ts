@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchMyStreak, markMyStreakPractisedToday } from "../services/api";
+import {
+  ANONYMOUS_LOCAL_STORAGE_KEYS,
+  fetchMyStreak,
+  markMyStreakPractisedToday,
+} from "../services/api";
 import { useAuth } from "./useAuth";
 
-const LAST_ACTIVE_KEY = "lle_last_active";
-const DAILY_STREAK_KEY = "lle_daily_streak";
+const LAST_ACTIVE_KEY = ANONYMOUS_LOCAL_STORAGE_KEYS.lastActive;
+const DAILY_STREAK_KEY = ANONYMOUS_LOCAL_STORAGE_KEYS.dailyStreak;
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -64,7 +68,7 @@ export function useStreak(): {
       })
       .catch(() => {
         if (cancelled) return;
-        setDailyStreak(0);
+        setDailyStreak(readStreak());
       });
 
     return () => {

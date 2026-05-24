@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { getAnonymousFirstCompletionKey } from "../services/api";
 
 export function useFirstCompletion(packageId: string): {
   isFirstCompletion: boolean;
   markCompleted: () => void;
 } {
-  const key = `lle_completed_${packageId}`;
+  const key = getAnonymousFirstCompletionKey(packageId);
 
   function hasCompleted(): boolean {
     try {

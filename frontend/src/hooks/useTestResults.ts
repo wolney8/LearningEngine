@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { UserProgressRecord } from "../schemas/progress";
-import { fetchMyProgress, upsertMyProgressForPackage } from "../services/api";
+import {
+  fetchMyProgress,
+  getAnonymousTestResultsKey,
+  readAnonymousProgressSeeds,
+  upsertMyProgressForPackage,
+} from "../services/api";
 import type { Difficulty } from "../types/difficulty";
 import type { DifficultyResult, PackageTestResults } from "../types/testResult";
 import { useAuth } from "./useAuth";
@@ -68,13 +73,9 @@ async function loadProgressCache(
   return cachedProgressRequest;
 }
 
-function getStorageKey(packageId: string): string {
-  return `lle_test_results_${packageId}`;
-}
-
 export function readResults(packageId: string): PackageTestResults {
   try {
-    const raw = localStorage.getItem(getStorageKey(packageId));
+    const raw = localStorage.getItem(getAnonymousTestResultsKey(packageId));
     if (!raw) {
       return {};
     }
@@ -88,7 +89,7 @@ export function readResults(packageId: string): PackageTestResults {
 
 export function writeResults(packageId: string, data: PackageTestResults): void {
   try {
-    localStorage.setItem(getStorageKey(packageId), JSON.stringify(data));
+    localStorage.setItem(getAnonymousTestResultsKey(packageId), JSON.stringify(data));
   } catch {
     // Private browsing or storage quota exceeded - silently no-op
   }
@@ -127,12 +128,18 @@ export function useTestResults(packageId: string): {
     void loadProgressCache(token).then((map) => {
       if (cancelled) return;
       const row = map.get(packageId);
-      const nextResults = row ? toPackageResultsFromServerRow(row) : {};
+      const localSeed = readAnonymousProgressSeeds().find(
+        (seed) => seed.package_id === packageId,
+      );
+      const nextResults = row
+        ? toPackageResultsFromServerRow(row)
+        : readResults(packageId);
       setResults(nextResults);
       resultsRef.current = nextResults;
       setProgressMetadata({
-        attemptCount: row?.attempt_count ?? 0,
-        firstCompletedAt: row?.first_completed_at ?? null,
+        attemptCount: row?.attempt_count ?? localSeed?.attempt_count ?? 0,
+        firstCompletedAt:
+          row?.first_completed_at ?? localSeed?.first_completed_at ?? null,
       });
     });
 

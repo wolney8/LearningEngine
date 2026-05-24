@@ -29,13 +29,45 @@ const TIMEOUT_MS = 10_000;
 const ADMIN_TOKEN_KEY = "lle_admin_token";
 const AUTH_TOKEN_KEY = "lle_auth_token";
 const ANONYMOUS_XP_KEY = "lle_xp";
+const ANONYMOUS_DAILY_STREAK_KEY = "lle_daily_streak";
+const ANONYMOUS_LAST_ACTIVE_KEY = "lle_last_active";
+const ANONYMOUS_ATTEMPT_KEY_PREFIX = "lle_attempt_";
+const ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX = "lle_completed_";
+const ANONYMOUS_TEST_RESULTS_KEY_PREFIX = "lle_test_results_";
 const XP_RECONCILIATION_DECISION_KEY_PREFIX = "lle_xp_reconciled_user_";
+const ISO_LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+export const ANONYMOUS_LOCAL_STORAGE_KEYS = {
+  xp: ANONYMOUS_XP_KEY,
+  dailyStreak: ANONYMOUS_DAILY_STREAK_KEY,
+  lastActive: ANONYMOUS_LAST_ACTIVE_KEY,
+  attemptPrefix: ANONYMOUS_ATTEMPT_KEY_PREFIX,
+  firstCompletionPrefix: ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX,
+  testResultsPrefix: ANONYMOUS_TEST_RESULTS_KEY_PREFIX,
+} as const;
+
+export interface AnonymousProgressSeed {
+  package_id: string;
+  latest_weighted_score: number;
+  completed: boolean;
+  attempt_count: number;
+  first_completed_at: string | null;
+}
+
+export interface AnonymousStreakSnapshot {
+  streak_count: number;
+  last_practised_date: string | null;
+}
+
 const UserXPSchema = z.object({
   xp: z.number().int().nonnegative(),
 });
 const UserStreakSchema = z.object({
   streak_count: z.number().int().nonnegative(),
   last_practised_date: z.string().nullable(),
+});
+const UserStreakUpdateSchema = z.object({
+  streak_count: z.number().int().nonnegative(),
+  last_practised_date: z.string().regex(ISO_LOCAL_DATE_RE).nullable(),
 });
 
 async function fetchWithTimeout(
@@ -148,6 +180,232 @@ export function writeAnonymousXP(xp: number): void {
 export function clearAnonymousXP(): void {
   try {
     localStorage.removeItem(ANONYMOUS_XP_KEY);
+  } catch {
+    // Storage unavailable - silently no-op
+  }
+}
+
+export function getAnonymousAttemptKey(packageId: string): string {
+  return `${ANONYMOUS_ATTEMPT_KEY_PREFIX}${packageId}`;
+}
+
+export function getAnonymousFirstCompletionKey(packageId: string): string {
+  return `${ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX}${packageId}`;
+}
+
+export function getAnonymousTestResultsKey(packageId: string): string {
+  return `${ANONYMOUS_TEST_RESULTS_KEY_PREFIX}${packageId}`;
+}
+
+function toDateIsoIfValid(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return new Date(parsed).toISOString();
+}
+
+function parseAnonymousAttemptCount(raw: string | null): number {
+  if (!raw) {
+    return 0;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { count?: unknown };
+    if (typeof parsed.count !== "number") {
+      return 0;
+    }
+    if (!Number.isFinite(parsed.count) || parsed.count < 0) {
+      return 0;
+    }
+    return Math.floor(parsed.count);
+  } catch {
+    return 0;
+  }
+}
+
+function collectAnonymousPackageIds(): string[] {
+  const ids = new Set<string>();
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key) {
+      continue;
+    }
+
+    if (key.startsWith(ANONYMOUS_ATTEMPT_KEY_PREFIX)) {
+      ids.add(key.slice(ANONYMOUS_ATTEMPT_KEY_PREFIX.length));
+    } else if (key.startsWith(ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX)) {
+      ids.add(key.slice(ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX.length));
+    } else if (key.startsWith(ANONYMOUS_TEST_RESULTS_KEY_PREFIX)) {
+      ids.add(key.slice(ANONYMOUS_TEST_RESULTS_KEY_PREFIX.length));
+    }
+  }
+
+  return [...ids].filter((id) => id.length > 0);
+}
+
+function readAnonymousResultSnapshot(packageId: string): {
+  completed: boolean;
+  latestWeightedScore: number;
+  firstCompletedAt: string | null;
+} {
+  const key = getAnonymousTestResultsKey(packageId);
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    return {
+      completed: false,
+      latestWeightedScore: 0,
+      firstCompletedAt: null,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") {
+      return {
+        completed: false,
+        latestWeightedScore: 0,
+        firstCompletedAt: null,
+      };
+    }
+
+    let completed = false;
+    let highestScore = 0;
+    let earliestCompletedAt: string | null = null;
+
+    for (const value of Object.values(parsed)) {
+      if (!value || typeof value !== "object") {
+        continue;
+      }
+
+      const result = value as {
+        passed?: unknown;
+        bestScore?: unknown;
+        lastAttemptedAt?: unknown;
+      };
+
+      if (typeof result.bestScore === "number" && Number.isFinite(result.bestScore)) {
+        highestScore = Math.max(highestScore, result.bestScore);
+      }
+
+      if (result.passed === true) {
+        completed = true;
+        const candidate = toDateIsoIfValid(result.lastAttemptedAt);
+        if (!candidate) {
+          continue;
+        }
+        if (!earliestCompletedAt || candidate < earliestCompletedAt) {
+          earliestCompletedAt = candidate;
+        }
+      }
+    }
+
+    return {
+      completed,
+      latestWeightedScore: Math.min(1, Math.max(0, highestScore / 100)),
+      firstCompletedAt: earliestCompletedAt,
+    };
+  } catch {
+    return {
+      completed: false,
+      latestWeightedScore: 0,
+      firstCompletedAt: null,
+    };
+  }
+}
+
+export function readAnonymousProgressSeeds(): AnonymousProgressSeed[] {
+  try {
+    const rows: AnonymousProgressSeed[] = [];
+
+    for (const packageId of collectAnonymousPackageIds()) {
+      const attemptCount = parseAnonymousAttemptCount(
+        localStorage.getItem(getAnonymousAttemptKey(packageId)),
+      );
+      const completionFlag =
+        localStorage.getItem(getAnonymousFirstCompletionKey(packageId)) === "1";
+      const resultsSnapshot = readAnonymousResultSnapshot(packageId);
+      const completed = completionFlag || resultsSnapshot.completed;
+
+      if (attemptCount <= 0 && !completed && resultsSnapshot.latestWeightedScore <= 0) {
+        continue;
+      }
+
+      rows.push({
+        package_id: packageId,
+        latest_weighted_score: resultsSnapshot.latestWeightedScore,
+        completed,
+        attempt_count: attemptCount,
+        first_completed_at: completed ? resultsSnapshot.firstCompletedAt : null,
+      });
+    }
+
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+export function readAnonymousStreakSnapshot(): AnonymousStreakSnapshot {
+  try {
+    const rawStreak = localStorage.getItem(ANONYMOUS_DAILY_STREAK_KEY);
+    const streakNumber = Number(rawStreak);
+    const streakCount =
+      Number.isFinite(streakNumber) && streakNumber >= 0 ? Math.floor(streakNumber) : 0;
+
+    const rawLastPractisedDate = localStorage.getItem(ANONYMOUS_LAST_ACTIVE_KEY);
+    const lastPractisedDate =
+      typeof rawLastPractisedDate === "string" &&
+      ISO_LOCAL_DATE_RE.test(rawLastPractisedDate)
+        ? rawLastPractisedDate
+        : null;
+
+    return {
+      streak_count: streakCount,
+      last_practised_date: lastPractisedDate,
+    };
+  } catch {
+    return {
+      streak_count: 0,
+      last_practised_date: null,
+    };
+  }
+}
+
+function readAnonymousPrefixedKeys(): string[] {
+  const keys: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key) {
+      continue;
+    }
+
+    if (
+      key.startsWith(ANONYMOUS_ATTEMPT_KEY_PREFIX) ||
+      key.startsWith(ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX) ||
+      key.startsWith(ANONYMOUS_TEST_RESULTS_KEY_PREFIX)
+    ) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+export function resetAnonymousLocalProgress(): void {
+  try {
+    localStorage.removeItem(ANONYMOUS_XP_KEY);
+    localStorage.removeItem(ANONYMOUS_DAILY_STREAK_KEY);
+    localStorage.removeItem(ANONYMOUS_LAST_ACTIVE_KEY);
+
+    for (const key of readAnonymousPrefixedKeys()) {
+      localStorage.removeItem(key);
+    }
   } catch {
     // Storage unavailable - silently no-op
   }
@@ -282,6 +540,34 @@ export async function markMyStreakPractisedToday(token: string): Promise<{
       headers: getAuthHeaders(token),
     },
   );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Could not update user streak (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return UserStreakSchema.parse(data);
+}
+
+export async function updateMyStreakSnapshot(
+  token: string,
+  payload: {
+    streak_count: number;
+    last_practised_date: string | null;
+  },
+): Promise<{
+  streak_count: number;
+  last_practised_date: string | null;
+}> {
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/streak`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify(UserStreakUpdateSchema.parse(payload)),
+  });
 
   if (!response.ok) {
     const detail = await response.text();

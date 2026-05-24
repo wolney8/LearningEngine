@@ -276,14 +276,27 @@ test.describe("XP persistence", () => {
     expect(serverXPCalls).toBe(0);
   });
 
-  test("login keep-account decision skips server XP write and clears anonymous XP key", async ({
+  test("login keep-account decision skips server writes and clears anonymous local state", async ({
     page,
   }) => {
     let putCalls = 0;
+    let progressPutCalls = 0;
+    let streakPutCalls = 0;
     let promptCount = 0;
+    let promptMessage = "";
+    const serverProgressRow = {
+      user_id: 9,
+      package_id: PACKAGE_ID,
+      attempt_count: 2,
+      completed: true,
+      latest_weighted_score: 0.7,
+      first_completed_at: "2026-05-23T00:00:00Z",
+      updated_at: "2026-05-23T00:00:00Z",
+    };
 
     page.on("dialog", async (dialog) => {
       promptCount += 1;
+      promptMessage = dialog.message();
       await dialog.dismiss();
     });
 
@@ -341,8 +354,59 @@ test.describe("XP persistence", () => {
       });
     });
 
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([serverProgressRow]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress/${PACKAGE_ID}`, (route) => {
+      if (route.request().method() === "PUT") {
+        progressPutCalls += 1;
+      }
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(serverProgressRow),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      if (route.request().method() === "PUT") {
+        streakPutCalls += 1;
+      }
+
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 4,
+          last_practised_date: "2026-05-23",
+        }),
+      });
+    });
+
     await page.goto("/");
     await page.evaluate(() => localStorage.setItem("lle_xp", "500"));
+    await page.evaluate(() => {
+      localStorage.setItem("lle_daily_streak", "3");
+      localStorage.setItem("lle_last_active", "2026-05-24");
+      localStorage.setItem("lle_attempt_xp-pkg", '{"count":2}');
+      localStorage.setItem("lle_completed_xp-pkg", "1");
+      localStorage.setItem(
+        "lle_test_results_xp-pkg",
+        JSON.stringify({
+          normal: {
+            passed: true,
+            bestScore: 70,
+            bestXpEarned: 20,
+            lastAttemptedAt: "2026-05-24T09:00:00Z",
+          },
+        }),
+      );
+    });
 
     await page.goto("/login");
     await page.getByLabel("Username or email").fill("keep-user");
@@ -351,13 +415,31 @@ test.describe("XP persistence", () => {
 
     await expect(page).toHaveURL("/");
     await expect.poll(() => promptCount).toBe(1);
+    await expect
+      .poll(() => promptMessage.includes("import this local data"))
+      .toBeTruthy();
+    await expect
+      .poll(() => promptMessage.includes("will not be overwritten"))
+      .toBeTruthy();
     expect(putCalls).toBe(0);
+    expect(progressPutCalls).toBe(0);
+    expect(streakPutCalls).toBe(0);
 
     const storage = await page.evaluate(() => ({
       xp: localStorage.getItem("lle_xp"),
+      streak: localStorage.getItem("lle_daily_streak"),
+      lastActive: localStorage.getItem("lle_last_active"),
+      attempt: localStorage.getItem("lle_attempt_xp-pkg"),
+      completed: localStorage.getItem("lle_completed_xp-pkg"),
+      results: localStorage.getItem("lle_test_results_xp-pkg"),
       decision: localStorage.getItem("lle_xp_reconciled_user_9"),
     }));
     expect(storage.xp).toBeNull();
+    expect(storage.streak).toBeNull();
+    expect(storage.lastActive).toBeNull();
+    expect(storage.attempt).toBeNull();
+    expect(storage.completed).toBeNull();
+    expect(storage.results).toBeNull();
     expect(storage.decision).toBe("1");
   });
 
@@ -435,6 +517,11 @@ test.describe("XP persistence", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL("/");
     await expect.poll(() => promptCount).toBe(1);
+    await expect
+      .poll(async () =>
+        page.evaluate(() => localStorage.getItem("lle_xp_reconciled_user_12")),
+      )
+      .toBe("1");
 
     await page.goto("/");
     await page.evaluate(() => localStorage.setItem("lle_xp", "300"));

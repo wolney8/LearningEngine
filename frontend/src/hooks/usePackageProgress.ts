@@ -31,8 +31,8 @@ export function usePackageProgress(packageIds: string[]): Map<string, PackageSta
       })
       .catch(() => {
         if (cancelled) return;
-        // Keep the UI usable when progress fetch fails.
-        setServerProgress(new Map<string, PackageStatus>());
+        // Keep local status visible if server fetch fails.
+        setServerProgress(null);
       });
 
     return () => {
@@ -41,10 +41,10 @@ export function usePackageProgress(packageIds: string[]): Map<string, PackageSta
   }, [status, token]);
 
   return useMemo(() => {
-    if (status === "authenticated" && token) {
+    if (status === "authenticated" && token && serverProgress !== null) {
       const map = new Map<string, PackageStatus>();
       for (const id of packageIds) {
-        map.set(id, serverProgress?.get(id) ?? "incomplete");
+        map.set(id, serverProgress.get(id) ?? "incomplete");
       }
       return map;
     }

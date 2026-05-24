@@ -5,6 +5,7 @@ import { PackageCard } from "../components/PackageCard";
 import { PackageFilterBar } from "../components/PackageFilterBar";
 import type { FilterKey, FilterOption } from "../components/PackageFilterBar";
 import { PackageSearchBar } from "../components/PackageSearchBar";
+import { useAuth } from "../hooks/useAuth";
 import { usePackageProgress } from "../hooks/usePackageProgress";
 import { useStreak } from "../hooks/useStreak";
 import type { PackageSummary } from "../schemas/package";
@@ -27,6 +28,7 @@ function parseFilter(value: string | null): FilterKey {
 }
 
 export function PackageListPage() {
+  const { status: authStatus, user, logout } = useAuth();
   const { dailyStreak } = useStreak();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
   const [status, setStatus] = useState<"loading" | "error" | "loaded">("loading");
@@ -151,11 +153,27 @@ export function PackageListPage() {
     <main className="package-list-page">
       <h1>Local Learning Engine</h1>
       <p className="package-list-page__subtitle">Pick a package to start learning</p>
-      <p className="package-list-page__auth-links">
-        <Link to="/login">Sign in</Link>
-        <span aria-hidden="true">|</span>
-        <Link to="/register">Create account</Link>
-      </p>
+      {authStatus === "authenticated" && user ? (
+        <p className="package-list-page__auth-links" aria-live="polite">
+          <span className="package-list-page__auth-user">
+            Signed in as {user.username}
+          </span>
+          <button
+            type="button"
+            className="package-list-page__auth-action"
+            onClick={logout}
+            aria-label="Sign out"
+          >
+            Sign out
+          </button>
+        </p>
+      ) : (
+        <p className="package-list-page__auth-links">
+          <Link to="/login">Sign in</Link>
+          <span aria-hidden="true">|</span>
+          <Link to="/register">Create account</Link>
+        </p>
+      )}
       {dailyStreak > 0 && (
         <p
           className="package-list-page__streak"

@@ -9,18 +9,25 @@ import {
 } from "react";
 import type { LoginRequest, RegisterRequest, User } from "../schemas/auth";
 import {
-  clearAnonymousXP,
+  clearAdminToken,
   clearAuthToken,
   fetchCurrentUser,
+  fetchMyProgress,
+  fetchMyStreak,
   fetchMyXP,
   getAuthToken,
   hasXPReconciliationDecision,
   loginUser,
   markXPReconciliationDecision,
+  readAnonymousProgressSeeds,
+  readAnonymousStreakSnapshot,
   readAnonymousXP,
   registerUser,
+  resetAnonymousLocalProgress,
   setAuthToken,
+  updateMyStreakSnapshot,
   updateMyXP,
+  upsertMyProgressForPackage,
 } from "../services/api";
 
 export type AuthStatus = "idle" | "loading" | "authenticated" | "error";
@@ -33,9 +40,24 @@ export type AuthContextValue = {
   login: (payload: LoginRequest) => Promise<void>;
   register: (payload: RegisterRequest) => Promise<void>;
   logout: () => void;
+  resetAnonymousLocalProgress: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function earliestNonNull(a: string | null, b: string | null): string | null {
+  if (a && b) {
+    return a < b ? a : b;
+  }
+  return a ?? b;
+}
+
+function laterDate(a: string | null, b: string | null): string | null {
+  if (a && b) {
+    return a > b ? a : b;
+  }
+  return a ?? b;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -74,30 +96,117 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [token]);
 
-  const reconcileAnonymousXP = useCallback(
+  const reconcileAnonymousLocalState = useCallback(
     async (nextToken: string, userId: number) => {
       if (hasXPReconciliationDecision(userId)) {
         return;
       }
 
       const anonymousXP = readAnonymousXP();
-      if (anonymousXP === null) {
+      const anonymousProgress = readAnonymousProgressSeeds();
+      const anonymousStreak = readAnonymousStreakSnapshot();
+      const hasAnonymousData =
+        anonymousXP !== null ||
+        anonymousProgress.length > 0 ||
+        anonymousStreak.streak_count > 0 ||
+        anonymousStreak.last_practised_date !== null;
+
+      if (!hasAnonymousData) {
+        markXPReconciliationDecision(userId);
         return;
       }
 
-      const shouldImportAnonymousXP = window.confirm(
-        "Import XP from this device into your account?",
+      const shouldImportAnonymousData = window.confirm(
+        "We found local anonymous data on this device (XP, saved progress, and streak).\n\nPress OK to import this local data into your account.\n\nYour existing account progress is safe and will not be overwritten.",
       );
 
       try {
-        if (shouldImportAnonymousXP) {
-          const serverXP = await fetchMyXP(nextToken);
-          const mergedXP = Math.max(anonymousXP, serverXP);
-          await updateMyXP(nextToken, mergedXP);
+        if (shouldImportAnonymousData) {
+          if (anonymousXP !== null) {
+            try {
+              const serverXP = await fetchMyXP(nextToken);
+              const mergedXP = Math.max(anonymousXP, serverXP);
+              await updateMyXP(nextToken, mergedXP);
+            } catch {
+              // Reconciliation is best-effort and must not block auth success.
+            }
+          }
+
+          try {
+            const serverRows = await fetchMyProgress(nextToken);
+            const serverByPackageId = new Map(
+              serverRows.map((row) => [row.package_id, row] as const),
+            );
+
+            for (const localRow of anonymousProgress) {
+              const serverRow = serverByPackageId.get(localRow.package_id);
+
+              const mergedAttemptCount = Math.max(
+                localRow.attempt_count,
+                serverRow?.attempt_count ?? 0,
+              );
+              const mergedCompleted =
+                localRow.completed || (serverRow?.completed ?? false);
+              const mergedLatestWeightedScore = Math.max(
+                localRow.latest_weighted_score,
+                serverRow?.latest_weighted_score ?? 0,
+              );
+              const mergedFirstCompletedAt = earliestNonNull(
+                localRow.first_completed_at,
+                serverRow?.first_completed_at ?? null,
+              );
+
+              const shouldUpsert =
+                !serverRow ||
+                mergedAttemptCount !== serverRow.attempt_count ||
+                mergedCompleted !== serverRow.completed ||
+                mergedLatestWeightedScore !== serverRow.latest_weighted_score ||
+                (serverRow.first_completed_at === null &&
+                  mergedFirstCompletedAt !== null);
+
+              if (!shouldUpsert) {
+                continue;
+              }
+
+              await upsertMyProgressForPackage(nextToken, localRow.package_id, {
+                latest_weighted_score: mergedLatestWeightedScore,
+                completed: mergedCompleted,
+                ...(mergedAttemptCount > 0
+                  ? { attempt_count: mergedAttemptCount }
+                  : {}),
+              });
+            }
+          } catch {
+            // Reconciliation is best-effort and must not block auth success.
+          }
+
+          try {
+            const serverStreak = await fetchMyStreak(nextToken);
+            const mergedStreakCount =
+              serverStreak.streak_count === 0 && anonymousStreak.streak_count > 0
+                ? anonymousStreak.streak_count
+                : serverStreak.streak_count;
+            const mergedLastPractisedDate = laterDate(
+              serverStreak.last_practised_date,
+              anonymousStreak.last_practised_date,
+            );
+
+            if (
+              mergedStreakCount !== serverStreak.streak_count ||
+              mergedLastPractisedDate !== serverStreak.last_practised_date
+            ) {
+              await updateMyStreakSnapshot(nextToken, {
+                streak_count: mergedStreakCount,
+                last_practised_date: mergedLastPractisedDate,
+              });
+            }
+          } catch {
+            // Reconciliation is best-effort and must not block auth success.
+          }
         }
       } finally {
         // Decision persistence and local cleanup happen for both choices.
-        clearAnonymousXP();
+        resetAnonymousLocalProgress();
         markXPReconciliationDecision(userId);
       }
     },
@@ -114,7 +223,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(response.access_token);
         setUser(response.user);
         setStatus("authenticated");
-        void reconcileAnonymousXP(response.access_token, response.user.id).catch(() => {
+        void reconcileAnonymousLocalState(
+          response.access_token,
+          response.user.id,
+        ).catch(() => {
           // Reconciliation is best-effort and must not block auth success.
         });
       } catch (err) {
@@ -123,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [reconcileAnonymousXP],
+    [reconcileAnonymousLocalState],
   );
 
   const register = useCallback(
@@ -136,7 +248,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(response.access_token);
         setUser(response.user);
         setStatus("authenticated");
-        void reconcileAnonymousXP(response.access_token, response.user.id).catch(() => {
+        void reconcileAnonymousLocalState(
+          response.access_token,
+          response.user.id,
+        ).catch(() => {
           // Reconciliation is best-effort and must not block auth success.
         });
       } catch (err) {
@@ -145,11 +260,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [reconcileAnonymousXP],
+    [reconcileAnonymousLocalState],
   );
 
   const logout = useCallback(() => {
+    clearAdminToken();
     clearAuthToken();
+    resetAnonymousLocalProgress();
     setToken(null);
     setUser(null);
     setStatus("idle");
@@ -165,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      resetAnonymousLocalProgress,
     }),
     [error, login, logout, register, status, token, user],
   );

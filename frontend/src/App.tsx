@@ -11,10 +11,12 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { TestModePage } from "./pages/TestModePage";
 
 function AppRoutes() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
+  const authBoundaryKey =
+    status === "authenticated" && user ? `auth-${user.id}` : "anonymous";
 
   return (
-    <div data-auth-status={status}>
+    <div key={authBoundaryKey} data-auth-status={status}>
       <Routes>
         <Route path="/" element={<PackageListPage />} />
         <Route path="/login" element={<LoginPage />} />
