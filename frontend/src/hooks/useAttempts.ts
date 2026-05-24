@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getAnonymousAttemptKey } from "../services/api";
 
 interface AttemptRecord {
   count: number;
@@ -13,7 +14,7 @@ export function useAttempts(packageId: string): {
   attemptNumber: number;
   recordAttempt: () => void;
 } {
-  const key = `lle_attempt_${packageId}`;
+  const key = getAnonymousAttemptKey(packageId);
 
   function readRecord(): AttemptRecord {
     const today = getToday();

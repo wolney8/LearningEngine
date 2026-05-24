@@ -1,23 +1,18 @@
-import { useState } from "react";
-
-const XP_KEY = "lle_xp";
+import { useEffect, useRef, useState } from "react";
+import {
+  fetchMyXP,
+  readAnonymousXP,
+  updateMyXP,
+  writeAnonymousXP,
+} from "../services/api";
+import { useAuth } from "./useAuth";
 
 function readXP(): number {
-  try {
-    const raw = localStorage.getItem(XP_KEY);
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-  } catch {
-    return 0;
-  }
+  return readAnonymousXP() ?? 0;
 }
 
 function writeXP(value: number): void {
-  try {
-    localStorage.setItem(XP_KEY, String(value));
-  } catch {
-    // Private browsing or storage quota exceeded - silently no-op
-  }
+  writeAnonymousXP(value);
 }
 
 export function useXP(): {
@@ -25,23 +20,85 @@ export function useXP(): {
   addXP: (amount: number) => void;
   subtractXP: (amount: number) => void;
 } {
+  const { token, status } = useAuth();
   const [xp, setXP] = useState<number>(readXP);
+  const requestChain = useRef<Promise<void>>(Promise.resolve());
+  const xpRef = useRef<number>(xp);
+
+  useEffect(() => {
+    xpRef.current = xp;
+  }, [xp]);
+
+  useEffect(() => {
+    if (!token || status !== "authenticated") {
+      const localXP = readXP();
+      xpRef.current = localXP;
+      setXP(localXP);
+      return;
+    }
+
+    let cancelled = false;
+    void fetchMyXP(token)
+      .then((nextXP) => {
+        if (!cancelled) {
+          xpRef.current = nextXP;
+          setXP(nextXP);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          xpRef.current = 0;
+          setXP(0);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, token]);
+
+  function persistAuthenticatedXP(nextXP: number): void {
+    if (!token) {
+      return;
+    }
+
+    requestChain.current = requestChain.current
+      .then(async () => {
+        const persistedXP = await updateMyXP(token, nextXP);
+        xpRef.current = persistedXP;
+        setXP(persistedXP);
+      })
+      .catch(() => {
+        // Keep UI responsive if the save fails; server state remains authoritative.
+      });
+  }
 
   function addXP(amount: number): void {
-    setXP((prev) => {
-      const next = prev + amount;
-      writeXP(next);
-      return next;
-    });
+    const base = token && status === "authenticated" ? xpRef.current : readXP();
+    const next = base + amount;
+    xpRef.current = next;
+    setXP(next);
+
+    if (token && status === "authenticated") {
+      persistAuthenticatedXP(next);
+      return;
+    }
+
+    writeXP(next);
   }
 
   function subtractXP(amount: number): void {
-    setXP(() => {
-      const current = readXP();
-      const next = Math.max(0, current - amount);
-      writeXP(next);
-      return next;
-    });
+    const base = token && status === "authenticated" ? xpRef.current : readXP();
+    const next = Math.max(0, base - amount);
+    xpRef.current = next;
+    setXP(next);
+
+    if (token && status === "authenticated") {
+      persistAuthenticatedXP(next);
+      return;
+    }
+
+    writeXP(next);
   }
 
   return { xp, addXP, subtractXP };

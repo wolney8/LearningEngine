@@ -1,0 +1,13 @@
+import { useAuthContext } from "../context/AuthContext";
+
+export function useAuth(): {
+  user: ReturnType<typeof useAuthContext>["user"];
+  token: string | null;
+  status: ReturnType<typeof useAuthContext>["status"];
+  error: string;
+  login: ReturnType<typeof useAuthContext>["login"];
+  register: ReturnType<typeof useAuthContext>["register"];
+  logout: () => void;
+} {
+  return useAuthContext();
+}

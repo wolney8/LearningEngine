@@ -4,9 +4,11 @@ import { CompletionScreen } from "../components/CompletionScreen";
 import { QuestionView } from "../components/QuestionView";
 import { StudyPageView } from "../components/StudyPageView";
 import { useAttempts } from "../hooks/useAttempts";
+import { useAuth } from "../hooks/useAuth";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
 import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
+import { useTestResults } from "../hooks/useTestResults";
 import { useXP } from "../hooks/useXP";
 import type { Package } from "../schemas/package";
 import { fetchPackage } from "../services/api";
@@ -51,7 +53,17 @@ export function LessonPage() {
   const { markPractised } = useStreak();
   const { attemptNumber, recordAttempt } = useAttempts(id ?? "");
   const { isFirstCompletion, markCompleted } = useFirstCompletion(id ?? "");
+  const { status } = useAuth();
+  const { saveResult, progressMetadata } = useTestResults(id ?? "");
   const { settings } = useSettings();
+
+  const isAuthenticated = status === "authenticated";
+  const activeAttemptNumber = isAuthenticated
+    ? (progressMetadata?.attemptCount ?? 0) + 1
+    : attemptNumber;
+  const activeIsFirstCompletion = isAuthenticated
+    ? progressMetadata?.firstCompletedAt == null
+    : isFirstCompletion;
 
   const [pkg, setPkg] = useState<Package | null>(null);
   const [phase, setPhase] = useState<LessonPhase>({ kind: "loading" });
@@ -127,8 +139,8 @@ export function LessonPage() {
 
     if (nextQIndex >= pkg.questions.length) {
       // All questions done
-      const currentAttemptNumber = attemptNumber;
-      const wasFirstCompletion = isFirstCompletion;
+      const currentAttemptNumber = activeAttemptNumber;
+      const wasFirstCompletion = activeIsFirstCompletion;
       const multiplier =
         settings.xp.attempt_multipliers[
           String(currentAttemptNumber) as "1" | "2" | "3"
@@ -136,15 +148,34 @@ export function LessonPage() {
       const baseXP = newCorrectCount * settings.xp.lesson_base_xp_per_correct;
       let earned = Math.round(baseXP * multiplier);
 
-      recordAttempt();
-
-      if (wasFirstCompletion) {
-        markCompleted();
-        earned += settings.xp.first_completion_bonus;
+      if (isAuthenticated) {
+        if (wasFirstCompletion) {
+          earned += settings.xp.first_completion_bonus;
+        }
+      } else {
+        recordAttempt();
+        if (wasFirstCompletion) {
+          markCompleted();
+          earned += settings.xp.first_completion_bonus;
+        }
       }
 
       addXP(earned);
       markPractised();
+
+      if (isAuthenticated) {
+        saveResult(
+          "normal",
+          {
+            passed: true,
+            bestScore: Math.round((newCorrectCount / pkg.questions.length) * 100),
+            bestXpEarned: earned,
+            lastAttemptedAt: new Date().toISOString(),
+          },
+          { attemptCount: currentAttemptNumber },
+        );
+      }
+
       setPhase({
         kind: "complete",
         correctCount: newCorrectCount,
@@ -188,7 +219,7 @@ export function LessonPage() {
 
       <main className="lesson-page__content">
         {(phase.kind === "studying" || phase.kind === "questions") &&
-          attemptNumber > 1 && (
+          activeAttemptNumber > 1 && (
             <div className="lesson-page__reduced-xp-notice" aria-live="polite">
               Reduced XP this attempt
             </div>

@@ -124,8 +124,10 @@ The handoff experience depends on whether the phase produces visible UI:
 ### Phases with UI changes (frontend components, pages, routes)
 
 1. After all gates pass, start the development servers locally:
-  - Backend: `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload`
-  - Frontend: `cd frontend && pnpm dev`
+
+- Backend: `cd backend && source .venv/bin/activate && uvicorn app.main:app --reload`
+- Frontend: `cd frontend && pnpm dev`
+
 2. Report to the user: "Running at **http://localhost:5173** — please [specific scenario: e.g. 'open the package list and click a card']."
 3. The user tests by interacting with the running app — not by reading files.
 4. When the user says it works (or flags an issue), that is the approval signal.

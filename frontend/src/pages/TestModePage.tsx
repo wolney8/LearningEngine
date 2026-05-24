@@ -4,6 +4,7 @@ import { QuestionCard } from "../components/QuestionCard";
 import { TestNavigator } from "../components/TestNavigator";
 import { TestResultsScreen } from "../components/TestResultsScreen";
 import { useAttempts } from "../hooks/useAttempts";
+import { useAuth } from "../hooks/useAuth";
 import { useCountdown } from "../hooks/useCountdown";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
 import { useSettings } from "../hooks/useSettings";
@@ -68,8 +69,17 @@ export function TestModePage() {
   const { isFirstCompletion, markCompleted } = useFirstCompletion(`test_${id}`);
   const { addXP, subtractXP } = useXP();
   const { markPractised } = useStreak();
-  const { saveResult } = useTestResults(id);
+  const { status } = useAuth();
+  const { saveResult, progressMetadata } = useTestResults(id);
   const { settings } = useSettings();
+
+  const isAuthenticated = status === "authenticated";
+  const activeAttemptNumber = isAuthenticated
+    ? (progressMetadata?.attemptCount ?? 0) + 1
+    : attemptNumber;
+  const activeIsFirstCompletion = isAuthenticated
+    ? progressMetadata?.firstCompletedAt == null
+    : isFirstCompletion;
 
   const inProgress = phase.kind === "in-progress" ? phase : null;
   const { timeRemaining } = useCountdown(
@@ -222,17 +232,25 @@ export function TestModePage() {
         correctCount < settings.xp.min_correct_for_xp[difficulty];
 
       const attemptMult =
-        settings.xp.attempt_multipliers[String(attemptNumber) as "1" | "2" | "3"] ?? 0;
+        settings.xp.attempt_multipliers[
+          String(activeAttemptNumber) as "1" | "2" | "3"
+        ] ?? 0;
       const diffMult = settings.difficulty.xp_multiplier[difficulty];
       const mult = attemptMult * diffMult;
       let earned = minimumAnswerGateApplies ? 0 : Math.round(weightScore * mult);
-      const wasFirst = isFirstCompletion;
+      const wasFirst = activeIsFirstCompletion;
       const awardFirstCompletionBonus = wasFirst && !minimumAnswerGateApplies;
 
-      recordAttempt();
-      if (awardFirstCompletionBonus) {
-        markCompleted();
-        earned += settings.xp.first_completion_bonus;
+      if (isAuthenticated) {
+        if (awardFirstCompletionBonus) {
+          earned += settings.xp.first_completion_bonus;
+        }
+      } else {
+        recordAttempt();
+        if (awardFirstCompletionBonus) {
+          markCompleted();
+          earned += settings.xp.first_completion_bonus;
+        }
       }
 
       if (!minimumAnswerGateApplies) {
@@ -249,7 +267,7 @@ export function TestModePage() {
         weightScore,
         passed,
         xpEarned: earned,
-        attemptNumber,
+        attemptNumber: activeAttemptNumber,
         wasFirstCompletion: awardFirstCompletionBonus,
         timedOut,
       });
@@ -259,17 +277,24 @@ export function TestModePage() {
           ? Math.round((weightScore / totalPossibleWeight) * 100)
           : 0;
 
-      saveResult(difficulty, {
-        passed,
-        bestScore: scorePercent,
-        bestXpEarned: earned,
-        lastAttemptedAt: new Date().toISOString(),
-      });
+      saveResult(
+        difficulty,
+        {
+          passed,
+          bestScore: scorePercent,
+          bestXpEarned: earned,
+          lastAttemptedAt: new Date().toISOString(),
+        },
+        {
+          attemptCount: isAuthenticated ? activeAttemptNumber : undefined,
+        },
+      );
     },
     [
       addXP,
-      attemptNumber,
-      isFirstCompletion,
+      activeAttemptNumber,
+      activeIsFirstCompletion,
+      isAuthenticated,
       markCompleted,
       markPractised,
       phase,

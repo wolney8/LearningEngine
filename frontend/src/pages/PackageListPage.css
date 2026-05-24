@@ -20,6 +20,49 @@
   font-weight: 400;
 }
 
+.package-list-page__auth-links {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: -1.25rem 0 1.25rem;
+  font-family: "Inter", sans-serif;
+  font-size: 0.95rem;
+}
+
+.package-list-page__auth-links a {
+  color: #4338ca;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.package-list-page__auth-links a:hover {
+  text-decoration: underline;
+}
+
+.package-list-page__auth-user {
+  color: #4b5563;
+}
+
+.package-list-page__auth-action {
+  border: 1px solid #c7d2fe;
+  border-radius: 9999px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 0.2rem 0.65rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.package-list-page__auth-action:hover {
+  background: #e0e7ff;
+}
+
+.package-list-page__auth-action:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
 .package-list-page__streak {
   font-family: "Nunito", sans-serif;
   font-weight: 700;
