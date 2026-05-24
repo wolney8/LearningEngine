@@ -10,9 +10,9 @@ from app.models.package import Package
 from app.models.user import User, UserLibraryItem
 from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
+from app.services.library_selection import validate_selectable_package_ids
 from app.services.overrides_loader import (
     PackageOverride,
-    resolve_effective_availability,
 )
 from app.services.security import create_access_token, hash_password, verify_password
 
@@ -76,7 +76,7 @@ def _deduplicate_package_ids(package_ids: list[str]) -> list[str]:
         package_id = raw_package_id.strip()
         if not package_id:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="selected_package_ids must not contain empty values",
             )
         if package_id in seen:
@@ -84,18 +84,6 @@ def _deduplicate_package_ids(package_ids: list[str]) -> list[str]:
         seen.add(package_id)
         deduplicated.append(package_id)
     return deduplicated
-
-
-def _build_selectable_package_id_universe(
-    cache: dict[str, Package],
-    overrides: dict[str, PackageOverride],
-) -> set[str]:
-    selectable_ids: set[str] = set()
-    for pkg_id in cache:
-        availability = resolve_effective_availability(overrides.get(pkg_id))
-        if availability != "hidden":
-            selectable_ids.add(pkg_id)
-    return selectable_ids
 
 
 @router.post("/register", response_model=AuthResponse)
@@ -108,23 +96,12 @@ async def register(
     username = _normalise_username(body.username)
     email = _normalise_email(body.email)
     selected_package_ids = _deduplicate_package_ids(body.selected_package_ids or [])
-    selectable_ids = _build_selectable_package_id_universe(cache, overrides)
-    invalid_package_ids = [
-        package_id
-        for package_id in selected_package_ids
-        if package_id not in selectable_ids
-    ]
-    if invalid_package_ids:
-        message = (
-            "selected_package_ids contains unknown or hidden package ids"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": message,
-                "invalid_package_ids": invalid_package_ids,
-            },
-        )
+    validate_selectable_package_ids(
+        selected_package_ids,
+        cache,
+        overrides,
+        detail_field="selected_package_ids",
+    )
 
     existing_username = session.exec(
         select(User).where(User.username == username)

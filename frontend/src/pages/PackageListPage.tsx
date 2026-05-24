@@ -9,7 +9,13 @@ import { useAuth } from "../hooks/useAuth";
 import { usePackageProgress } from "../hooks/usePackageProgress";
 import { useStreak } from "../hooks/useStreak";
 import type { PackageSummary } from "../schemas/package";
-import { fetchMyCatalogue, fetchMyLibrary, fetchPackages } from "../services/api";
+import {
+  addToLibrary,
+  fetchMyCatalogue,
+  fetchMyLibrary,
+  fetchPackages,
+  removeFromLibrary,
+} from "../services/api";
 import "./PackageListPage.css";
 
 type PackageScope = "library" | "catalogue";
@@ -279,7 +285,26 @@ export function PackageListPage() {
               aria-label="Available packages"
             >
               {filteredPackages.map((pkg) => (
-                <PackageCard key={pkg.id} pkg={pkg} />
+                <PackageCard
+                  key={pkg.id}
+                  pkg={pkg}
+                  onAdd={
+                    isAuthenticated && effectiveScope === "catalogue" && !pkg.selected
+                      ? async () => {
+                          await addToLibrary(token as string, pkg.id);
+                          await loadPackages();
+                        }
+                      : undefined
+                  }
+                  onRemove={
+                    isAuthenticated && effectiveScope === "library"
+                      ? async () => {
+                          await removeFromLibrary(token as string, pkg.id);
+                          await loadPackages();
+                        }
+                      : undefined
+                  }
+                />
               ))}
             </section>
           )}

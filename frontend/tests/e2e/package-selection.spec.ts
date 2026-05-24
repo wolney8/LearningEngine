@@ -899,3 +899,349 @@ test.describe("Package search and filter", () => {
     await assertVisibleTitles(page, [authPackage.title]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Library management: add / remove courses
+// ---------------------------------------------------------------------------
+
+const LM_API = "http://localhost:8000";
+
+const LM_AUTH_USER = {
+  id: 200,
+  username: "lib-mgmt-user",
+  email: "lib-mgmt-user@example.com",
+  role: "student",
+  xp: 0,
+  created_at: "2026-05-23T00:00:00Z",
+};
+
+const LM_PACKAGE_UNSELECTED = {
+  id: "python-basics",
+  title: "Python Basics",
+  description: "Learn Python fundamentals.",
+  version: "1.0.0",
+  tags: ["python"],
+  passing_score: 0.75,
+  page_count: 3,
+  question_count: 4,
+  availability: "available",
+  enabled: true,
+  xp_threshold: null,
+  selected: false,
+};
+
+const LM_PACKAGE_SELECTED = {
+  ...LM_PACKAGE_UNSELECTED,
+  selected: true,
+};
+
+const LM_PACKAGE_UNAVAILABLE_UNSELECTED = {
+  id: "locked-course",
+  title: "Locked Course",
+  description: "Temporarily unavailable.",
+  version: "1.0.0",
+  tags: ["locked"],
+  passing_score: 0.75,
+  page_count: 1,
+  question_count: 1,
+  availability: "unavailable",
+  enabled: false,
+  xp_threshold: null,
+  selected: false,
+};
+
+async function seedAuthSession(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("lle_auth_token", "lib-mgmt-token");
+  });
+
+  await page.route(`${LM_API}/users/me`, (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(LM_AUTH_USER),
+    });
+  });
+
+  await page.route(`${LM_API}/users/me/streak`, (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ streak_count: 0, last_practised_date: null }),
+    });
+  });
+
+  await page.route(`${LM_API}/users/me/progress`, (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([]),
+    });
+  });
+}
+
+test.describe("Library management — authenticated users", () => {
+  const getCard = (page: Page, title: string) =>
+    page.locator("article.package-card").filter({
+      has: page.getByRole("heading", { name: new RegExp(title, "i") }),
+    });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.clear();
+    });
+  });
+
+  test("catalogue view shows Add to Library for unselected packages", async ({
+    page,
+  }) => {
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${LM_API}/users/me/catalogue`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNSELECTED]),
+      });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Full catalogue" }).click();
+
+    const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
+  });
+
+  test("catalogue view hides Add to Library for already-selected packages", async ({
+    page,
+  }) => {
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNSELECTED]),
+      });
+    });
+
+    await page.route(`${LM_API}/users/me/catalogue`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_SELECTED]),
+      });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Full catalogue" }).click();
+
+    const card = getCard(page, LM_PACKAGE_SELECTED.title);
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
+  });
+
+  test("clicking Add to Library calls PUT /users/me/library/:id and reloads", async ({
+    page,
+  }) => {
+    let putCalled = false;
+
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      if (route.request().method() === "GET") {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([]),
+        });
+        return;
+      }
+      route.fallback();
+    });
+
+    await page.route(`${LM_API}/users/me/catalogue`, (route) => {
+      // After PUT the catalogue shows the item as selected
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNSELECTED]),
+      });
+    });
+
+    await page.route(
+      `${LM_API}/users/me/library/${LM_PACKAGE_UNSELECTED.id}`,
+      (route) => {
+        if (route.request().method() === "PUT") {
+          putCalled = true;
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(LM_PACKAGE_SELECTED),
+          });
+          return;
+        }
+        route.fallback();
+      },
+    );
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Full catalogue" }).click();
+
+    const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
+    await card.getByRole("button", { name: /Add to Library/i }).click();
+
+    await expect.poll(() => putCalled).toBe(true);
+  });
+
+  test("library view shows Remove button for each course", async ({ page }) => {
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNSELECTED]),
+      });
+    });
+
+    await page.goto("/");
+
+    const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
+    await expect(card.getByRole("button", { name: /Remove/i })).toBeVisible();
+  });
+
+  test("clicking Remove calls DELETE /users/me/library/:id and reloads", async ({
+    page,
+  }) => {
+    let deleteCalled = false;
+
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      if (route.request().method() === "GET") {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([LM_PACKAGE_UNSELECTED]),
+        });
+        return;
+      }
+      route.fallback();
+    });
+
+    await page.route(
+      `${LM_API}/users/me/library/${LM_PACKAGE_UNSELECTED.id}`,
+      (route) => {
+        if (route.request().method() === "DELETE") {
+          deleteCalled = true;
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ ...LM_PACKAGE_UNSELECTED, selected: false }),
+          });
+          return;
+        }
+        route.fallback();
+      },
+    );
+
+    await page.goto("/");
+
+    const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
+    await card.getByRole("button", { name: /Remove/i }).click();
+
+    await expect.poll(() => deleteCalled).toBe(true);
+  });
+
+  test("library view does not show Add to Library buttons", async ({ page }) => {
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNSELECTED]),
+      });
+    });
+
+    await page.goto("/");
+
+    await expect(page.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
+  });
+
+  test("anonymous users see no Add to Library or Remove buttons", async ({ page }) => {
+    await page.route(`${LM_API}/packages`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNSELECTED]),
+      });
+    });
+
+    await page.goto("/");
+
+    await expect(page.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Remove/i })).toHaveCount(0);
+  });
+
+  test("unavailable packages in catalogue show Add to Library but Start Learning and Take Test remain disabled", async ({
+    page,
+  }) => {
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${LM_API}/users/me/catalogue`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNAVAILABLE_UNSELECTED]),
+      });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Full catalogue" }).click();
+    await page.getByRole("button", { name: /Unavailable/i }).click();
+
+    const card = getCard(page, LM_PACKAGE_UNAVAILABLE_UNSELECTED.title);
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
+  });
+
+  test("unavailable packages in library show Remove but Start Learning and Take Test remain disabled", async ({
+    page,
+  }) => {
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([LM_PACKAGE_UNAVAILABLE_UNSELECTED]),
+      });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: /Unavailable/i }).click();
+
+    const card = getCard(page, LM_PACKAGE_UNAVAILABLE_UNSELECTED.title);
+    await expect(card.getByRole("button", { name: /Remove/i })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
+  });
+});

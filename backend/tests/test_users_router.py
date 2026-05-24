@@ -264,6 +264,216 @@ async def test_users_library_is_isolated_per_user(users_client: AsyncClient) -> 
     assert second_user_response.json() == []
 
 
+async def test_users_library_selects_visible_package_for_current_user(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="library-select",
+        email="library-select@example.com",
+    )
+
+    response = await users_client.put(
+        "/users/me/library/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": "sample-demo",
+        "title": "Sample Demo Package",
+        "description": "Available package for users route tests.",
+        "version": "1.0.0",
+        "tags": ["demo"],
+        "passing_score": 0.75,
+        "page_count": 1,
+        "question_count": 1,
+        "availability": "available",
+        "enabled": True,
+        "xp_threshold": None,
+        "selected": True,
+    }
+
+    library_response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert library_response.status_code == 200
+    assert [item["id"] for item in library_response.json()] == ["sample-demo"]
+
+
+async def test_users_library_select_is_idempotent_when_already_selected(
+    users_client: AsyncClient,
+) -> None:
+    register = await users_client.post(
+        "/auth/register",
+        json={
+            "username": "library-select-idempotent",
+            "email": "library-select-idempotent@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo"],
+        },
+    )
+    assert register.status_code == 200
+    token = register.json()["access_token"]
+
+    response = await users_client.put(
+        "/users/me/library/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["selected"] is True
+
+    library_response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert library_response.status_code == 200
+    assert [item["id"] for item in library_response.json()] == ["sample-demo"]
+
+
+async def test_users_library_select_allows_unavailable_package(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="library-select-unavailable",
+        email="library-select-unavailable@example.com",
+    )
+
+    response = await users_client.put(
+        "/users/me/library/unavailable-demo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == "unavailable-demo"
+    assert body["availability"] == "unavailable"
+    assert body["enabled"] is False
+    assert body["selected"] is True
+
+
+@pytest.mark.parametrize("package_id", ["missing-demo", "hidden-demo"])
+async def test_users_library_select_rejects_unknown_or_hidden_package(
+    users_client: AsyncClient,
+    package_id: str,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username=f"library-select-{package_id}",
+        email=f"library-select-{package_id}@example.com",
+    )
+
+    response = await users_client.put(
+        f"/users/me/library/{package_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": {
+            "message": "package_id contains unknown or hidden package ids",
+            "invalid_package_ids": [package_id],
+        }
+    }
+
+
+async def test_users_library_deselects_selected_package_for_current_user(
+    users_client: AsyncClient,
+) -> None:
+    register = await users_client.post(
+        "/auth/register",
+        json={
+            "username": "library-remove",
+            "email": "library-remove@example.com",
+            "password": "StrongPass123",
+            "selected_package_ids": ["sample-demo"],
+        },
+    )
+    assert register.status_code == 200
+    token = register.json()["access_token"]
+
+    response = await users_client.delete(
+        "/users/me/library/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["selected"] is False
+
+    library_response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert library_response.status_code == 200
+    assert library_response.json() == []
+
+
+async def test_users_library_deselect_is_idempotent_when_absent(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="library-remove-idempotent",
+        email="library-remove-idempotent@example.com",
+    )
+
+    response = await users_client.delete(
+        "/users/me/library/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["selected"] is False
+
+
+async def test_users_library_selection_requires_auth(users_client: AsyncClient) -> None:
+    response = await users_client.put("/users/me/library/sample-demo")
+    assert response.status_code == 401
+
+
+async def test_users_library_deselection_requires_auth(
+    users_client: AsyncClient,
+) -> None:
+    response = await users_client.delete("/users/me/library/sample-demo")
+    assert response.status_code == 401
+
+
+async def test_users_library_selection_is_isolated_per_user(
+    users_client: AsyncClient,
+) -> None:
+    token_one = await _register_user_and_get_token(
+        users_client,
+        username="library-isolation-one",
+        email="library-isolation-one@example.com",
+    )
+    token_two = await _register_user_and_get_token(
+        users_client,
+        username="library-isolation-two",
+        email="library-isolation-two@example.com",
+    )
+
+    select_response = await users_client.put(
+        "/users/me/library/sample-demo",
+        headers={"Authorization": f"Bearer {token_one}"},
+    )
+    assert select_response.status_code == 200
+
+    first_user_response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token_one}"},
+    )
+    second_user_response = await users_client.get(
+        "/users/me/library",
+        headers={"Authorization": f"Bearer {token_two}"},
+    )
+
+    assert [item["id"] for item in first_user_response.json()] == ["sample-demo"]
+    assert second_user_response.json() == []
+
+
 async def test_users_catalogue_returns_visible_packages_with_selected_flag(
     users_client: AsyncClient,
 ) -> None:

@@ -98,6 +98,14 @@
   flex-wrap: wrap;
 }
 
+.package-card__library-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .package-card__status {
   margin: 0.8rem 0 0;
   color: #334155;
@@ -146,6 +154,28 @@
   border-color: #94a3b8;
   color: #475569;
   background: #e2e8f0;
+}
+
+.package-card__btn--library-add {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.package-card__btn--library-add:hover:not(:disabled) {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
+.package-card__btn--library-remove {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+.package-card__btn--library-remove:hover:not(:disabled) {
+  background: #ffedd5;
+  border-color: #fb923c;
 }
 
 @media (prefers-reduced-motion: reduce) {

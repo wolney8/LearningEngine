@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useTestResults } from "../hooks/useTestResults";
@@ -7,14 +8,30 @@ import "./PackageCard.css";
 
 interface PackageCardProps {
   pkg: PackageSummary;
+  onAdd?: () => Promise<void>;
+  onRemove?: () => Promise<void>;
 }
 
-export function PackageCard({ pkg }: PackageCardProps) {
+export function PackageCard({ pkg, onAdd, onRemove }: PackageCardProps) {
   const navigate = useNavigate();
   const { results } = useTestResults(pkg.id);
   const passingScorePercent = Math.round(pkg.passing_score * 100);
   const isUnavailable = pkg.availability === "unavailable";
   const isActionEnabled = pkg.availability === "available";
+  const [libraryPending, setLibraryPending] = useState(false);
+  const [libraryError, setLibraryError] = useState("");
+
+  async function handleLibraryAction(action: () => Promise<void>) {
+    setLibraryError("");
+    setLibraryPending(true);
+    try {
+      await action();
+    } catch {
+      setLibraryError("Could not update your library. Please try again.");
+    } finally {
+      setLibraryPending(false);
+    }
+  }
 
   return (
     <article
@@ -68,6 +85,35 @@ export function PackageCard({ pkg }: PackageCardProps) {
         >
           Take Test
         </button>
+        {onAdd && (
+          <button
+            type="button"
+            className="package-card__btn package-card__btn--library-add"
+            onClick={() => void handleLibraryAction(onAdd)}
+            disabled={libraryPending}
+            aria-busy={libraryPending}
+            aria-label={`Add to library: ${pkg.title}`}
+          >
+            {libraryPending ? "Adding…" : "Add to Library"}
+          </button>
+        )}
+        {onRemove && (
+          <button
+            type="button"
+            className="package-card__btn package-card__btn--library-remove"
+            onClick={() => void handleLibraryAction(onRemove)}
+            disabled={libraryPending}
+            aria-busy={libraryPending}
+            aria-label={`Remove from library: ${pkg.title}`}
+          >
+            {libraryPending ? "Removing…" : "Remove"}
+          </button>
+        )}
+        {libraryError && (
+          <p className="package-card__library-error" role="alert">
+            {libraryError}
+          </p>
+        )}
       </div>
     </article>
   );

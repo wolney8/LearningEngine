@@ -114,6 +114,38 @@ export async function fetchMyCatalogue(token: string): Promise<PackageSummary[]>
   return z.array(PackageSummarySchema).parse(data);
 }
 
+export async function addToLibrary(
+  token: string,
+  packageId: string,
+): Promise<PackageSummary> {
+  const encodedId = encodeURIComponent(packageId);
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/library/${encodedId}`, {
+    method: "PUT",
+    headers: getAuthHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to add to library: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return PackageSummarySchema.parse(data);
+}
+
+export async function removeFromLibrary(
+  token: string,
+  packageId: string,
+): Promise<PackageSummary> {
+  const encodedId = encodeURIComponent(packageId);
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/library/${encodedId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to remove from library: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return PackageSummarySchema.parse(data);
+}
+
 export async function fetchPackage(id: string): Promise<Package> {
   const encodedId = encodeURIComponent(id);
   const response = await fetchWithTimeout(`${BASE_URL}/packages/${encodedId}`);

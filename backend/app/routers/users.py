@@ -16,6 +16,10 @@ from app.routers.packages import (
     list_visible_package_summaries,
 )
 from app.services.db import get_session
+from app.services.library_selection import (
+    normalise_package_id,
+    validate_selectable_package_ids,
+)
 from app.services.overrides_loader import (
     PackageOverride,
     resolve_effective_availability,
@@ -98,6 +102,28 @@ def _read_selected_package_ids_for_user(
         .order_by(UserLibraryItem.package_id)
     ).all()
     return set(rows)
+
+
+def _require_current_user_id(current_user: User) -> int:
+    user_id = current_user.id
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Current user has no id",
+        )
+    return user_id
+
+
+def _build_catalogue_item_response(
+    package_id: str,
+    *,
+    selected: bool,
+    cache: dict[str, Package],
+    overrides: dict[str, PackageOverride],
+) -> UserCatalogueItemResponse:
+    pkg = cache[package_id]
+    summary = build_package_summary(pkg, overrides.get(package_id))
+    return UserCatalogueItemResponse(**summary.model_dump(), selected=selected)
 
 
 def get_current_user(
@@ -226,12 +252,7 @@ async def read_my_library(
     cache: dict[str, Package] = Depends(get_packages_cache),
     overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
 ) -> list[PackageSummary]:
-    user_id = current_user.id
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Current user has no id",
-        )
+    user_id = _require_current_user_id(current_user)
 
     selected_package_ids = session.exec(
         select(UserLibraryItem.package_id)
@@ -255,6 +276,82 @@ async def read_my_library(
     return summaries
 
 
+@router.put("/me/library/{package_id}", response_model=UserCatalogueItemResponse)
+async def select_my_library_package(
+    package_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
+) -> UserCatalogueItemResponse:
+    user_id = _require_current_user_id(current_user)
+    normalised_package_id = normalise_package_id(package_id)
+    validate_selectable_package_ids(
+        [normalised_package_id],
+        cache,
+        overrides,
+        detail_field="package_id",
+    )
+
+    existing_item = session.exec(
+        select(UserLibraryItem).where(
+            UserLibraryItem.user_id == user_id,
+            UserLibraryItem.package_id == normalised_package_id,
+        )
+    ).first()
+    if existing_item is None:
+        session.add(
+            UserLibraryItem(
+                user_id=user_id,
+                package_id=normalised_package_id,
+                status="selected",
+            )
+        )
+        session.commit()
+
+    return _build_catalogue_item_response(
+        normalised_package_id,
+        selected=True,
+        cache=cache,
+        overrides=overrides,
+    )
+
+
+@router.delete("/me/library/{package_id}", response_model=UserCatalogueItemResponse)
+async def deselect_my_library_package(
+    package_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
+) -> UserCatalogueItemResponse:
+    user_id = _require_current_user_id(current_user)
+    normalised_package_id = normalise_package_id(package_id)
+    validate_selectable_package_ids(
+        [normalised_package_id],
+        cache,
+        overrides,
+        detail_field="package_id",
+    )
+
+    existing_item = session.exec(
+        select(UserLibraryItem).where(
+            UserLibraryItem.user_id == user_id,
+            UserLibraryItem.package_id == normalised_package_id,
+        )
+    ).first()
+    if existing_item is not None:
+        session.delete(existing_item)
+        session.commit()
+
+    return _build_catalogue_item_response(
+        normalised_package_id,
+        selected=False,
+        cache=cache,
+        overrides=overrides,
+    )
+
+
 @router.get("/me/catalogue", response_model=list[UserCatalogueItemResponse])
 async def read_my_catalogue(
     current_user: User = Depends(get_current_user),
@@ -262,12 +359,7 @@ async def read_my_catalogue(
     cache: dict[str, Package] = Depends(get_packages_cache),
     overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
 ) -> list[UserCatalogueItemResponse]:
-    user_id = current_user.id
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Current user has no id",
-        )
+    user_id = _require_current_user_id(current_user)
 
     selected_package_ids = _read_selected_package_ids_for_user(session, user_id)
     visible_summaries = list_visible_package_summaries(cache, overrides)
@@ -287,19 +379,8 @@ async def upsert_my_progress_for_package(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> UserTestResultResponse:
-    user_id = current_user.id
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Current user has no id",
-        )
-
-    normalised_package_id = package_id.strip()
-    if not normalised_package_id:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="package_id must not be empty",
-        )
+    user_id = _require_current_user_id(current_user)
+    normalised_package_id = normalise_package_id(package_id)
 
     existing_result = session.exec(
         select(UserTestResult).where(
