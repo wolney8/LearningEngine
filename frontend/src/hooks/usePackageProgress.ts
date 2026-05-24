@@ -19,6 +19,7 @@ export function usePackageProgress(packageIds: string[]): Map<string, PackageSta
     }
 
     let cancelled = false;
+    setServerProgress(null);
 
     void fetchMyProgress(token)
       .then((rows) => {
@@ -31,8 +32,8 @@ export function usePackageProgress(packageIds: string[]): Map<string, PackageSta
       })
       .catch(() => {
         if (cancelled) return;
-        // Keep local status visible if server fetch fails.
-        setServerProgress(null);
+        // Authenticated fallback must be server-safe (all incomplete), never anonymous.
+        setServerProgress(new Map<string, PackageStatus>());
       });
 
     return () => {
@@ -41,10 +42,10 @@ export function usePackageProgress(packageIds: string[]): Map<string, PackageSta
   }, [status, token]);
 
   return useMemo(() => {
-    if (status === "authenticated" && token && serverProgress !== null) {
+    if (status === "authenticated" && token) {
       const map = new Map<string, PackageStatus>();
       for (const id of packageIds) {
-        map.set(id, serverProgress.get(id) ?? "incomplete");
+        map.set(id, serverProgress?.get(id) ?? "incomplete");
       }
       return map;
     }

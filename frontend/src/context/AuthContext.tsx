@@ -120,92 +120,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "We found local anonymous data on this device (XP, saved progress, and streak).\n\nPress OK to import this local data into your account.\n\nYour existing account progress is safe and will not be overwritten.",
       );
 
-      try {
-        if (shouldImportAnonymousData) {
-          if (anonymousXP !== null) {
-            try {
-              const serverXP = await fetchMyXP(nextToken);
-              const mergedXP = Math.max(anonymousXP, serverXP);
-              await updateMyXP(nextToken, mergedXP);
-            } catch {
-              // Reconciliation is best-effort and must not block auth success.
-            }
-          }
+      if (!shouldImportAnonymousData) {
+        resetAnonymousLocalProgress();
+        markXPReconciliationDecision(userId);
+        return;
+      }
 
-          try {
-            const serverRows = await fetchMyProgress(nextToken);
-            const serverByPackageId = new Map(
-              serverRows.map((row) => [row.package_id, row] as const),
-            );
+      let importSucceeded = true;
 
-            for (const localRow of anonymousProgress) {
-              const serverRow = serverByPackageId.get(localRow.package_id);
-
-              const mergedAttemptCount = Math.max(
-                localRow.attempt_count,
-                serverRow?.attempt_count ?? 0,
-              );
-              const mergedCompleted =
-                localRow.completed || (serverRow?.completed ?? false);
-              const mergedLatestWeightedScore = Math.max(
-                localRow.latest_weighted_score,
-                serverRow?.latest_weighted_score ?? 0,
-              );
-              const mergedFirstCompletedAt = earliestNonNull(
-                localRow.first_completed_at,
-                serverRow?.first_completed_at ?? null,
-              );
-
-              const shouldUpsert =
-                !serverRow ||
-                mergedAttemptCount !== serverRow.attempt_count ||
-                mergedCompleted !== serverRow.completed ||
-                mergedLatestWeightedScore !== serverRow.latest_weighted_score ||
-                (serverRow.first_completed_at === null &&
-                  mergedFirstCompletedAt !== null);
-
-              if (!shouldUpsert) {
-                continue;
-              }
-
-              await upsertMyProgressForPackage(nextToken, localRow.package_id, {
-                latest_weighted_score: mergedLatestWeightedScore,
-                completed: mergedCompleted,
-                ...(mergedAttemptCount > 0
-                  ? { attempt_count: mergedAttemptCount }
-                  : {}),
-              });
-            }
-          } catch {
-            // Reconciliation is best-effort and must not block auth success.
-          }
-
-          try {
-            const serverStreak = await fetchMyStreak(nextToken);
-            const mergedStreakCount =
-              serverStreak.streak_count === 0 && anonymousStreak.streak_count > 0
-                ? anonymousStreak.streak_count
-                : serverStreak.streak_count;
-            const mergedLastPractisedDate = laterDate(
-              serverStreak.last_practised_date,
-              anonymousStreak.last_practised_date,
-            );
-
-            if (
-              mergedStreakCount !== serverStreak.streak_count ||
-              mergedLastPractisedDate !== serverStreak.last_practised_date
-            ) {
-              await updateMyStreakSnapshot(nextToken, {
-                streak_count: mergedStreakCount,
-                last_practised_date: mergedLastPractisedDate,
-              });
-            }
-          } catch {
-            // Reconciliation is best-effort and must not block auth success.
-          }
+      if (anonymousXP !== null) {
+        try {
+          const serverXP = await fetchMyXP(nextToken);
+          const mergedXP = Math.max(anonymousXP, serverXP);
+          await updateMyXP(nextToken, mergedXP);
+        } catch {
+          importSucceeded = false;
         }
-      } finally {
-        // Decision persistence and local cleanup happen for both choices.
+      }
+
+      if (anonymousProgress.length > 0) {
+        try {
+          const serverRows = await fetchMyProgress(nextToken);
+          const serverByPackageId = new Map(
+            serverRows.map((row) => [row.package_id, row] as const),
+          );
+
+          for (const localRow of anonymousProgress) {
+            const serverRow = serverByPackageId.get(localRow.package_id);
+
+            const mergedAttemptCount = Math.max(
+              localRow.attempt_count,
+              serverRow?.attempt_count ?? 0,
+            );
+            const mergedCompleted =
+              localRow.completed || (serverRow?.completed ?? false);
+            const mergedLatestWeightedScore = Math.max(
+              localRow.latest_weighted_score,
+              serverRow?.latest_weighted_score ?? 0,
+            );
+            const mergedFirstCompletedAt = earliestNonNull(
+              localRow.first_completed_at,
+              serverRow?.first_completed_at ?? null,
+            );
+
+            const shouldUpsert =
+              !serverRow ||
+              mergedAttemptCount !== serverRow.attempt_count ||
+              mergedCompleted !== serverRow.completed ||
+              mergedLatestWeightedScore !== serverRow.latest_weighted_score ||
+              (serverRow.first_completed_at === null &&
+                mergedFirstCompletedAt !== null);
+
+            if (!shouldUpsert) {
+              continue;
+            }
+
+            await upsertMyProgressForPackage(nextToken, localRow.package_id, {
+              latest_weighted_score: mergedLatestWeightedScore,
+              completed: mergedCompleted,
+              ...(mergedAttemptCount > 0 ? { attempt_count: mergedAttemptCount } : {}),
+            });
+          }
+        } catch {
+          importSucceeded = false;
+        }
+      }
+
+      const hasAnonymousStreakData =
+        anonymousStreak.streak_count > 0 ||
+        anonymousStreak.last_practised_date !== null;
+
+      if (hasAnonymousStreakData) {
+        try {
+          const serverStreak = await fetchMyStreak(nextToken);
+          const mergedStreakCount =
+            serverStreak.streak_count === 0 && anonymousStreak.streak_count > 0
+              ? anonymousStreak.streak_count
+              : serverStreak.streak_count;
+          const mergedLastPractisedDate = laterDate(
+            serverStreak.last_practised_date,
+            anonymousStreak.last_practised_date,
+          );
+
+          if (
+            mergedStreakCount !== serverStreak.streak_count ||
+            mergedLastPractisedDate !== serverStreak.last_practised_date
+          ) {
+            await updateMyStreakSnapshot(nextToken, {
+              streak_count: mergedStreakCount,
+              last_practised_date: mergedLastPractisedDate,
+            });
+          }
+        } catch {
+          importSucceeded = false;
+        }
+      }
+
+      if (importSucceeded) {
+        // Mark complete only when import fully succeeds.
         resetAnonymousLocalProgress();
         markXPReconciliationDecision(userId);
       }

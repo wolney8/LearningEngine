@@ -518,6 +518,9 @@ test.describe("XP persistence", () => {
     await expect(page).toHaveURL("/");
     await expect.poll(() => promptCount).toBe(1);
     await expect
+      .poll(async () => page.evaluate(() => localStorage.getItem("lle_xp")))
+      .toBeNull();
+    await expect
       .poll(async () =>
         page.evaluate(() => localStorage.getItem("lle_xp_reconciled_user_12")),
       )
@@ -533,5 +536,106 @@ test.describe("XP persistence", () => {
 
     expect(promptCount).toBe(1);
     expect(putCalls).toBe(1);
+  });
+
+  test("accepted import with backend write failure keeps anonymous data and allows retry prompt", async ({
+    page,
+  }) => {
+    let promptCount = 0;
+    let xpPutCalls = 0;
+
+    page.on("dialog", async (dialog) => {
+      promptCount += 1;
+      await dialog.accept();
+    });
+
+    await registerPackageRoutes(page);
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "xp-retry-token",
+          token_type: "bearer",
+          user: {
+            id: 14,
+            username: "retry-user",
+            email: "retry-user@example.com",
+            role: "student",
+            xp: 50,
+            created_at: "2026-05-23T00:00:00Z",
+          },
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 14,
+          username: "retry-user",
+          email: "retry-user@example.com",
+          role: "student",
+          xp: 50,
+          created_at: "2026-05-23T00:00:00Z",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/xp`, (route) => {
+      if (route.request().method() === "GET") {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ xp: 50 }),
+        });
+        return;
+      }
+
+      xpPutCalls += 1;
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Simulated XP write failure" }),
+      });
+    });
+
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("lle_xp", "120"));
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("retry-user");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL("/");
+
+    await expect.poll(() => promptCount).toBe(1);
+    await expect.poll(() => xpPutCalls).toBe(1);
+    await expect
+      .poll(async () => page.evaluate(() => localStorage.getItem("lle_xp")))
+      .toBe("120");
+    await expect
+      .poll(async () =>
+        page.evaluate(() => localStorage.getItem("lle_xp_reconciled_user_14")),
+      )
+      .toBeNull();
+
+    await page.evaluate(() => {
+      sessionStorage.removeItem("lle_auth_token");
+    });
+    await page.goto("/");
+    await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("retry-user");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL("/");
+
+    await expect.poll(() => promptCount).toBe(2);
+    await expect.poll(() => xpPutCalls).toBe(2);
   });
 });
