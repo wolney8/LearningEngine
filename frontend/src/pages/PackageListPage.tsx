@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { PackageCard } from "../components/PackageCard";
@@ -19,6 +19,14 @@ import {
 import "./PackageListPage.css";
 
 type PackageScope = "library" | "catalogue";
+type CatalogueTagOption = {
+  key: string;
+  label: string;
+  count: number;
+};
+
+const UNAVAILABLE_TAG_KEY = "unavailable";
+const VISIBLE_TAG_CHIP_COUNT = 4;
 
 const VALID_FILTERS: FilterKey[] = [
   "all",
@@ -42,14 +50,18 @@ export function PackageListPage() {
   const [libraryNotice, setLibraryNotice] = useState("");
   const [status, setStatus] = useState<"loading" | "error" | "loaded">("loading");
   const [authenticatedScope, setAuthenticatedScope] = useState<PackageScope>("library");
+  const [isOverflowMenuOpen, setOverflowMenuOpen] = useState(false);
+  const overflowMenuRef = useRef<HTMLDivElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const isAuthenticated = authStatus === "authenticated" && Boolean(token);
   const effectiveScope: PackageScope = isAuthenticated
     ? authenticatedScope
     : "catalogue";
+  const isFullCatalogue = isAuthenticated && effectiveScope === "catalogue";
 
   const query = searchParams.get("q") ?? "";
   const activeFilter = parseFilter(searchParams.get("filter"));
+  const activeTagParam = (searchParams.get("tag") ?? "").trim().toLowerCase();
 
   const loadPackages = useCallback(async () => {
     setStatus("loading");
@@ -89,8 +101,69 @@ export function PackageListPage() {
     [packages],
   );
 
+  const catalogueTagOptions = useMemo((): CatalogueTagOption[] => {
+    const tagCounts = new Map<string, CatalogueTagOption>();
+
+    for (const pkg of packages) {
+      for (const rawTag of pkg.tags) {
+        const normalised = rawTag.trim().toLowerCase();
+        if (!normalised || normalised === UNAVAILABLE_TAG_KEY) {
+          continue;
+        }
+
+        const existing = tagCounts.get(normalised);
+        if (existing) {
+          existing.count += 1;
+          continue;
+        }
+
+        tagCounts.set(normalised, {
+          key: normalised,
+          label: rawTag.trim(),
+          count: 1,
+        });
+      }
+    }
+
+    const sortedTags = Array.from(tagCounts.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+    );
+
+    return [
+      {
+        key: UNAVAILABLE_TAG_KEY,
+        label: "Unavailable",
+        count: unavailablePackages.length,
+      },
+      ...sortedTags,
+    ];
+  }, [packages, unavailablePackages.length]);
+
+  const activeCatalogueTag = useMemo(() => {
+    if (!activeTagParam) {
+      return "";
+    }
+    const isValid = catalogueTagOptions.some((tag) => tag.key === activeTagParam);
+    return isValid ? activeTagParam : "";
+  }, [activeTagParam, catalogueTagOptions]);
+
+  const visibleTagOptions = useMemo(
+    () => catalogueTagOptions.slice(0, VISIBLE_TAG_CHIP_COUNT),
+    [catalogueTagOptions],
+  );
+
+  const overflowTagOptions = useMemo(
+    () => catalogueTagOptions.slice(VISIBLE_TAG_CHIP_COUNT),
+    [catalogueTagOptions],
+  );
+
+  const hasOverflowSelectedTag = useMemo(
+    () => overflowTagOptions.some((tag) => tag.key === activeCatalogueTag),
+    [overflowTagOptions, activeCatalogueTag],
+  );
+
   const updateParams = useCallback(
-    (updates: { q?: string; filter?: FilterKey }): void => {
+    (updates: { q?: string; filter?: FilterKey; tag?: string }): void => {
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -108,6 +181,14 @@ export function PackageListPage() {
               next.delete("filter");
             }
           }
+          if ("tag" in updates) {
+            const normalisedTag = (updates.tag ?? "").trim().toLowerCase();
+            if (normalisedTag) {
+              next.set("tag", normalisedTag);
+            } else {
+              next.delete("tag");
+            }
+          }
           return next;
         },
         { replace: true },
@@ -115,6 +196,38 @@ export function PackageListPage() {
     },
     [setSearchParams],
   );
+
+  useEffect(() => {
+    if (!isFullCatalogue) {
+      setOverflowMenuOpen(false);
+    }
+  }, [isFullCatalogue]);
+
+  useEffect(() => {
+    if (!isOverflowMenuOpen) {
+      return;
+    }
+
+    function closeOnClickOutside(event: MouseEvent): void {
+      if (!overflowMenuRef.current?.contains(event.target as Node)) {
+        setOverflowMenuOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        setOverflowMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeOnClickOutside);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeOnClickOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOverflowMenuOpen]);
 
   const statusFilteredPackages = useMemo(() => {
     const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
@@ -137,16 +250,34 @@ export function PackageListPage() {
     effectiveScope,
   ]);
 
+  const catalogueTagFilteredPackages = useMemo(() => {
+    if (!activeCatalogueTag) {
+      return packages;
+    }
+
+    if (activeCatalogueTag === UNAVAILABLE_TAG_KEY) {
+      return unavailablePackages;
+    }
+
+    return packages.filter((pkg) =>
+      pkg.tags.some((tag) => tag.trim().toLowerCase() === activeCatalogueTag),
+    );
+  }, [activeCatalogueTag, packages, unavailablePackages]);
+
+  const filterBasePackages = isFullCatalogue
+    ? catalogueTagFilteredPackages
+    : statusFilteredPackages;
+
   const filteredPackages = useMemo(() => {
-    if (!query) return statusFilteredPackages;
+    if (!query) return filterBasePackages;
     const q = query.toLowerCase();
-    return statusFilteredPackages.filter(
+    return filterBasePackages.filter(
       (pkg) =>
         pkg.title.toLowerCase().includes(q) ||
         pkg.description.toLowerCase().includes(q) ||
         pkg.tags.join(" ").toLowerCase().includes(q),
     );
-  }, [statusFilteredPackages, query]);
+  }, [filterBasePackages, query]);
 
   const filterCounts = useMemo(() => {
     const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
@@ -184,10 +315,11 @@ export function PackageListPage() {
     },
   ];
 
-  const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
+  const includeUnavailableInAll = isFullCatalogue;
 
-  const countBase =
-    activeFilter === "unavailable"
+  const countBase = isFullCatalogue
+    ? packages
+    : activeFilter === "unavailable"
       ? unavailablePackages
       : activeFilter === "all" && includeUnavailableInAll
         ? [...availablePackages, ...unavailablePackages]
@@ -196,6 +328,12 @@ export function PackageListPage() {
 
   function getEmptyMessage(): string {
     if (query) return `No packages match '${query}'`;
+    if (isFullCatalogue && activeCatalogueTag === UNAVAILABLE_TAG_KEY) {
+      return "No unavailable packages";
+    }
+    if (isFullCatalogue && activeCatalogueTag) {
+      return `No packages tagged '${activeCatalogueTag}'`;
+    }
     return `No ${activeFilter} packages yet`;
   }
 
@@ -297,11 +435,85 @@ export function PackageListPage() {
               onChange={(v) => updateParams({ q: v })}
               onClear={() => updateParams({ q: "" })}
             />
-            <PackageFilterBar
-              filters={filterOptions}
-              activeFilter={activeFilter}
-              onChange={(key) => updateParams({ filter: key })}
-            />
+            {isFullCatalogue ? (
+              <div
+                className="package-list-page__tag-filter-bar"
+                aria-label="Filter packages by tag"
+              >
+                {visibleTagOptions.map(({ key, label }) => {
+                  const isActive = activeCatalogueTag === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`package-list-page__tag-chip${isActive ? " package-list-page__tag-chip--active" : ""}`}
+                      aria-pressed={isActive}
+                      onClick={() => updateParams({ tag: isActive ? "" : key })}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+
+                {overflowTagOptions.length > 0 && (
+                  <div
+                    className="package-list-page__tag-overflow"
+                    ref={overflowMenuRef}
+                  >
+                    <button
+                      type="button"
+                      className={`package-list-page__tag-chip${hasOverflowSelectedTag ? " package-list-page__tag-chip--active" : ""}`}
+                      aria-haspopup="menu"
+                      aria-expanded={isOverflowMenuOpen}
+                      onClick={() => {
+                        if (hasOverflowSelectedTag) {
+                          setOverflowMenuOpen(false);
+                          updateParams({ tag: "" });
+                          return;
+                        }
+                        setOverflowMenuOpen((previous) => !previous);
+                      }}
+                    >
+                      {hasOverflowSelectedTag ? "x ..." : "..."}
+                    </button>
+
+                    {isOverflowMenuOpen && !hasOverflowSelectedTag && (
+                      <ul
+                        className="package-list-page__tag-menu"
+                        role="menu"
+                        aria-label="More package tags"
+                      >
+                        {overflowTagOptions.map(({ key, label }) => {
+                          const isActive = activeCatalogueTag === key;
+                          return (
+                            <li key={key}>
+                              <button
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={isActive}
+                                className="package-list-page__tag-menu-item"
+                                onClick={() => {
+                                  updateParams({ tag: key });
+                                  setOverflowMenuOpen(false);
+                                }}
+                              >
+                                {label}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <PackageFilterBar
+                filters={filterOptions}
+                activeFilter={activeFilter}
+                onChange={(key) => updateParams({ filter: key })}
+              />
+            )}
           </div>
 
           {isFiltered && (

@@ -960,6 +960,85 @@ const LM_PACKAGE_UNAVAILABLE_UNSELECTED = {
   selected: false,
 };
 
+const LM_CATALOGUE_TAG_PACKAGES = [
+  {
+    id: "cloud-foundations",
+    title: "Cloud Foundations",
+    description: "Cloud platform basics.",
+    version: "1.0.0",
+    tags: ["cloud"],
+    passing_score: 0.75,
+    page_count: 2,
+    question_count: 3,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
+    selected: false,
+  },
+  {
+    id: "network-essentials",
+    title: "Network Essentials",
+    description: "Networking fundamentals.",
+    version: "1.0.0",
+    tags: ["network"],
+    passing_score: 0.75,
+    page_count: 2,
+    question_count: 3,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
+    selected: false,
+  },
+  {
+    id: "python-data",
+    title: "Python Data",
+    description: "Data workflows in Python.",
+    version: "1.0.0",
+    tags: ["python"],
+    passing_score: 0.75,
+    page_count: 3,
+    question_count: 4,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
+    selected: false,
+  },
+  {
+    id: "security-core",
+    title: "Security Core",
+    description: "Practical cyber security basics.",
+    version: "1.0.0",
+    tags: ["security"],
+    passing_score: 0.75,
+    page_count: 3,
+    question_count: 4,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
+    selected: false,
+  },
+  {
+    id: "sql-analytics",
+    title: "SQL Analytics",
+    description: "Query and report with SQL.",
+    version: "1.0.0",
+    tags: ["sql"],
+    passing_score: 0.75,
+    page_count: 3,
+    question_count: 4,
+    availability: "available",
+    enabled: true,
+    xp_threshold: null,
+    selected: false,
+  },
+  {
+    ...LM_PACKAGE_UNAVAILABLE_UNSELECTED,
+    id: "ops-locked",
+    title: "Ops Locked Track",
+    tags: ["operations"],
+  },
+];
+
 async function seedAuthSession(page: Page): Promise<void> {
   await page.addInitScript(() => {
     sessionStorage.setItem("lle_auth_token", "lib-mgmt-token");
@@ -1246,6 +1325,92 @@ test.describe("Library management — authenticated users", () => {
     await expect(card.getByRole("button", { name: "Start Learning" })).toHaveCount(0);
     await expect(card.getByRole("button", { name: "Take Test" })).toHaveCount(0);
     await expect(card.locator(".package-progress-panel")).toHaveCount(0);
+  });
+
+  test("full catalogue uses tag chips with overflow menu and supports clearing overflow selection", async ({
+    page,
+  }) => {
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${LM_API}/users/me/catalogue`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(LM_CATALOGUE_TAG_PACKAGES),
+      });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Full catalogue" }).click();
+
+    await expect(
+      page.getByRole("searchbox", { name: "Search packages" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unavailable" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "..." })).toBeVisible();
+
+    await page.getByRole("button", { name: "..." }).click();
+    await expect(page.getByRole("menu", { name: "More package tags" })).toBeVisible();
+
+    await page.getByRole("menuitemradio", { name: "sql" }).click();
+    await expect(page).toHaveURL(/tag=sql/);
+
+    const sqlCard = getCard(page, "SQL Analytics");
+    await expect(sqlCard).toBeVisible();
+    await expect(page.locator("article.package-card")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "x ..." }).click();
+    await expect(page).not.toHaveURL(/tag=sql/);
+    await expect(page.locator("article.package-card")).toHaveCount(
+      LM_CATALOGUE_TAG_PACKAGES.length,
+    );
+  });
+
+  test("full catalogue applies unavailable tag from URL parameter", async ({
+    page,
+  }) => {
+    const unavailableCataloguePackage = LM_CATALOGUE_TAG_PACKAGES.find(
+      (pkg) => pkg.availability === "unavailable",
+    );
+    if (!unavailableCataloguePackage) {
+      throw new Error("Expected unavailable package in catalogue fixture");
+    }
+
+    await seedAuthSession(page);
+
+    await page.route(`${LM_API}/users/me/library`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${LM_API}/users/me/catalogue`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(LM_CATALOGUE_TAG_PACKAGES),
+      });
+    });
+
+    await page.goto("/?tag=unavailable");
+    await page.getByRole("button", { name: "Full catalogue" }).click();
+
+    await expect(page.getByRole("button", { name: "Unavailable" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(getCard(page, unavailableCataloguePackage.title)).toBeVisible();
+    await expect(page.locator("article.package-card")).toHaveCount(1);
   });
 
   test("unavailable packages in library show Remove but Start Learning and Take Test remain disabled", async ({
