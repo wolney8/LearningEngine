@@ -1,6 +1,11 @@
 import "./PackageFilterBar.css";
 
-export type FilterKey = "all" | "incomplete" | "failed" | "completed" | "unavailable";
+export type FilterKey =
+  | "all"
+  | "incomplete"
+  | "failed"
+  | "completed"
+  | "unavailable";
 
 export interface FilterOption {
   key: FilterKey;

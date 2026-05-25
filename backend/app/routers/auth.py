@@ -76,7 +76,7 @@ def _deduplicate_package_ids(package_ids: list[str]) -> list[str]:
         package_id = raw_package_id.strip()
         if not package_id:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="selected_package_ids must not contain empty values",
             )
         if package_id in seen:

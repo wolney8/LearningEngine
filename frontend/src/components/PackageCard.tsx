@@ -62,8 +62,8 @@ export function PackageCard({
       <div className="package-card__content">
         <div className="package-card__header">
           <h2 className="package-card__title">{pkg.title}</h2>
-          <span className="package-card__version">v{pkg.version}</span>
         </div>
+        <span className="package-card__version">v{pkg.version}</span>
 
         <p className="package-card__description">{pkg.description}</p>
 
@@ -85,10 +85,12 @@ export function PackageCard({
 
         {isUnavailable && <p className="package-card__status">Unavailable</p>}
 
-        {isLearningCard && !isUnavailable && <PackageProgressPanel results={results} />}
+        {isLearningCard && !isUnavailable && (
+          <PackageProgressPanel results={results} />
+        )}
       </div>
 
-      {(isLearningCard || onAdd) && (
+      {(isLearningCard || onAdd || (isCatalogueCard && onRemove)) && (
         <div className="package-card__actions">
           {isLearningCard && (
             <>
@@ -122,6 +124,18 @@ export function PackageCard({
               aria-label={`Add to library: ${pkg.title}`}
             >
               {libraryPending ? "Adding..." : "Add to Library"}
+            </button>
+          )}
+          {isCatalogueCard && onRemove && (
+            <button
+              type="button"
+              className="package-card__btn package-card__btn--library-remove"
+              onClick={() => void handleLibraryAction(onRemove)}
+              disabled={libraryPending}
+              aria-busy={libraryPending}
+              aria-label={`Remove from library: ${pkg.title}`}
+            >
+              {libraryPending ? "Removing..." : "Remove from Library"}
             </button>
           )}
           {libraryError && (

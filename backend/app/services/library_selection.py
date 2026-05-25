@@ -13,7 +13,7 @@ def normalise_package_id(raw_package_id: str) -> str:
     package_id = raw_package_id.strip()
     if not package_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="package_id must not be empty",
         )
     return package_id
@@ -44,7 +44,7 @@ def validate_selectable_package_ids(
     ]
     if invalid_package_ids:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "message": (
                     f"{detail_field} contains unknown or hidden package ids"

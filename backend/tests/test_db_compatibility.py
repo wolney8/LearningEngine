@@ -172,3 +172,73 @@ def test_init_db_adds_missing_user_library_columns_and_unique_index(
         row[1] for row in _read_index_list(db_path, "user_library_item")
     ]
     assert second_pass_indexes.count("uq_user_library_items_user_package") == 1
+
+
+def test_init_db_adds_missing_user_test_result_columns(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "legacy-test-result.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE user (
+                id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL,
+                email TEXT NOT NULL,
+                hashed_password TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'student',
+                xp INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE usertestresult (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                package_id TEXT NOT NULL,
+                latest_weighted_score REAL NOT NULL,
+                completed BOOLEAN NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES user(id)
+            )
+            """
+        )
+        connection.commit()
+
+    database_url = f"sqlite:///{db_path}"
+    test_engine = create_engine(
+        database_url,
+        connect_args={"check_same_thread": False},
+    )
+
+    monkeypatch.setattr(db, "DATABASE_URL", database_url)
+    monkeypatch.setattr(db, "engine", test_engine)
+
+    db.init_db()
+
+    table_info = _read_table_info(db_path, "usertestresult")
+    column_names = [row[1] for row in table_info]
+    assert "attempt_count" in column_names
+    assert "first_completed_at" in column_names
+
+    attempt_count_column = next(row for row in table_info if row[1] == "attempt_count")
+    assert attempt_count_column[2].upper() == "INTEGER"
+    assert attempt_count_column[3] == 1
+    assert attempt_count_column[4] == "1"
+
+    first_completed_at_column = next(
+        row for row in table_info if row[1] == "first_completed_at"
+    )
+    assert first_completed_at_column[2].upper() == "TIMESTAMP"
+    assert first_completed_at_column[3] == 0
+    assert first_completed_at_column[4] is None
+
+    db.init_db()
+    second_pass_columns = [
+        row[1] for row in _read_table_info(db_path, "usertestresult")
+    ]
+    assert second_pass_columns.count("attempt_count") == 1
+    assert second_pass_columns.count("first_completed_at") == 1

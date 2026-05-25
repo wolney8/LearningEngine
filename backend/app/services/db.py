@@ -74,6 +74,30 @@ def _ensure_sqlite_user_library_schema_compatibility() -> None:
         )
 
 
+def _ensure_sqlite_user_test_result_schema_compatibility() -> None:
+    """Backfill newly-added UserTestResult columns for legacy SQLite DBs."""
+    with engine.begin() as connection:
+        table_info = connection.exec_driver_sql(
+            'PRAGMA table_info("usertestresult")'
+        ).all()
+        if not table_info:
+            return
+
+        existing_columns = {row[1] for row in table_info}
+
+        if "attempt_count" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "usertestresult" '
+                "ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 1"
+            )
+
+        if "first_completed_at" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "usertestresult" '
+                "ADD COLUMN first_completed_at TIMESTAMP"
+            )
+
+
 def init_db() -> None:
     # Ensure metadata includes the User table before creating schema.
     from app.models.user import User, UserLibraryItem, UserTestResult  # noqa: F401
@@ -83,6 +107,7 @@ def init_db() -> None:
         Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
         _ensure_sqlite_user_schema_compatibility()
         _ensure_sqlite_user_library_schema_compatibility()
+        _ensure_sqlite_user_test_result_schema_compatibility()
     SQLModel.metadata.create_all(engine)
 
 
