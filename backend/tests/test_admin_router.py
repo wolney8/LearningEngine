@@ -80,6 +80,36 @@ def _sample_package() -> Package:
     )
 
 
+
+def _publish_yaml_content(package_id: str = "new-package") -> str:
+    return f"""
+id: {package_id}
+title: New Package
+description: Created from admin publish endpoint.
+version: 1.0.0
+tags:
+  - demo
+passing_score: 0.8
+pages:
+  - id: p1
+    title: Page 1
+    content: Body
+questions:
+  - id: q1
+    text: Question?
+    answers:
+      - id: a
+        text: "Yes"
+      - id: b
+        text: "No"
+    correct_answer: a
+    weight: 100.0
+    feedback: Correct
+    revision_page_ids:
+      - p1
+""".strip()
+
+
 async def test_admin_settings_rejects_invalid_token() -> None:
     os.environ["ADMIN_TOKEN"] = "secret-token"
 
@@ -261,3 +291,154 @@ async def test_admin_patch_availability_overrides_enabled_if_both_sent(
 
     assert admin_response.status_code == 200
     assert admin_response.json()[0]["availability"] == "hidden"
+
+
+async def test_admin_publish_package_requires_admin_token() -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages",
+            json={"yaml_content": _publish_yaml_content()},
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid admin token"
+
+
+async def test_admin_publish_package_rejects_invalid_yaml(tmp_path: Path) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    packages_cache: dict[str, Package] = {}
+    overrides_cache: dict[str, PackageOverride] = {}
+
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+    app.dependency_overrides[get_package_overrides] = lambda: overrides_cache
+
+    from app.routers import admin as admin_router
+
+    original_packages_dir = admin_router.PACKAGES_DIR
+    admin_router.PACKAGES_DIR = tmp_path
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"yaml_content": "id: bad: yaml"},
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.PACKAGES_DIR = original_packages_dir
+
+    assert response.status_code == 422
+    assert "YAML parse error" in response.json()["detail"]
+
+
+async def test_admin_publish_package_rejects_schema_validation_error(
+    tmp_path: Path,
+) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    packages_cache: dict[str, Package] = {}
+    overrides_cache: dict[str, PackageOverride] = {}
+
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+    app.dependency_overrides[get_package_overrides] = lambda: overrides_cache
+
+    from app.routers import admin as admin_router
+
+    original_packages_dir = admin_router.PACKAGES_DIR
+    admin_router.PACKAGES_DIR = tmp_path
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"yaml_content": "id: only-id"},
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.PACKAGES_DIR = original_packages_dir
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["message"] == "Package schema validation failed"
+    assert len(response.json()["detail"]["errors"]) > 0
+
+
+async def test_admin_publish_package_rejects_duplicate_id(tmp_path: Path) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    existing = _sample_package()
+    packages_cache = {existing.id: existing}
+    overrides_cache: dict[str, PackageOverride] = {}
+
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+    app.dependency_overrides[get_package_overrides] = lambda: overrides_cache
+
+    from app.routers import admin as admin_router
+
+    original_packages_dir = admin_router.PACKAGES_DIR
+    admin_router.PACKAGES_DIR = tmp_path
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"yaml_content": _publish_yaml_content(existing.id)},
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.PACKAGES_DIR = original_packages_dir
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Package id already exists"
+
+
+async def test_admin_publish_package_success_updates_cache_and_writes_file(
+    tmp_path: Path,
+) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    packages_cache: dict[str, Package] = {}
+    overrides_cache: dict[str, PackageOverride] = {}
+
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+    app.dependency_overrides[get_package_overrides] = lambda: overrides_cache
+
+    app.state.packages = packages_cache
+    app.state.package_overrides = overrides_cache
+
+    from app.routers import admin as admin_router
+
+    original_packages_dir = admin_router.PACKAGES_DIR
+    admin_router.PACKAGES_DIR = tmp_path
+
+    yaml_content = _publish_yaml_content("published-demo")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"yaml_content": yaml_content},
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.PACKAGES_DIR = original_packages_dir
+
+    assert response.status_code == 201
+    assert response.json()["id"] == "published-demo"
+    assert response.json()["page_count"] == 1
+    assert response.json()["question_count"] == 1
+
+    assert "published-demo" in app.state.packages
+    assert (tmp_path / "published-demo.yaml").exists()
