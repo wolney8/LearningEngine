@@ -264,3 +264,4 @@ def test_get_last_updated_at_returns_metadata_value(tmp_path) -> None:
 
     actual = get_last_updated_at("sample-demo", refresh_metadata, tmp_path)
     assert actual == refreshed_at
+# end
