@@ -74,7 +74,9 @@ test.describe("WCAG 2.2 AA Accessibility Audit", () => {
 
         let i = 0;
         while (i < 20) {
-          await expect(page.locator(".question-card__answer").first()).toBeVisible();
+          await expect(
+            page.locator(".question-card__answer").first(),
+          ).toBeVisible();
           await page.locator(".question-card__answer").first().click();
 
           if (await page.getByRole("button", { name: "Finish" }).isVisible()) {
@@ -93,7 +95,9 @@ test.describe("WCAG 2.2 AA Accessibility Audit", () => {
               await nav.click();
             } else {
               await page.waitForTimeout(500);
-              if (await page.getByRole("button", { name: "Finish" }).isVisible()) {
+              if (
+                await page.getByRole("button", { name: "Finish" }).isVisible()
+              ) {
                 await page.getByRole("button", { name: "Finish" }).click();
                 break;
               }
