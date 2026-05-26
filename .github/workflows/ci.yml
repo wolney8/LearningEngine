@@ -62,7 +62,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
 
       - name: Lint with Biome
         run: pnpm exec biome check src/
