@@ -4,8 +4,9 @@ import hmac
 import os
 from typing import Any, Literal
 
+import yaml
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.models.package import Package, PackageSummary
 from app.models.settings import GameSettings
@@ -16,6 +17,7 @@ from app.services.overrides_loader import (
     resolve_effective_availability,
     save_package_overrides,
 )
+from app.services.package_loader import PACKAGES_DIR
 from app.services.settings_loader import SETTINGS_FILE, save_settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -33,6 +35,12 @@ class PackageOverridePatchRequest(BaseModel):
         if not self.model_fields_set:
             raise ValueError("At least one field must be provided")
         return self
+
+
+class PublishPackageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    yaml_content: str = Field(min_length=1)
 
 
 def require_admin_token(
@@ -155,3 +163,54 @@ async def patch_admin_package(
     request.app.state.package_overrides = overrides
 
     return build_package_summary(pkg, updated_override)
+
+
+@router.post(
+    "/packages",
+    response_model=PackageSummary,
+    status_code=201,
+    dependencies=[Depends(require_admin_token)],
+)
+async def publish_admin_package(
+    body: PublishPackageRequest,
+    request: Request,
+    packages: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
+) -> PackageSummary:
+    try:
+        raw = yaml.safe_load(body.yaml_content)
+    except yaml.YAMLError as exc:
+        raise HTTPException(status_code=422, detail=f"YAML parse error: {exc}") from exc
+
+    try:
+        pkg = Package.model_validate(raw)
+    except ValidationError as exc:
+        errors = [
+            {
+                "path": [str(loc) for loc in error["loc"]],
+                "message": error["msg"],
+            }
+            for error in exc.errors()
+        ]
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Package schema validation failed", "errors": errors},
+        ) from exc
+
+    if pkg.id in packages:
+        raise HTTPException(status_code=409, detail="Package id already exists")
+
+    output_file = PACKAGES_DIR / f"{pkg.id}.yaml"
+    try:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(body.yaml_content, encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to write package file",
+        ) from exc
+
+    packages[pkg.id] = pkg
+    request.app.state.packages = packages
+
+    return build_package_summary(pkg, overrides.get(pkg.id))
