@@ -14,6 +14,27 @@ import { useAuth } from "./useAuth";
 let cachedProgressToken: string | null = null;
 let cachedProgressByPackage: Map<string, UserProgressRecord> | null = null;
 let cachedProgressRequest: Promise<Map<string, UserProgressRecord>> | null = null;
+export const PROGRESS_UPDATED_EVENT = "lle-progress-updated";
+
+function notifyProgressUpdated(packageId: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(PROGRESS_UPDATED_EVENT, {
+      detail: { packageId },
+    }),
+  );
+}
+
+export function removeCachedProgressForPackage(packageId: string): void {
+  if (cachedProgressByPackage) {
+    cachedProgressByPackage.delete(packageId);
+  }
+
+  notifyProgressUpdated(packageId);
+}
 
 export interface ProgressMetadata {
   attemptCount: number;
@@ -131,9 +152,7 @@ export function useTestResults(packageId: string): {
       const localSeed = readAnonymousProgressSeeds().find(
         (seed) => seed.package_id === packageId,
       );
-      const nextResults = row
-        ? toPackageResultsFromServerRow(row)
-        : readResults(packageId);
+      const nextResults = row ? toPackageResultsFromServerRow(row) : {};
       setResults(nextResults);
       resultsRef.current = nextResults;
       setProgressMetadata({
@@ -180,18 +199,23 @@ export function useTestResults(packageId: string): {
         completed,
         attempt_count:
           options?.attemptCount ?? (previousRow ? previousRow.attempt_count + 1 : 1),
-      }).then((saved) => {
-        if (!cachedProgressByPackage) {
-          cachedProgressByPackage = new Map<string, UserProgressRecord>();
-        }
-        cachedProgressByPackage.set(packageId, saved);
-        setResults(toPackageResultsFromServerRow(saved));
-        resultsRef.current = toPackageResultsFromServerRow(saved);
-        setProgressMetadata({
-          attemptCount: saved.attempt_count,
-          firstCompletedAt: saved.first_completed_at,
+      })
+        .then((saved) => {
+          if (!cachedProgressByPackage) {
+            cachedProgressByPackage = new Map<string, UserProgressRecord>();
+          }
+          cachedProgressByPackage.set(packageId, saved);
+          setResults(toPackageResultsFromServerRow(saved));
+          resultsRef.current = toPackageResultsFromServerRow(saved);
+          setProgressMetadata({
+            attemptCount: saved.attempt_count,
+            firstCompletedAt: saved.first_completed_at,
+          });
+          notifyProgressUpdated(packageId);
+        })
+        .catch(() => {
+          notifyProgressUpdated(packageId);
         });
-      });
       return;
     }
 
