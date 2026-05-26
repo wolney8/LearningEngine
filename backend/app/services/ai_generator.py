@@ -7,6 +7,7 @@ import os
 import yaml
 from pydantic_ai import Agent
 from pydantic_ai.models.gemini import GeminiModel
+from pydantic_ai.providers.google_gla import GoogleGLAProvider
 
 from app.models.package import Package
 
@@ -57,7 +58,8 @@ def _get_agent() -> Agent[None, Package]:
     if not api_key:
         raise AIGenerationError("GEMINI_API_KEY is not set. Add it to backend/.env")
 
-    model = GeminiModel(model_name, api_key=api_key)
+    provider = GoogleGLAProvider(api_key=api_key)
+    model = GeminiModel(model_name, provider=provider)
     return Agent(model=model, output_type=Package, system_prompt=_SYSTEM_PROMPT)
 
 
