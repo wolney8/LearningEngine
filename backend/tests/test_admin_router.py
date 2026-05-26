@@ -442,3 +442,4 @@ async def test_admin_publish_package_success_updates_cache_and_writes_file(
 
     assert "published-demo" in app.state.packages
     assert (tmp_path / "published-demo.yaml").exists()
+    # end of file
