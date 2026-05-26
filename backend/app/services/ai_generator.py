@@ -5,13 +5,10 @@ from __future__ import annotations
 import os
 
 import yaml
-from dotenv import load_dotenv
 from pydantic_ai import Agent
 from pydantic_ai.models.gemini import GeminiModel
 
 from app.models.package import Package
-
-load_dotenv()
 
 _SYSTEM_PROMPT = """\
 You are an expert instructional designer creating training packages for a

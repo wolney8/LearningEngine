@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,6 +16,8 @@ from app.services.overrides_loader import load_package_overrides
 from app.services.package_loader import load_packages
 from app.services.refresh_metadata_loader import load_refresh_metadata
 from app.services.settings_loader import load_settings
+
+load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
