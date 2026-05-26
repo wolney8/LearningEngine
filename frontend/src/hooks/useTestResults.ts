@@ -14,6 +14,7 @@ import { useAuth } from "./useAuth";
 let cachedProgressToken: string | null = null;
 let cachedProgressByPackage: Map<string, UserProgressRecord> | null = null;
 let cachedProgressRequest: Promise<Map<string, UserProgressRecord>> | null = null;
+let cachedProgressGeneration = 0;
 export const PROGRESS_UPDATED_EVENT = "lle-progress-updated";
 
 function notifyProgressUpdated(packageId: string): void {
@@ -32,6 +33,11 @@ export function removeCachedProgressForPackage(packageId: string): void {
   if (cachedProgressByPackage) {
     cachedProgressByPackage.delete(packageId);
   }
+
+  // Invalidate any in-flight cache load so stale server snapshots cannot restore
+  // recently deleted progress into the local cache.
+  cachedProgressGeneration += 1;
+  cachedProgressRequest = null;
 
   notifyProgressUpdated(packageId);
 }
@@ -63,6 +69,7 @@ async function loadProgressCache(
     cachedProgressToken = token;
     cachedProgressByPackage = null;
     cachedProgressRequest = null;
+    cachedProgressGeneration += 1;
   }
 
   if (cachedProgressByPackage) {
@@ -73,22 +80,35 @@ async function loadProgressCache(
     return cachedProgressRequest;
   }
 
+  const requestGeneration = cachedProgressGeneration;
+
   cachedProgressRequest = fetchMyProgress(token)
     .then((rows) => {
       const map = new Map<string, UserProgressRecord>();
       for (const row of rows) {
         map.set(row.package_id, row);
       }
+
+      if (requestGeneration !== cachedProgressGeneration) {
+        return cachedProgressByPackage ?? new Map<string, UserProgressRecord>();
+      }
+
       cachedProgressByPackage = map;
       return map;
     })
     .catch(() => {
+      if (requestGeneration !== cachedProgressGeneration) {
+        return cachedProgressByPackage ?? new Map<string, UserProgressRecord>();
+      }
+
       const map = new Map<string, UserProgressRecord>();
       cachedProgressByPackage = map;
       return map;
     })
     .finally(() => {
-      cachedProgressRequest = null;
+      if (requestGeneration === cachedProgressGeneration) {
+        cachedProgressRequest = null;
+      }
     });
 
   return cachedProgressRequest;
@@ -205,8 +225,26 @@ export function useTestResults(packageId: string): {
             cachedProgressByPackage = new Map<string, UserProgressRecord>();
           }
           cachedProgressByPackage.set(packageId, saved);
-          setResults(toPackageResultsFromServerRow(saved));
-          resultsRef.current = toPackageResultsFromServerRow(saved);
+
+          const current = resultsRef.current;
+          const localDifficulty = current[difficulty];
+          const mergedDifficulty: DifficultyResult = {
+            passed: (localDifficulty?.passed ?? false) || saved.completed,
+            bestScore: Math.max(
+              localDifficulty?.bestScore ?? 0,
+              Math.round(saved.latest_weighted_score * 100),
+            ),
+            bestXpEarned: localDifficulty?.bestXpEarned ?? 0,
+            lastAttemptedAt: localDifficulty?.lastAttemptedAt ?? saved.updated_at,
+          };
+
+          const mergedResults: PackageTestResults = {
+            ...current,
+            [difficulty]: mergedDifficulty,
+          };
+
+          setResults(mergedResults);
+          resultsRef.current = mergedResults;
           setProgressMetadata({
             attemptCount: saved.attempt_count,
             firstCompletedAt: saved.first_completed_at,
