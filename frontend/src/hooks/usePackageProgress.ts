@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchMyProgress } from "../services/api";
 import { useAuth } from "./useAuth";
-import { readResults } from "./useTestResults";
+import { PROGRESS_UPDATED_EVENT, readResults } from "./useTestResults";
 
 export type PackageStatus = "incomplete" | "failed" | "completed";
 
@@ -13,31 +13,46 @@ export function usePackageProgress(packageIds: string[]): Map<string, PackageSta
   > | null>(null);
 
   useEffect(() => {
-    if (status !== "authenticated" || !token) {
+    if (status !== "authenticated" || !token || typeof window === "undefined") {
       setServerProgress(null);
       return;
     }
 
     let cancelled = false;
-    setServerProgress(null);
 
-    void fetchMyProgress(token)
-      .then((rows) => {
-        if (cancelled) return;
-        const next = new Map<string, PackageStatus>();
-        for (const row of rows) {
-          next.set(row.package_id, row.completed ? "completed" : "failed");
-        }
-        setServerProgress(next);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Authenticated fallback must be server-safe (all incomplete), never anonymous.
-        setServerProgress(new Map<string, PackageStatus>());
-      });
+    const reloadServerProgress = () => {
+      if (cancelled) {
+        return;
+      }
+
+      setServerProgress(null);
+      void fetchMyProgress(token)
+        .then((rows) => {
+          if (cancelled) return;
+          const next = new Map<string, PackageStatus>();
+          for (const row of rows) {
+            next.set(row.package_id, row.completed ? "completed" : "failed");
+          }
+          setServerProgress(next);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          // Authenticated fallback must be server-safe (all incomplete), never anonymous.
+          setServerProgress(new Map<string, PackageStatus>());
+        });
+    };
+
+    reloadServerProgress();
+
+    const handleProgressUpdated = () => {
+      reloadServerProgress();
+    };
+
+    window.addEventListener(PROGRESS_UPDATED_EVENT, handleProgressUpdated);
 
     return () => {
       cancelled = true;
+      window.removeEventListener(PROGRESS_UPDATED_EVENT, handleProgressUpdated);
     };
   }, [status, token]);
 

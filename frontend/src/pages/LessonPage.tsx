@@ -116,6 +116,21 @@ export function LessonPage() {
     });
   }
 
+  function handlePreviousPage(): void {
+    if (!pkg || phase.kind !== "studying") return;
+
+    const previousIndex = Math.max(0, phase.pageIndex - 1);
+    if (previousIndex === phase.pageIndex) {
+      return;
+    }
+
+    setPhase({
+      kind: "studying",
+      pageIndex: previousIndex,
+      visitedPageIds: new Set(phase.visitedPageIds),
+    });
+  }
+
   function handleSkipToQuestions(): void {
     startQuestions();
   }
@@ -246,6 +261,7 @@ export function LessonPage() {
             pageIndex={phase.pageIndex}
             pageCount={pkg.pages.length}
             allPagesVisited={phase.visitedPageIds.size >= pkg.pages.length}
+            onPrevious={handlePreviousPage}
             onNext={handleNextPage}
             onSkipToQuestions={handleSkipToQuestions}
           />

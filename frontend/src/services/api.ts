@@ -251,6 +251,16 @@ export function getAnonymousTestResultsKey(packageId: string): string {
   return `${ANONYMOUS_TEST_RESULTS_KEY_PREFIX}${packageId}`;
 }
 
+export function clearAnonymousPackageProgress(packageId: string): void {
+  try {
+    localStorage.removeItem(getAnonymousAttemptKey(packageId));
+    localStorage.removeItem(getAnonymousFirstCompletionKey(packageId));
+    localStorage.removeItem(getAnonymousTestResultsKey(packageId));
+  } catch {
+    // Storage unavailable - silently no-op
+  }
+}
+
 function toDateIsoIfValid(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;

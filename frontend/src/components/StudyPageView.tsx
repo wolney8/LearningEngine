@@ -9,6 +9,7 @@ interface StudyPageViewProps {
   pageIndex: number; // 0-based
   pageCount: number;
   allPagesVisited: boolean;
+  onPrevious: () => void;
   onNext: () => void;
   onSkipToQuestions: () => void;
 }
@@ -39,6 +40,7 @@ export function StudyPageView({
   pageIndex,
   pageCount,
   allPagesVisited,
+  onPrevious,
   onNext,
   onSkipToQuestions,
 }: StudyPageViewProps) {
@@ -75,6 +77,14 @@ export function StudyPageView({
       </article>
 
       <div className="study-page-view__actions">
+        <button
+          type="button"
+          className="study-page-view__btn study-page-view__btn--ghost"
+          onClick={onPrevious}
+          disabled={pageIndex === 0}
+        >
+          ← Previous Page
+        </button>
         {!isLast && (
           <button
             type="button"

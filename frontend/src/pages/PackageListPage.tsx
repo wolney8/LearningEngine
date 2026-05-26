@@ -8,9 +8,11 @@ import { PackageSearchBar } from "../components/PackageSearchBar";
 import { useAuth } from "../hooks/useAuth";
 import { usePackageProgress } from "../hooks/usePackageProgress";
 import { useStreak } from "../hooks/useStreak";
+import { removeCachedProgressForPackage } from "../hooks/useTestResults";
 import type { PackageSummary } from "../schemas/package";
 import {
   addToLibrary,
+  clearAnonymousPackageProgress,
   fetchMyCatalogue,
   fetchMyLibrary,
   fetchPackages,
@@ -560,6 +562,8 @@ export function PackageListPage() {
                           }
 
                           await removeFromLibrary(token as string, pkg.id);
+                          clearAnonymousPackageProgress(pkg.id);
+                          removeCachedProgressForPackage(pkg.id);
                           setLibraryNotice(
                             `Removed '${pkg.title}' from My Library. Progress was reset.`,
                           );
@@ -572,6 +576,8 @@ export function PackageListPage() {
                         ? async () => {
                             setLibraryNotice("");
                             await removeFromLibrary(token as string, pkg.id);
+                            clearAnonymousPackageProgress(pkg.id);
+                            removeCachedProgressForPackage(pkg.id);
                             await loadPackages();
                           }
                         : undefined
