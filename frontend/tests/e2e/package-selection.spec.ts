@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -192,6 +193,14 @@ const SEEDED_TEST_RESULTS = {
   }),
 };
 
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
+
 test.describe("Package Selection Screen", () => {
   const packageTitle = MOCK_PACKAGES[0].title;
 
@@ -225,6 +234,7 @@ test.describe("Package Selection Screen", () => {
 
   test("heading is visible", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await expect(
       page.getByRole("heading", { name: "Local Learning Engine" }),
     ).toBeVisible();
@@ -232,16 +242,16 @@ test.describe("Package Selection Screen", () => {
 
   test("renders a package card for each mocked package", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     const card = getPackageCard(page, packageTitle);
     await expect(card).toBeVisible();
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeVisible();
     await expect(card.getByRole("button", { name: "Take Test" })).toBeVisible();
   });
 
   test("card shows page and question counts", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await expect(page.getByText("3 pages")).toBeVisible();
     await expect(page.getByText("4 questions")).toBeVisible();
   });
@@ -259,28 +269,22 @@ test.describe("Package Selection Screen", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Unavailable/i }).click();
 
     const card = getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title);
     await expect(card).toBeVisible();
     await expect(card).toHaveClass(/package-card--unavailable/);
-    await expect(card.locator(".package-card__status")).toHaveText(
-      "Unavailable",
-    );
+    await expect(card.locator(".package-card__status")).toHaveText("Unavailable");
     await expect(card.locator(".package-stats-strip")).toHaveCount(0);
 
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeDisabled();
-    await expect(
-      card.getByRole("button", { name: "Take Test" }),
-    ).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
   });
 
-  test("clicking a card navigates to the package detail URL", async ({
-    page,
-  }) => {
+  test("clicking a card navigates to the package detail URL", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     const card = getPackageCard(page, packageTitle);
     await card.getByRole("button", { name: "Start Learning" }).click();
     await expect(page).toHaveURL(/\/packages\/python-basics/);
@@ -292,12 +296,11 @@ test.describe("Package Selection Screen", () => {
       route.fulfill({ status: 500, body: "Internal Server Error" });
     });
     await page.goto("/");
+    await checkA11y(page);
     await expect(page.getByText(/Could not load packages/i)).toBeVisible();
   });
 
-  test("shows empty state when backend returns empty array", async ({
-    page,
-  }) => {
+  test("shows empty state when backend returns empty array", async ({ page }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route("**/packages", (route) => {
       route.fulfill({
@@ -307,6 +310,7 @@ test.describe("Package Selection Screen", () => {
       });
     });
     await page.goto("/");
+    await checkA11y(page);
     await expect(page.getByText("No packages available.")).toBeVisible();
   });
 
@@ -314,6 +318,7 @@ test.describe("Package Selection Screen", () => {
     page,
   }) => {
     await page.goto("/");
+    await checkA11y(page);
 
     const card = getPackageCard(page, packageTitle);
     const circles = card.locator(".difficulty-circle");
@@ -331,6 +336,7 @@ test.describe("Package Selection Screen", () => {
     page,
   }) => {
     await page.goto("/");
+    await checkA11y(page);
     const card = getPackageCard(page, packageTitle);
 
     await card.getByRole("button", { name: "Take Test" }).click();
@@ -348,9 +354,7 @@ test.describe("Package Selection Screen", () => {
     }
 
     await page.getByRole("button", { name: "Finish" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Test Complete" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
 
     await page
       .locator(".test-results__actions")
@@ -364,9 +368,7 @@ test.describe("Package Selection Screen", () => {
     );
 
     await expect(easyCircle).toBeVisible();
-    await expect(easyCircle).toHaveClass(
-      /difficulty-circle--(passed|attempted)/,
-    );
+    await expect(easyCircle).toHaveClass(/difficulty-circle--(passed|attempted)/);
 
     const statsStrip = refreshedCard.locator(".package-stats-strip");
     await expect(statsStrip).toBeVisible();
@@ -374,10 +376,9 @@ test.describe("Package Selection Screen", () => {
     await expect(statsStrip).toContainText(/\d+%/);
   });
 
-  test("difficulty circles expose descriptive aria-label text", async ({
-    page,
-  }) => {
+  test("difficulty circles expose descriptive aria-label text", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
 
     const card = getPackageCard(page, packageTitle);
     const notAttemptedCircle = card
@@ -385,10 +386,7 @@ test.describe("Package Selection Screen", () => {
       .first();
 
     await expect(notAttemptedCircle).toBeVisible();
-    await expect(notAttemptedCircle).toHaveAttribute(
-      "aria-label",
-      /Not attempted/,
-    );
+    await expect(notAttemptedCircle).toHaveAttribute("aria-label", /Not attempted/);
   });
 
   test("anonymous users see streak from localStorage", async ({ page }) => {
@@ -398,6 +396,7 @@ test.describe("Package Selection Screen", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
 
     await expect(page.getByText("🔥 3 days streak")).toBeVisible();
     await expect(page.getByLabel("3 day streak")).toBeVisible();
@@ -449,6 +448,7 @@ test.describe("Package Selection Screen", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
 
     await expect(page.getByText("🔥 6 days streak")).toBeVisible();
     await expect(page.getByText("🔥 1 day streak")).toHaveCount(0);
@@ -514,42 +514,39 @@ test.describe("Package Selection Screen", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
 
-    await expect(
-      page.getByRole("button", { name: "My Library" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "My Library" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(getPackageCard(page, MOCK_PACKAGES[0].title)).toBeVisible();
 
     await page.getByRole("button", { name: "Full catalogue" }).click();
-    await expect(
-      page.getByRole("button", { name: "Full catalogue" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Full catalogue" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     const availableCard = getPackageCard(page, MOCK_PACKAGES[0].title);
-    const unavailableCard = getPackageCard(
-      page,
-      MOCK_UNAVAILABLE_PACKAGE.title,
-    );
+    const unavailableCard = getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title);
     await expect(availableCard).toBeVisible();
     await expect(unavailableCard).toBeVisible();
     await expect(
       availableCard.getByRole("button", { name: "Start Learning" }),
     ).toHaveCount(0);
-    await expect(
-      availableCard.getByRole("button", { name: "Take Test" }),
-    ).toHaveCount(0);
-    await expect(availableCard.locator(".package-progress-panel")).toHaveCount(
+    await expect(availableCard.getByRole("button", { name: "Take Test" })).toHaveCount(
       0,
     );
+    await expect(availableCard.locator(".package-progress-panel")).toHaveCount(0);
   });
 
   test("anonymous users keep global catalogue behaviour without scope toggle", async ({
     page,
   }) => {
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "My Library" })).toHaveCount(
-      0,
-    );
+    await checkA11y(page);
+    await expect(page.getByRole("button", { name: "My Library" })).toHaveCount(0);
     await expect(getPackageCard(page, MOCK_PACKAGES[0].title)).toBeVisible();
   });
 });
@@ -604,6 +601,7 @@ test.describe("Package search and filter", () => {
 
   test("renders a usable search input", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     const input = page.getByRole("searchbox", { name: "Search packages" });
     await expect(input).toBeVisible();
     await input.fill("python");
@@ -612,35 +610,31 @@ test.describe("Package search and filter", () => {
 
   test("searches packages by title", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("searchbox", { name: "Search packages" }).fill("Rust");
     await assertVisibleTitles(page, [titles.failed]);
   });
 
   test("searches packages by description", async ({ page }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("goroutines");
+    await checkA11y(page);
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("goroutines");
     await assertVisibleTitles(page, [titles.incomplete]);
   });
 
   test("searches packages by tag", async ({ page }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await checkA11y(page);
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await assertVisibleTitles(page, [titles.completed]);
   });
 
-  test("clear button clears query and restores package list", async ({
-    page,
-  }) => {
+  test("clear button clears query and restores package list", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     const input = page.getByRole("searchbox", { name: "Search packages" });
     await input.fill("rust");
-    await expect(
-      page.getByRole("button", { name: "Clear search" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(input).toHaveValue("");
     await assertVisibleTitles(page, [
@@ -652,69 +646,61 @@ test.describe("Package search and filter", () => {
 
   test("updates the q query parameter while typing", async ({ page }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await checkA11y(page);
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await expect(page).toHaveURL(/\?q=python/);
   });
 
-  test("prefills and filters when loading with q query parameter", async ({
-    page,
-  }) => {
+  test("prefills and filters when loading with q query parameter", async ({ page }) => {
     await page.goto("/?q=rust");
-    await expect(
-      page.getByRole("searchbox", { name: "Search packages" }),
-    ).toHaveValue("rust");
+    await checkA11y(page);
+    await expect(page.getByRole("searchbox", { name: "Search packages" })).toHaveValue(
+      "rust",
+    );
     await assertVisibleTitles(page, [titles.failed]);
   });
 
   test("renders filter pills with counts", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await expect(page.getByRole("button", { name: /All\s*3/i })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Incomplete\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Failed\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Completed\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Unavailable\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Failed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Unavailable\s*1/i })).toBeVisible();
   });
 
   test("completed filter shows only completed packages", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [titles.completed]);
   });
 
   test("failed filter shows only failed packages", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Failed/i }).click();
     await assertVisibleTitles(page, [titles.failed]);
   });
 
-  test("incomplete filter shows only unattempted packages", async ({
-    page,
-  }) => {
+  test("incomplete filter shows only unattempted packages", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Incomplete/i }).click();
     await assertVisibleTitles(page, [titles.incomplete]);
   });
 
-  test("unavailable filter shows only unavailable packages", async ({
-    page,
-  }) => {
+  test("unavailable filter shows only unavailable packages", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Unavailable/i }).click();
     await assertVisibleTitles(page, [titles.unavailable]);
   });
 
   test("hidden packages are absent from learner feed", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await expect(getPackageCard(page, titles.hidden)).toHaveCount(0);
     await assertVisibleTitles(page, [
       titles.completed,
@@ -725,6 +711,7 @@ test.describe("Package search and filter", () => {
 
   test("persists active filter in URL", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Failed/i }).click();
     await expect(page).toHaveURL(/\?filter=failed/);
   });
@@ -733,19 +720,20 @@ test.describe("Package search and filter", () => {
     page,
   }) => {
     await page.goto("/?filter=completed");
+    await checkA11y(page);
     await assertVisibleTitles(page, [titles.completed]);
-    await expect(
-      page.getByRole("button", { name: /Completed/i }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /Completed/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   test("supports combined search and filter with matching and empty states", async ({
     page,
   }) => {
     await page.goto("/");
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await checkA11y(page);
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [titles.completed]);
 
@@ -754,10 +742,9 @@ test.describe("Package search and filter", () => {
     await expect(page.getByText("No packages match 'python'")).toBeVisible();
   });
 
-  test("shows filtered count text when results are narrowed", async ({
-    page,
-  }) => {
+  test("shows filtered count text when results are narrowed", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
     const filteredCount = page.locator(".package-list-page__count");
 
     await page.getByRole("button", { name: /Failed/i }).click();
@@ -767,14 +754,13 @@ test.describe("Package search and filter", () => {
     await expect(filteredCount).toHaveCount(0);
   });
 
-  test("anonymous users keep localStorage-derived package status", async ({
-    page,
-  }) => {
+  test("anonymous users keep localStorage-derived package status", async ({ page }) => {
     await page.route(`${API_BASE_URL}/users/me/progress**`, (route) => {
       route.fulfill({ status: 500, body: "Should not be called" });
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [titles.completed]);
   });
@@ -885,20 +871,17 @@ test.describe("Package search and filter", () => {
       });
     });
 
-    await page.route(
-      `${API_BASE_URL}/users/me/streak/mark-practised`,
-      (route) => {
-        streakCount += 1;
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            streak_count: streakCount,
-            last_practised_date: "2026-05-24",
-          }),
-        });
-      },
-    );
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakCount += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: streakCount,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
 
     await page.route("**/packages", (route) => {
       route.fulfill({
@@ -943,14 +926,13 @@ test.describe("Package search and filter", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("learner-progress");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.getByRole("button", { name: /Incomplete\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
     await page.getByRole("button", { name: /Incomplete/i }).click();
     await assertVisibleTitles(page, [authPackage.title]);
 
@@ -964,9 +946,7 @@ test.describe("Package search and filter", () => {
       .getByRole("button", { name: "Back to packages", exact: true })
       .click();
 
-    await expect(
-      page.getByRole("button", { name: /Completed\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [authPackage.title]);
   });
@@ -1163,12 +1143,11 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: "Full catalogue" }).click();
 
     const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toBeVisible();
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
   });
 
   test("catalogue view shows Remove from Library for already-selected packages", async ({
@@ -1193,15 +1172,14 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: "Full catalogue" }).click();
 
     const card = getCard(page, LM_PACKAGE_SELECTED.title);
     await expect(
       card.getByRole("button", { name: /Remove from Library/i }),
     ).toBeVisible();
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toHaveCount(0);
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
   });
 
   test("clicking Add to Library calls PUT /users/me/library/:id and reloads", async ({
@@ -1264,6 +1242,7 @@ test.describe("Library management — authenticated users", () => {
     );
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: "Full catalogue" }).click();
 
     const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
@@ -1276,9 +1255,7 @@ test.describe("Library management — authenticated users", () => {
 
     await card.getByRole("button", { name: /Remove from Library/i }).click();
     await expect.poll(() => deleteCalled).toBe(true);
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toBeVisible();
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
   });
 
   test("library view shows top-right remove control for each course", async ({
@@ -1295,6 +1272,7 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
 
     const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
     await expect(
@@ -1344,6 +1322,7 @@ test.describe("Library management — authenticated users", () => {
     );
 
     await page.goto("/");
+    await checkA11y(page);
 
     const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
     await card.getByRole("button", { name: /Remove from library/i }).click();
@@ -1353,9 +1332,7 @@ test.describe("Library management — authenticated users", () => {
     await expect(page.getByText(/Progress was reset/i)).toBeVisible();
   });
 
-  test("library view does not show Add to Library buttons", async ({
-    page,
-  }) => {
+  test("library view does not show Add to Library buttons", async ({ page }) => {
     await seedAuthSession(page);
 
     await page.route(`${API_BASE_URL}/users/me/library`, (route) => {
@@ -1367,15 +1344,12 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
 
-    await expect(
-      page.getByRole("button", { name: /Add to Library/i }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
   });
 
-  test("anonymous users see no Add to Library or Remove buttons", async ({
-    page,
-  }) => {
+  test("anonymous users see no Add to Library or Remove buttons", async ({ page }) => {
     await page.route(`${API_BASE_URL}/packages`, (route) => {
       route.fulfill({
         status: 200,
@@ -1385,10 +1359,9 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
 
-    await expect(
-      page.getByRole("button", { name: /Add to Library/i }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /Remove from library/i }),
     ).toHaveCount(0);
@@ -1416,19 +1389,14 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: "Full catalogue" }).click();
     await page.getByRole("button", { name: /Unavailable/i }).click();
 
     const card = getCard(page, LM_PACKAGE_UNAVAILABLE_UNSELECTED.title);
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toBeVisible();
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toHaveCount(0);
-    await expect(card.getByRole("button", { name: "Take Test" })).toHaveCount(
-      0,
-    );
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Take Test" })).toHaveCount(0);
     await expect(card.locator(".package-progress-panel")).toHaveCount(0);
   });
 
@@ -1454,20 +1422,17 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: "Full catalogue" }).click();
 
     await expect(
       page.getByRole("searchbox", { name: "Search packages" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Unavailable" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unavailable" })).toBeVisible();
     await expect(page.getByRole("button", { name: "..." })).toBeVisible();
 
     await page.getByRole("button", { name: "..." }).click();
-    await expect(
-      page.getByRole("menu", { name: "More package tags" }),
-    ).toBeVisible();
+    await expect(page.getByRole("menu", { name: "More package tags" })).toBeVisible();
 
     await page.getByRole("menuitemradio", { name: "sql" }).click();
     await expect(page).toHaveURL(/tag=sql/);
@@ -1512,14 +1477,14 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/?tag=unavailable");
+    await checkA11y(page);
     await page.getByRole("button", { name: "Full catalogue" }).click();
 
-    await expect(
-      page.getByRole("button", { name: "Unavailable" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(
-      getCard(page, unavailableCataloguePackage.title),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unavailable" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(getCard(page, unavailableCataloguePackage.title)).toBeVisible();
     await expect(page.locator("article.package-card")).toHaveCount(1);
   });
 
@@ -1537,17 +1502,14 @@ test.describe("Library management — authenticated users", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Unavailable/i }).click();
 
     const card = getCard(page, LM_PACKAGE_UNAVAILABLE_UNSELECTED.title);
     await expect(
       card.getByRole("button", { name: /Remove from library/i }),
     ).toHaveCount(0);
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeDisabled();
-    await expect(
-      card.getByRole("button", { name: "Take Test" }),
-    ).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
   });
 });

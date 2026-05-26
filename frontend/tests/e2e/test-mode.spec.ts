@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 const MOCK_PACKAGE_ID = "python-basics";
@@ -273,6 +274,14 @@ const toSummary = (pkg: {
   question_count: pkg.questions.length,
 });
 
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
+
 test.describe("Test Mode", () => {
   test.beforeEach(async ({ page }) => {
     await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
@@ -296,6 +305,7 @@ test.describe("Test Mode", () => {
     page,
   }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
     await expect(
       page.getByText("Choose your difficulty to begin the timed exam."),
@@ -304,6 +314,7 @@ test.describe("Test Mode", () => {
 
   test("all four difficulty options are visible", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await expect(page.getByRole("button", { name: /Easy/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Normal/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Hard/i })).toBeVisible();
@@ -312,6 +323,7 @@ test.describe("Test Mode", () => {
 
   test("selecting Normal difficulty shows exam view with timer", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
     await expect(page.getByLabel(/minutes .* seconds remaining/i)).toBeVisible();
     await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
@@ -319,6 +331,7 @@ test.describe("Test Mode", () => {
 
   test("timer displays in MM:SS format", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
     await expect(page.getByText(/^\d{2}:\d{2}$/)).toBeVisible();
   });
@@ -341,6 +354,7 @@ test.describe("Test Mode", () => {
     });
 
     await page.goto("/test/exam/tagged-pkg");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Easy/i }).click();
 
     await expect(page.getByText(/Easy question (one|two)\?/)).toBeVisible();
@@ -366,6 +380,7 @@ test.describe("Test Mode", () => {
     });
 
     await page.goto("/test/exam/tagged-pkg");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Expert/i }).click();
     await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
 
@@ -394,6 +409,7 @@ test.describe("Test Mode", () => {
     });
 
     await page.goto("/test/exam/legacy-pkg");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Easy/i }).click();
 
     await expect(page.getByText(/Legacy question (one|two)\?/)).toBeVisible();
@@ -419,6 +435,7 @@ test.describe("Test Mode", () => {
     });
 
     await page.goto("/test/exam/hard-only-pkg");
+    await checkA11y(page);
     await page.getByRole("button", { name: /Easy/i }).click();
 
     await expect(page.getByText(/Hard question (one|two)\?/)).toBeVisible();
@@ -435,6 +452,7 @@ test.describe("Test Mode", () => {
       });
 
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await checkA11y(page);
       await page.getByRole("button", { name: /Normal/i }).click();
 
       await page.locator(".question-card__answer").first().click();
@@ -453,6 +471,7 @@ test.describe("Test Mode", () => {
       page,
     }) => {
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await checkA11y(page);
       await page.getByRole("button", { name: /Easy/i }).click();
 
       await page.getByRole("button", { name: /Question 4,/i }).click();
@@ -464,6 +483,7 @@ test.describe("Test Mode", () => {
       page,
     }) => {
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await checkA11y(page);
       await page.getByRole("button", { name: /Easy/i }).click();
 
       await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
@@ -474,6 +494,7 @@ test.describe("Test Mode", () => {
       page,
     }) => {
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await checkA11y(page);
       await page.getByRole("button", { name: /Easy/i }).click();
 
       await page.getByRole("button", { name: /Question 4,/i }).click();
@@ -491,6 +512,7 @@ test.describe("Test Mode", () => {
 
     test("Hard difficulty shows pre-start warning phase", async ({ page }) => {
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await checkA11y(page);
       await page.getByRole("button", { name: /Hard/i }).click();
 
       await expect(page.locator(".test-mode-page__warning-callout")).toBeVisible();
@@ -512,6 +534,7 @@ test.describe("Test Mode", () => {
 
     test("confirming Hard difficulty starts exam", async ({ page }) => {
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await checkA11y(page);
       await page.getByRole("button", { name: /Hard/i }).click();
       await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
 
@@ -521,6 +544,7 @@ test.describe("Test Mode", () => {
 
     test("few-answer Hard warning mentions 50 XP deduction", async ({ page }) => {
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+      await checkA11y(page);
       await page.getByRole("button", { name: /Hard/i }).click();
       await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
 
@@ -537,6 +561,7 @@ test.describe("Test Mode", () => {
 
   test("clicking an answer marks the question dot as answered", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
 
     await page.locator(".question-card__answer").first().click();
@@ -549,6 +574,7 @@ test.describe("Test Mode", () => {
 
   test("flag button toggles flag indicator", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
 
     await page.getByRole("button", { name: /Flag question for review/i }).click();
@@ -561,6 +587,7 @@ test.describe("Test Mode", () => {
 
   test("navigating via dot shows different question", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
 
     await page.getByRole("button", { name: "Question 2, unanswered" }).click();
@@ -569,6 +596,7 @@ test.describe("Test Mode", () => {
 
   test("previous answer is preserved when navigating back", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
 
     const firstAnswer = page.locator(".question-card__answer").first();
@@ -590,6 +618,7 @@ test.describe("Test Mode", () => {
     page,
   }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
 
     for (let index = 0; index < 4; index++) {
@@ -609,6 +638,7 @@ test.describe("Test Mode", () => {
 
   test("results screen shows score percentage", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
 
     for (let index = 0; index < 4; index++) {
@@ -641,6 +671,7 @@ test.describe("Test Mode", () => {
     });
 
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Expert/i }).click();
     await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
     await expect(page.getByText("00:10")).toBeVisible();
@@ -744,6 +775,7 @@ test.describe("Test Mode", () => {
     );
 
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Easy/i }).click();
 
     for (let index = 0; index < 4; index++) {
@@ -790,6 +822,7 @@ test.describe("Test Mode", () => {
     });
 
     await page.goto("/test/exam/nonexistent");
+    await checkA11y(page);
     await expect(page).toHaveURL("/");
     await expect(
       page.getByRole("heading", { name: "Local Learning Engine" }),

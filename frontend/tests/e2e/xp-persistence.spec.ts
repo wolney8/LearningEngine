@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -82,6 +83,14 @@ const PACKAGE_DETAIL = {
   ],
 };
 
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
+
 async function registerPackageRoutes(page: Page): Promise<void> {
   await page.route(`${API_BASE_URL}/packages`, (route) => {
     route.fulfill({
@@ -110,6 +119,7 @@ async function registerPackageRoutes(page: Page): Promise<void> {
 
 async function completeLessonRun(page: Page): Promise<void> {
   await page.goto(`/packages/${PACKAGE_ID}`);
+  await checkA11y(page);
   await page.getByRole("button", { name: /Start Questions/i }).click();
   await page.getByRole("button", { name: "Correct" }).click();
   await page.getByRole("button", { name: "Next" }).click();
@@ -227,6 +237,7 @@ test.describe("XP persistence", () => {
     );
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("xp-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -238,6 +249,7 @@ test.describe("XP persistence", () => {
 
     await page.reload();
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("xp-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -389,6 +401,7 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "500"));
     await page.evaluate(() => {
       localStorage.setItem("lle_daily_streak", "3");
@@ -409,6 +422,7 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("keep-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -509,9 +523,11 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "100"));
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("once-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -527,8 +543,10 @@ test.describe("XP persistence", () => {
       .toBe("1");
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "300"));
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("once-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -604,9 +622,11 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "120"));
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("retry-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -627,9 +647,11 @@ test.describe("XP persistence", () => {
       sessionStorage.removeItem("lle_auth_token");
     });
     await page.goto("/");
+    await checkA11y(page);
     await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("retry-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();

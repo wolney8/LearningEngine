@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -53,6 +54,14 @@ const PACKAGE_LIST = [
     xp_threshold: null,
   },
 ];
+
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
 
 test.describe("Admin panel", () => {
   test.beforeEach(async ({ page }) => {
@@ -122,6 +131,7 @@ test.describe("Admin panel", () => {
     page,
   }) => {
     await page.goto("/admin");
+    await checkA11y(page);
 
     await page.getByLabel("Admin token").fill("bad-token");
     await page.getByRole("button", { name: "Enter Admin" }).click();
@@ -140,6 +150,7 @@ test.describe("Admin panel", () => {
     }, ADMIN_TOKEN);
 
     await page.goto("/admin/settings");
+    await checkA11y(page);
 
     const bonus = page
       .locator("label")
@@ -158,6 +169,7 @@ test.describe("Admin panel", () => {
     }, ADMIN_TOKEN);
 
     await page.goto("/admin/packages");
+    await checkA11y(page);
 
     await expect(page.getByRole("heading", { name: "Admin Packages" })).toBeVisible();
     const availabilityControl = page.getByLabel("Availability");
@@ -174,6 +186,7 @@ test.describe("Admin panel", () => {
     }, ADMIN_TOKEN);
 
     await page.goto("/admin/packages");
+    await checkA11y(page);
 
     const availabilityControl = page.getByLabel("Availability");
     await availabilityControl.selectOption("unavailable");

@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 const MOCK_PACKAGE_ID = "python-basics";
@@ -92,6 +93,14 @@ const MOCK_FULL_PACKAGE = {
   ],
 };
 
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
+
 test.describe("Lesson Mode", () => {
   test.beforeEach(async ({ page }) => {
     await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
@@ -121,21 +130,25 @@ test.describe("Lesson Mode", () => {
 
   test("navigating to a package loads the lesson page", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
   });
 
   test("first study page content is visible", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await expect(page.getByText("Introduction")).toBeVisible();
   });
 
   test("progress bar shows page 1 of 2", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await expect(page.getByText("Page 1 of 2")).toBeVisible();
   });
 
   test("clicking Next Page advances to second page", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
     await expect(page.getByText("Page 2 of 2")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Variables" })).toBeVisible();
@@ -145,6 +158,7 @@ test.describe("Lesson Mode", () => {
     page,
   }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
     await page.getByRole("button", { name: /Start Questions/i }).click();
     await expect(page.getByText("Question 1 of 2")).toBeVisible();
@@ -152,6 +166,7 @@ test.describe("Lesson Mode", () => {
 
   test("answering a question correctly shows correct feedback", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
     await page.getByRole("button", { name: /Start Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
@@ -165,6 +180,7 @@ test.describe("Lesson Mode", () => {
     page,
   }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
     await page.getByRole("button", { name: /Start Questions/i }).click();
     await page.getByRole("button", { name: "A snake" }).click();
@@ -173,6 +189,7 @@ test.describe("Lesson Mode", () => {
 
   test("completing all questions shows the completion screen", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -193,11 +210,13 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.goto("/packages/nonexistent");
+    await checkA11y(page);
     await expect(page.getByText(/not found|Failed to load/i)).toBeVisible();
   });
 
   test("back link navigates to home", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("link", { name: /Back to packages/i }).click();
     await expect(page).toHaveURL("/");
   });
@@ -211,6 +230,7 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -233,6 +253,7 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -255,6 +276,7 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -290,6 +312,7 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -409,6 +432,7 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
@@ -495,6 +519,7 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();

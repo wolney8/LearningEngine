@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -19,8 +20,17 @@ const MOCK_PACKAGES = [
   },
 ];
 
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
+
 async function seedAnonymousMergeState(page: Page): Promise<void> {
   await page.goto("/");
+  await checkA11y(page);
   await page.evaluate((packageId) => {
     localStorage.setItem("lle_xp", "125");
     localStorage.setItem(
@@ -57,11 +67,10 @@ test.describe("Optional auth shell", () => {
 
   test("home shows sign in and create account links", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
 
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Create account" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
     await expect(page.getByText("Sample Package")).toBeVisible();
   });
 
@@ -100,6 +109,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/register");
+    await checkA11y(page);
     await page.getByLabel("Username").fill("newuser");
     await page.getByLabel("Email").fill("newuser@example.com");
     await page.getByLabel("Password").fill("StrongPass123");
@@ -111,9 +121,7 @@ test.describe("Optional auth shell", () => {
     expect(registerBody?.selected_package_ids).toEqual([SAMPLE_PACKAGE_ID]);
   });
 
-  test("login page shows API error on invalid credentials", async ({
-    page,
-  }) => {
+  test("login page shows API error on invalid credentials", async ({ page }) => {
     await page.route(`${API_BASE_URL}/auth/login`, (route) => {
       route.fulfill({
         status: 401,
@@ -123,6 +131,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("learner1");
     await page.getByLabel("Password").fill("WrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -130,9 +139,7 @@ test.describe("Optional auth shell", () => {
     await expect(page.getByRole("alert")).toContainText("Login failed (401)");
   });
 
-  test("successful login updates shared auth state above routes", async ({
-    page,
-  }) => {
+  test("successful login updates shared auth state above routes", async ({ page }) => {
     const authUser = {
       id: 2,
       username: "learner1",
@@ -163,19 +170,17 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("learner1");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.locator("[data-auth-status='authenticated']"),
-    ).toBeVisible();
+    await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
 
     await page.goto("/register");
-    await expect(
-      page.locator("[data-auth-status='authenticated']"),
-    ).toBeVisible();
+    await checkA11y(page);
+    await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
   });
 
   test("register accepts anonymous import and merges XP, progress, and streak", async ({
@@ -324,6 +329,7 @@ test.describe("Optional auth shell", () => {
     await seedAnonymousMergeState(page);
 
     await page.goto("/register");
+    await checkA11y(page);
     await page.getByLabel("Username").fill("merge-user");
     await page.getByLabel("Email").fill("merge-user@example.com");
     await page.getByLabel("Password").fill("StrongPass123");
@@ -344,9 +350,7 @@ test.describe("Optional auth shell", () => {
     await expect.poll(() => updatedXP).toBe(125);
     await expect.poll(() => mergedProgress?.attempt_count ?? 0).toBe(3);
     await expect.poll(() => mergedProgress?.completed ?? false).toBeTruthy();
-    await expect
-      .poll(() => mergedProgress?.latest_weighted_score ?? 0)
-      .toBe(0.6);
+    await expect.poll(() => mergedProgress?.latest_weighted_score ?? 0).toBe(0.6);
     await expect.poll(() => mergedStreak?.streak_count ?? 0).toBe(5);
     await expect
       .poll(() => mergedStreak?.last_practised_date ?? null)
@@ -422,6 +426,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => {
       localStorage.setItem("lle_xp", "40");
       localStorage.setItem("lle_daily_streak", "3");
@@ -442,6 +447,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("logout-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -453,9 +459,7 @@ test.describe("Optional auth shell", () => {
 
     await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Create account" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
 
     const storage = await page.evaluate(() => ({
       xp: localStorage.getItem("lle_xp"),
@@ -564,7 +568,9 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.goto("/login");
+    await checkA11y(page);
 
     await page.getByLabel("Username or email").fill("alice");
     await page.getByLabel("Password").fill("StrongPass123");
@@ -578,6 +584,7 @@ test.describe("Optional auth shell", () => {
     await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("bob");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
