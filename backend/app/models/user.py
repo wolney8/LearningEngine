@@ -35,3 +35,21 @@ class UserTestResult(SQLModel, table=True):
     attempt_count: int = Field(default=1, ge=1)
     first_completed_at: datetime | None = Field(default=None)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserLibraryItem(SQLModel, table=True):
+    __tablename__ = "user_library_item"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "package_id",
+            name="uq_user_library_items_user_package",
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    package_id: str = Field(index=True, min_length=1, max_length=200)
+    status: str = Field(default="selected", min_length=1, max_length=30)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -73,6 +73,7 @@ export const PackageSummarySchema = z
     availability: PackageAvailabilitySchema.default("available"),
     enabled: z.boolean().default(true),
     xp_threshold: z.number().int().nonnegative().nullable().default(null),
+    selected: z.boolean().optional(),
   })
   .transform((summary) => ({
     ...summary,

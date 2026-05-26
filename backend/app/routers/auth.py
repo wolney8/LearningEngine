@@ -6,8 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Session, select
 
-from app.models.user import User
+from app.models.package import Package
+from app.models.user import User, UserLibraryItem
+from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
+from app.services.library_selection import validate_selectable_package_ids
+from app.services.overrides_loader import (
+    PackageOverride,
+)
 from app.services.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -19,6 +25,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: str = Field(min_length=5, max_length=320)
     password: str = Field(min_length=8, max_length=128)
+    selected_package_ids: list[str] | None = None
 
 
 class LoginRequest(BaseModel):
@@ -62,13 +69,39 @@ def _to_user_response(user: User) -> UserResponse:
     )
 
 
+def _deduplicate_package_ids(package_ids: list[str]) -> list[str]:
+    deduplicated: list[str] = []
+    seen: set[str] = set()
+    for raw_package_id in package_ids:
+        package_id = raw_package_id.strip()
+        if not package_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="selected_package_ids must not contain empty values",
+            )
+        if package_id in seen:
+            continue
+        seen.add(package_id)
+        deduplicated.append(package_id)
+    return deduplicated
+
+
 @router.post("/register", response_model=AuthResponse)
 async def register(
     body: RegisterRequest,
     session: Session = Depends(get_session),
+    cache: dict[str, Package] = Depends(get_packages_cache),
+    overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
 ) -> AuthResponse:
     username = _normalise_username(body.username)
     email = _normalise_email(body.email)
+    selected_package_ids = _deduplicate_package_ids(body.selected_package_ids or [])
+    validate_selectable_package_ids(
+        selected_package_ids,
+        cache,
+        overrides,
+        detail_field="selected_package_ids",
+    )
 
     existing_username = session.exec(
         select(User).where(User.username == username)
@@ -92,6 +125,24 @@ async def register(
         hashed_password=hash_password(body.password),
     )
     session.add(user)
+
+    session.flush()
+    user_id = user.id
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user",
+        )
+
+    for package_id in selected_package_ids:
+        session.add(
+            UserLibraryItem(
+                user_id=user_id,
+                package_id=package_id,
+                status="selected",
+            )
+        )
+
     session.commit()
     session.refresh(user)
 
