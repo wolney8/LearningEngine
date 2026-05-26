@@ -103,3 +103,32 @@ async def generate_package(
         sort_keys=False,
         default_flow_style=False,
     )
+
+
+async def refresh_package(existing: Package) -> str:
+    """Re-generate content for an existing package, preserving its id and identity."""
+    agent = _get_agent()
+    prompt = (
+        f"Refresh the training package titled: {existing.title}\n"
+        f"Original description: {existing.description}\n"
+        f"Include exactly {len(existing.pages)} pages and "
+        f"exactly {len(existing.questions)} questions.\n"
+        "Generate completely new, fresh content on the same topic. "
+        "Do NOT reuse existing question text or page content verbatim.\n"
+        "Distribute questions evenly across all four difficulty levels. "
+        "Within each difficulty group, weights must sum to exactly 100."
+    )
+
+    try:
+        result = await agent.run(prompt)
+    except Exception as exc:
+        raise AIGenerationError(f"Gemini API call failed: {exc}") from exc
+
+    pkg: Package = result.output
+    pkg_dict = pkg.model_dump(mode="python")
+    return yaml.dump(
+        pkg_dict,
+        allow_unicode=True,
+        sort_keys=False,
+        default_flow_style=False,
+    )
