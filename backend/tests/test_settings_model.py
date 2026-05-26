@@ -87,3 +87,25 @@ def test_game_settings_rejects_negative_values() -> None:
 
     with pytest.raises(ValidationError):
         GameSettings.model_validate(negative_multiplier_payload)
+
+
+def test_game_settings_content_refresh_defaults() -> None:
+    settings = GameSettings.model_validate(_valid_settings_dict())
+
+    assert settings.content_refresh.stale_after_days == 90
+
+
+def test_game_settings_content_refresh_custom_value() -> None:
+    payload = _valid_settings_dict()
+    payload["content_refresh"] = {"stale_after_days": 30}
+
+    settings = GameSettings.model_validate(payload)
+    assert settings.content_refresh.stale_after_days == 30
+
+
+def test_game_settings_content_refresh_rejects_zero() -> None:
+    payload = _valid_settings_dict()
+    payload["content_refresh"] = {"stale_after_days": 0}
+
+    with pytest.raises(ValidationError):
+        GameSettings.model_validate(payload)

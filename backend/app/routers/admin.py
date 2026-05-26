@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 import yaml
@@ -9,7 +10,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.models.package import Package, PackageSummary
+from app.models.refresh import PackageRefreshRecord, RefreshResult, StalePackageInfo
 from app.models.settings import GameSettings
+from app.services.ai_generator import AIGenerationError, refresh_package
 from app.services.overrides_loader import (
     OVERRIDES_FILE,
     PackageOverride,
@@ -18,6 +21,13 @@ from app.services.overrides_loader import (
     save_package_overrides,
 )
 from app.services.package_loader import PACKAGES_DIR
+from app.services.refresh_metadata_loader import REFRESH_METADATA_FILE
+from app.services.refresh_service import (
+    _bump_patch_version,
+    compute_diff_summary,
+    detect_stale_packages,
+    write_refreshed_package,
+)
 from app.services.settings_loader import SETTINGS_FILE, save_settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -67,6 +77,10 @@ def get_packages_cache(request: Request) -> dict[str, Package]:
 
 def get_package_overrides(request: Request) -> dict[str, PackageOverride]:
     return request.app.state.package_overrides
+
+
+def get_refresh_metadata_cache(request: Request) -> dict[str, PackageRefreshRecord]:
+    return request.app.state.refresh_metadata
 
 
 def build_package_summary(
@@ -165,6 +179,27 @@ async def patch_admin_package(
     return build_package_summary(pkg, updated_override)
 
 
+@router.get(
+    "/packages/stale",
+    response_model=list[StalePackageInfo],
+    dependencies=[Depends(require_admin_token)],
+)
+async def list_stale_packages(
+    packages: dict[str, Package] = Depends(get_packages_cache),
+    refresh_metadata: dict[str, PackageRefreshRecord] = Depends(
+        get_refresh_metadata_cache
+    ),
+    settings: GameSettings = Depends(get_settings_cache),
+) -> list[StalePackageInfo]:
+    stale_after_days = settings.content_refresh.stale_after_days
+    return detect_stale_packages(
+        packages,
+        refresh_metadata,
+        stale_after_days,
+        PACKAGES_DIR,
+    )
+
+
 @router.post(
     "/packages",
     response_model=PackageSummary,
@@ -214,3 +249,79 @@ async def publish_admin_package(
     request.app.state.packages = packages
 
     return build_package_summary(pkg, overrides.get(pkg.id))
+
+
+@router.post(
+    "/packages/{package_id}/refresh",
+    response_model=RefreshResult,
+    dependencies=[Depends(require_admin_token)],
+)
+async def refresh_admin_package(
+    package_id: str,
+    request: Request,
+    dry_run: bool = False,
+    packages: dict[str, Package] = Depends(get_packages_cache),
+    refresh_metadata: dict[str, PackageRefreshRecord] = Depends(
+        get_refresh_metadata_cache
+    ),
+) -> RefreshResult:
+    pkg = packages.get(package_id)
+    if pkg is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+
+    try:
+        new_yaml = await refresh_package(pkg)
+    except AIGenerationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        raw = yaml.safe_load(new_yaml)
+        new_pkg = Package.model_validate(raw)
+    except yaml.YAMLError as exc:
+        raise HTTPException(status_code=422, detail=f"YAML parse error: {exc}") from exc
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Schema validation failed", "errors": exc.errors()},
+        ) from exc
+
+    new_pkg_patched = new_pkg.model_copy(
+        update={"id": pkg.id, "version": _bump_patch_version(pkg.version)}
+    )
+    diff = compute_diff_summary(pkg, new_pkg_patched)
+
+    if dry_run:
+        return RefreshResult(
+            package_id=package_id,
+            previous_version=pkg.version,
+            new_version=new_pkg_patched.version,
+            diff_summary=diff,
+            dry_run=True,
+        )
+
+    now = datetime.now(tz=timezone.utc)
+    try:
+        _, record = write_refreshed_package(
+            package_id,
+            new_yaml,
+            PACKAGES_DIR,
+            pkg,
+            refresh_metadata,
+            REFRESH_METADATA_FILE,
+            now,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    packages[package_id] = new_pkg_patched
+    request.app.state.packages = packages
+    request.app.state.refresh_metadata = refresh_metadata
+
+    return RefreshResult(
+        package_id=package_id,
+        previous_version=pkg.version,
+        new_version=new_pkg_patched.version,
+        diff_summary=diff,
+        dry_run=False,
+        refreshed_at=record.refreshed_at,
+    )

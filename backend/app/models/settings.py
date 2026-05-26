@@ -94,9 +94,18 @@ class DifficultySettings(BaseModel):
     xp_multiplier: DifficultyXPMultiplierSettings
 
 
+class ContentRefreshSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stale_after_days: int = Field(default=90, ge=1)
+
+
 class GameSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: int = Field(ge=0)
     xp: XPSettings
     difficulty: DifficultySettings
+    content_refresh: ContentRefreshSettings = Field(
+        default_factory=ContentRefreshSettings
+    )
