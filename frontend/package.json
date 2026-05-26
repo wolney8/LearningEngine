@@ -31,5 +31,8 @@
     "@vitejs/plugin-react": "^4",
     "typescript": "^5",
     "vite": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@biomejs/biome", "esbuild"]
   }
 }
