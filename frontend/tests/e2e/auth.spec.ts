@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -19,8 +20,17 @@ const MOCK_PACKAGES = [
   },
 ];
 
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
+
 async function seedAnonymousMergeState(page: Page): Promise<void> {
   await page.goto("/");
+  await checkA11y(page);
   await page.evaluate((packageId) => {
     localStorage.setItem("lle_xp", "125");
     localStorage.setItem(
@@ -57,6 +67,7 @@ test.describe("Optional auth shell", () => {
 
   test("home shows sign in and create account links", async ({ page }) => {
     await page.goto("/");
+    await checkA11y(page);
 
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
     await expect(
@@ -100,6 +111,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/register");
+    await checkA11y(page);
     await page.getByLabel("Username").fill("newuser");
     await page.getByLabel("Email").fill("newuser@example.com");
     await page.getByLabel("Password").fill("StrongPass123");
@@ -123,6 +135,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("learner1");
     await page.getByLabel("Password").fill("WrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -163,6 +176,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("learner1");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -173,6 +187,7 @@ test.describe("Optional auth shell", () => {
     ).toBeVisible();
 
     await page.goto("/register");
+    await checkA11y(page);
     await expect(
       page.locator("[data-auth-status='authenticated']"),
     ).toBeVisible();
@@ -324,6 +339,7 @@ test.describe("Optional auth shell", () => {
     await seedAnonymousMergeState(page);
 
     await page.goto("/register");
+    await checkA11y(page);
     await page.getByLabel("Username").fill("merge-user");
     await page.getByLabel("Email").fill("merge-user@example.com");
     await page.getByLabel("Password").fill("StrongPass123");
@@ -422,6 +438,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => {
       localStorage.setItem("lle_xp", "40");
       localStorage.setItem("lle_daily_streak", "3");
@@ -442,6 +459,7 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("logout-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -564,7 +582,9 @@ test.describe("Optional auth shell", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.goto("/login");
+    await checkA11y(page);
 
     await page.getByLabel("Username or email").fill("alice");
     await page.getByLabel("Password").fill("StrongPass123");
@@ -578,6 +598,7 @@ test.describe("Optional auth shell", () => {
     await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("bob");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();

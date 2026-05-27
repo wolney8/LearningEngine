@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { type Page, expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -82,6 +83,14 @@ const PACKAGE_DETAIL = {
   ],
 };
 
+async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+    .analyze();
+
+  expect(results.violations).toEqual([]);
+}
+
 async function registerPackageRoutes(page: Page): Promise<void> {
   await page.route(`${API_BASE_URL}/packages`, (route) => {
     route.fulfill({
@@ -110,10 +119,13 @@ async function registerPackageRoutes(page: Page): Promise<void> {
 
 async function completeLessonRun(page: Page): Promise<void> {
   await page.goto(`/packages/${PACKAGE_ID}`);
+  await checkA11y(page);
   await page.getByRole("button", { name: /Start Questions/i }).click();
   await page.getByRole("button", { name: "Correct" }).click();
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Lesson complete!" }),
+  ).toBeVisible();
 }
 
 test.describe("XP persistence", () => {
@@ -193,7 +205,9 @@ test.describe("XP persistence", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(serverProgress.attempt_count > 0 ? [serverProgress] : []),
+        body: JSON.stringify(
+          serverProgress.attempt_count > 0 ? [serverProgress] : [],
+        ),
       });
     });
 
@@ -227,6 +241,7 @@ test.describe("XP persistence", () => {
     );
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("xp-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -238,6 +253,7 @@ test.describe("XP persistence", () => {
 
     await page.reload();
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("xp-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -263,7 +279,9 @@ test.describe("XP persistence", () => {
 
     await completeLessonRun(page);
 
-    const localXPAfterRun = await page.evaluate(() => localStorage.getItem("lle_xp"));
+    const localXPAfterRun = await page.evaluate(() =>
+      localStorage.getItem("lle_xp"),
+    );
     expect(localXPAfterRun).toBe("30");
     expect(serverXPCalls).toBe(0);
 
@@ -362,16 +380,19 @@ test.describe("XP persistence", () => {
       });
     });
 
-    await page.route(`${API_BASE_URL}/users/me/progress/${PACKAGE_ID}`, (route) => {
-      if (route.request().method() === "PUT") {
-        progressPutCalls += 1;
-      }
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(serverProgressRow),
-      });
-    });
+    await page.route(
+      `${API_BASE_URL}/users/me/progress/${PACKAGE_ID}`,
+      (route) => {
+        if (route.request().method() === "PUT") {
+          progressPutCalls += 1;
+        }
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(serverProgressRow),
+        });
+      },
+    );
 
     await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
       if (route.request().method() === "PUT") {
@@ -389,6 +410,7 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "500"));
     await page.evaluate(() => {
       localStorage.setItem("lle_daily_streak", "3");
@@ -409,6 +431,7 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("keep-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -509,9 +532,11 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "100"));
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("once-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -527,8 +552,10 @@ test.describe("XP persistence", () => {
       .toBe("1");
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "300"));
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("once-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -604,9 +631,11 @@ test.describe("XP persistence", () => {
     });
 
     await page.goto("/");
+    await checkA11y(page);
     await page.evaluate(() => localStorage.setItem("lle_xp", "120"));
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("retry-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -627,9 +656,11 @@ test.describe("XP persistence", () => {
       sessionStorage.removeItem("lle_auth_token");
     });
     await page.goto("/");
+    await checkA11y(page);
     await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
 
     await page.goto("/login");
+    await checkA11y(page);
     await page.getByLabel("Username or email").fill("retry-user");
     await page.getByLabel("Password").fill("StrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();

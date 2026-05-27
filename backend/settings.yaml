@@ -24,3 +24,5 @@ difficulty:
     normal: 1.0
     hard: 1.5
     expert: 2.0
+content_refresh:
+  stale_after_days: 1
