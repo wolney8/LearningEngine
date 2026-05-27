@@ -85,7 +85,9 @@ export function PackageCard({
 
         {isUnavailable && <p className="package-card__status">Unavailable</p>}
 
-        {isLearningCard && !isUnavailable && <PackageProgressPanel results={results} />}
+        {isLearningCard && !isUnavailable && (
+          <PackageProgressPanel results={results} />
+        )}
       </div>
 
       {(isLearningCard || onAdd || (isCatalogueCard && onRemove)) && (
