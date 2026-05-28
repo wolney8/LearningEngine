@@ -36,13 +36,12 @@
 .package-card__header-top-row {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.35rem;
 }
 
 .package-card__header .package-progress-panel {
-  margin-top: 0.45rem;
+  margin-top: 0.25rem;
 }
 
 .package-card__remove-control {
@@ -93,6 +92,8 @@
 
 .package-card__title {
   margin: 0;
+  flex: 1;
+  min-width: 0;
   font-family: "Nunito", "Segoe UI", sans-serif;
   font-size: 1.125rem;
   font-weight: 700;

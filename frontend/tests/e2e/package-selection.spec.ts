@@ -324,7 +324,7 @@ test.describe("Package Selection Screen", () => {
     const circles = card.locator(".difficulty-circle");
     const title = card.locator(".package-card__title");
     const headerIndicators = card.locator(
-      ".package-card__title + .package-progress-panel",
+      ".package-card__header > .package-progress-panel",
     );
 
     await expect(

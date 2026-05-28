@@ -48,8 +48,9 @@ export function PackageCard({
     >
       <div className="package-card__content">
         <div className="package-card__header">
-          {isLearningCard && onRemove && (
-            <div className="package-card__header-top-row">
+          <div className="package-card__header-top-row">
+            <h2 className="package-card__title">{pkg.title}</h2>
+            {isLearningCard && onRemove && (
               <button
                 type="button"
                 className="package-card__remove-control"
@@ -69,9 +70,8 @@ export function PackageCard({
                   <X size={13} aria-hidden="true" />
                 )}
               </button>
-            </div>
-          )}
-          <h2 className="package-card__title">{pkg.title}</h2>
+            )}
+          </div>
           {isLearningCard && !isUnavailable && (
             <PackageProgressPanel results={results} showStats={false} />
           )}
