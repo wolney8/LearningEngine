@@ -48,37 +48,34 @@ export function PackageCard({
     >
       <div className="package-card__content">
         <div className="package-card__header">
-          {isLearningCard && (
+          {isLearningCard && onRemove && (
             <div className="package-card__header-top-row">
-              {!isUnavailable && (
-                <PackageProgressPanel results={results} showStats={false} />
-              )}
-              {onRemove && (
-                <button
-                  type="button"
-                  className="package-card__remove-control"
-                  onClick={() => void handleLibraryAction(onRemove)}
-                  disabled={libraryPending}
-                  aria-busy={libraryPending}
-                  aria-label={`Remove from library: ${pkg.title}`}
-                  title="Remove from library"
-                >
-                  {libraryPending ? (
-                    <LoaderCircle
-                      size={13}
-                      aria-hidden="true"
-                      className="package-card__remove-spinner"
-                    />
-                  ) : (
-                    <X size={13} aria-hidden="true" />
-                  )}
-                </button>
-              )}
+              <button
+                type="button"
+                className="package-card__remove-control"
+                onClick={() => void handleLibraryAction(onRemove)}
+                disabled={libraryPending}
+                aria-busy={libraryPending}
+                aria-label={`Remove from library: ${pkg.title}`}
+                title="Remove from library"
+              >
+                {libraryPending ? (
+                  <LoaderCircle
+                    size={13}
+                    aria-hidden="true"
+                    className="package-card__remove-spinner"
+                  />
+                ) : (
+                  <X size={13} aria-hidden="true" />
+                )}
+              </button>
             </div>
           )}
           <h2 className="package-card__title">{pkg.title}</h2>
+          {isLearningCard && !isUnavailable && (
+            <PackageProgressPanel results={results} showStats={false} />
+          )}
         </div>
-        <span className="package-card__version">v{pkg.version}</span>
 
         <p className="package-card__description">{pkg.description}</p>
 

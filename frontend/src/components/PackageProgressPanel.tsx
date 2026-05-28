@@ -7,7 +7,6 @@ import {
   Sprout,
   XCircle,
 } from "lucide-react";
-import { useId } from "react";
 import type { Difficulty } from "../types/difficulty";
 import { DIFFICULTY_LABEL as difficultyLabel } from "../types/difficulty";
 import type { PackageTestResults } from "../types/testResult";
@@ -44,12 +43,28 @@ function buildAriaLabel(
   return `${label}: Passed — best score ${result.bestScore}%`;
 }
 
+function buildTooltipText(
+  difficulty: Difficulty,
+  result: PackageTestResults[Difficulty],
+): string {
+  const label = difficultyLabel[difficulty];
+
+  if (!result) {
+    return `${label} difficulty: not attempted yet.`;
+  }
+
+  if (!result.passed) {
+    return `${label} difficulty: attempted, best score ${result.bestScore}%.`;
+  }
+
+  return `${label} difficulty: passed, best score ${result.bestScore}%.`;
+}
+
 export function PackageProgressPanel({
   results,
   showIndicators = true,
   showStats = true,
 }: PackageProgressPanelProps) {
-  const indicatorsHelperId = useId();
   const attemptedDifficulties = DIFFICULTIES.filter((difficulty) =>
     Boolean(results[difficulty]),
   );
@@ -77,14 +92,8 @@ export function PackageProgressPanel({
       {showIndicators && (
         <fieldset
           className="difficulty-indicators-wrap"
-          aria-describedby={indicatorsHelperId}
+          aria-label="Previously completed difficulties"
         >
-          <legend className="difficulty-indicators__label">
-            Previously completed difficulties
-          </legend>
-          <p className="difficulty-indicators__helper" id={indicatorsHelperId}>
-            Shows your best previous test outcome for each difficulty.
-          </p>
           <div className="difficulty-indicators">
             {DIFFICULTIES.map((difficulty) => {
               const result = results[difficulty];
@@ -101,6 +110,7 @@ export function PackageProgressPanel({
                   className={`difficulty-circle ${stateClass}`}
                   role="img"
                   aria-label={buildAriaLabel(difficulty, result)}
+                  title={buildTooltipText(difficulty, result)}
                   data-difficulty={difficulty}
                 >
                   <DifficultyIcon

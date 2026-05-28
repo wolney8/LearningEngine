@@ -322,15 +322,22 @@ test.describe("Package Selection Screen", () => {
 
     const card = getPackageCard(page, packageTitle);
     const circles = card.locator(".difficulty-circle");
+    const title = card.locator(".package-card__title");
+    const headerIndicators = card.locator(
+      ".package-card__title + .package-progress-panel",
+    );
 
     await expect(
       card.getByText("Previously completed difficulties", { exact: true }),
-    ).toBeVisible();
+    ).toBeHidden();
     await expect(
       card.getByText("Shows your best previous test outcome for each difficulty.", {
         exact: true,
       }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(card.getByText("v1.0.0", { exact: true })).toHaveCount(0);
+    await expect(title).toBeVisible();
+    await expect(headerIndicators).toBeVisible();
 
     await expect(circles).toHaveCount(4);
     await expect(circles).toHaveClass([
@@ -396,6 +403,10 @@ test.describe("Package Selection Screen", () => {
 
     await expect(easyIndicator).toBeVisible();
     await expect(easyIndicator).toHaveAttribute("aria-label", /Easy: Not attempted/);
+    await expect(easyIndicator).toHaveAttribute(
+      "title",
+      "Easy difficulty: not attempted yet.",
+    );
   });
 
   test("anonymous users see streak from localStorage", async ({ page }) => {
