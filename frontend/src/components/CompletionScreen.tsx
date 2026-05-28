@@ -55,7 +55,9 @@ export function CompletionScreen({
 
       <p className="completion-screen__message">{message}</p>
 
-      {xpEarned > 0 && <p className="completion-screen__xp">+{xpEarned} XP earned</p>}
+      {xpEarned > 0 && (
+        <p className="completion-screen__xp">+{xpEarned} XP earned</p>
+      )}
 
       {isFirstCompletion && (
         <span

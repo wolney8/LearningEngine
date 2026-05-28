@@ -20,7 +20,10 @@ export function ProgressBar({ current, total, label }: ProgressBarProps) {
         aria-valuemax={total}
         aria-label={label}
       >
-        <div className="progress-bar__fill" style={{ width: `${percentage}%` }} />
+        <div
+          className="progress-bar__fill"
+          style={{ width: `${percentage}%` }}
+        />
       </div>
       <span className="progress-bar__label" aria-hidden="true">
         {label}
