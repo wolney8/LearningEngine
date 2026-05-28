@@ -1,35 +1,65 @@
 /* -- Difficulty indicator circles -------------------------------- */
+.package-progress-panel {
+  width: 100%;
+}
+
+.difficulty-indicators-wrap {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
 .difficulty-indicators {
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-top: 0.75rem;
 }
 
 .difficulty-circle {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  font-family: "Inter", system-ui, sans-serif;
-  font-weight: 600;
-  font-size: 0.875rem;
   box-sizing: border-box;
   user-select: none;
 }
 
+.difficulty-circle__icon {
+  width: 15px;
+  height: 15px;
+}
+
+.difficulty-circle__status-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: currentColor;
+  border: 1px solid currentColor;
+}
+
 .difficulty-circle--not-attempted {
-  background-color: var(--colour-surface, #f4f5f7);
-  border: 1px solid var(--colour-border, #e2e8f0);
+  background-color: var(--colour-background, #ffffff);
+  border: 1px dashed var(--colour-border, #94a3b8);
   color: var(--colour-text-secondary, #475569);
 }
 
 .difficulty-circle--attempted {
   background-color: var(--colour-background, #ffffff);
-  border: 2px solid var(--colour-warning, #d97706);
-  color: var(--colour-text-primary, #0f172a);
+  border: 2px solid var(--colour-warning, #b45309);
+  color: #92400e;
 }
 
 .difficulty-circle--passed {
@@ -51,6 +81,10 @@
 
 .difficulty-circle--passed[data-difficulty="expert"] {
   background-color: #dc2626;
+}
+
+.difficulty-circle--passed .difficulty-circle__status-badge {
+  background: #f8fafc;
 }
 
 /* -- Stats strip -------------------------------------------------- */

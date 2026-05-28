@@ -1,5 +1,7 @@
 .package-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   min-height: 44px;
   padding: 1.25rem;
@@ -33,24 +35,40 @@
   display: block;
 }
 
+.package-card__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.package-card__header-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.package-card__header .package-progress-panel {
+  margin-top: 0.25rem;
+}
+
 .package-card__remove-control {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  width: 1.7rem;
-  height: 1.7rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid #fdba74;
   background: #fff7ed;
   color: #c2410c;
-  font-family: "Nunito", "Segoe UI", sans-serif;
-  font-size: 0.8rem;
-  font-weight: 800;
-  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.package-card__remove-spinner {
+  animation: package-card-spin 0.9s linear infinite;
 }
 
 .package-card__remove-control:hover:not(:disabled) {
@@ -70,8 +88,25 @@
   background: #f1f5f9;
 }
 
+@keyframes package-card-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .package-card__title {
   margin: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   font-family: "Nunito", "Segoe UI", sans-serif;
   font-size: 1.125rem;
   font-weight: 700;
@@ -79,17 +114,13 @@
   color: #1e1b4b;
 }
 
-.package-card__version {
-  display: inline-block;
-  margin-top: 0.2rem;
-  font-family: "Inter", system-ui, sans-serif;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #374151;
-}
-
 .package-card__description {
   margin: 0.5rem 0 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   font-family: "Inter", system-ui, sans-serif;
   font-size: 0.9rem;
   line-height: 1.45;
@@ -106,11 +137,15 @@
   color: #4b5563;
 }
 
+.package-card__tags-wrap {
+  margin-top: 0.9rem;
+}
+
 .package-card__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin: 0.9rem 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -126,6 +161,28 @@
   background-color: #eef2ff;
   border: 1px solid #4f46e5;
   border-radius: 999px;
+}
+
+.package-card__tags-toggle {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4338ca;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.package-card__tags-toggle:hover {
+  color: #3730a3;
+}
+
+.package-card__tags-toggle:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+  border-radius: 0.25rem;
 }
 
 .package-card__actions {

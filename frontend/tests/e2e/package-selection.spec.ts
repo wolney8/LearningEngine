@@ -33,6 +33,22 @@ const MOCK_UNAVAILABLE_PACKAGE = {
   xp_threshold: null,
 };
 
+const MOCK_LONG_TEXT_PACKAGE = {
+  id: "long-text-package",
+  title:
+    "Foundations of Secure Systems Engineering for Distributed Teams and Enterprise Governance",
+  description:
+    "This intentionally long package description validates clamping behaviour across cards with complex narrative content, multiple clauses, and enough text volume to exceed three rendered lines in compact card widths.",
+  version: "1.0.0",
+  tags: ["tag-one", "tag-two", "tag-three", "tag-four", "tag-five"],
+  passing_score: 0.75,
+  page_count: 7,
+  question_count: 9,
+  availability: "available",
+  enabled: true,
+  xp_threshold: null,
+};
+
 const MOCK_FULL_PACKAGE = {
   id: "python-basics",
   title: "Python Basics",
@@ -245,9 +261,7 @@ test.describe("Package Selection Screen", () => {
     await checkA11y(page);
     const card = getPackageCard(page, packageTitle);
     await expect(card).toBeVisible();
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeVisible();
     await expect(card.getByRole("button", { name: "Take Test" })).toBeVisible();
   });
 
@@ -256,6 +270,85 @@ test.describe("Package Selection Screen", () => {
     await checkA11y(page);
     await expect(page.getByText("3 pages")).toBeVisible();
     await expect(page.getByText("4 questions")).toBeVisible();
+  });
+
+  test("applies title and description truncation structure for long card text", async ({
+    page,
+  }) => {
+    await page.unrouteAll({ behavior: "wait" });
+    await page.route("**/packages", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_LONG_TEXT_PACKAGE]),
+      });
+    });
+
+    await page.goto("/");
+    await checkA11y(page);
+
+    const card = getPackageCard(page, MOCK_LONG_TEXT_PACKAGE.title);
+    const title = card.locator(".package-card__title");
+    const description = card.locator(".package-card__description");
+
+    await expect(card).toBeVisible();
+    await expect(title).toBeVisible();
+    await expect(description).toBeVisible();
+
+    const titleClamp = await title.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue("-webkit-line-clamp").trim(),
+    );
+    const descriptionClamp = await description.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue("-webkit-line-clamp").trim(),
+    );
+    const titleOverflow = await title.evaluate(
+      (node) => getComputedStyle(node).overflow,
+    );
+    const descriptionOverflow = await description.evaluate(
+      (node) => getComputedStyle(node).overflow,
+    );
+
+    expect(titleClamp).toBe("2");
+    expect(descriptionClamp).toBe("3");
+    expect(titleOverflow).toBe("hidden");
+    expect(descriptionOverflow).toBe("hidden");
+  });
+
+  test("shows compact tag overflow control and toggles full tag list", async ({
+    page,
+  }) => {
+    await page.unrouteAll({ behavior: "wait" });
+    await page.route("**/packages", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_LONG_TEXT_PACKAGE]),
+      });
+    });
+
+    await page.goto("/");
+    await checkA11y(page);
+
+    const card = getPackageCard(page, MOCK_LONG_TEXT_PACKAGE.title);
+    const tags = card.locator(".package-card__tag");
+    const overflowButton = card.locator(".package-card__tags-toggle");
+
+    await expect(card).toBeVisible();
+    await expect(tags).toHaveCount(3);
+    await expect(card.getByText("tag-four", { exact: true })).toHaveCount(0);
+    await expect(overflowButton).toHaveText("+2 more");
+    await expect(overflowButton).toHaveAttribute("aria-expanded", "false");
+
+    await overflowButton.click();
+    await expect(tags).toHaveCount(5);
+    await expect(card.getByText("tag-four", { exact: true })).toBeVisible();
+    await expect(overflowButton).toHaveText("Show less");
+    await expect(overflowButton).toHaveAttribute("aria-expanded", "true");
+
+    await overflowButton.click();
+    await expect(tags).toHaveCount(3);
+    await expect(overflowButton).toHaveText("+2 more");
+    await expect(overflowButton).toHaveAttribute("aria-expanded", "false");
   });
 
   test("unavailable packages are greyed and learner actions are disabled", async ({
@@ -277,22 +370,14 @@ test.describe("Package Selection Screen", () => {
     const card = getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title);
     await expect(card).toBeVisible();
     await expect(card).toHaveClass(/package-card--unavailable/);
-    await expect(card.locator(".package-card__status")).toHaveText(
-      "Unavailable",
-    );
+    await expect(card.locator(".package-card__status")).toHaveText("Unavailable");
     await expect(card.locator(".package-stats-strip")).toHaveCount(0);
 
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeDisabled();
-    await expect(
-      card.getByRole("button", { name: "Take Test" }),
-    ).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
   });
 
-  test("clicking a card navigates to the package detail URL", async ({
-    page,
-  }) => {
+  test("clicking a card navigates to the package detail URL", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
     const card = getPackageCard(page, packageTitle);
@@ -310,9 +395,7 @@ test.describe("Package Selection Screen", () => {
     await expect(page.getByText(/Could not load packages/i)).toBeVisible();
   });
 
-  test("shows empty state when backend returns empty array", async ({
-    page,
-  }) => {
+  test("shows empty state when backend returns empty array", async ({ page }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route("**/packages", (route) => {
       route.fulfill({
@@ -326,7 +409,7 @@ test.describe("Package Selection Screen", () => {
     await expect(page.getByText("No packages available.")).toBeVisible();
   });
 
-  test("shows four not-attempted difficulty circles on each package card by default", async ({
+  test("shows labelled not-attempted difficulty indicators on each package card by default", async ({
     page,
   }) => {
     await page.goto("/");
@@ -334,6 +417,22 @@ test.describe("Package Selection Screen", () => {
 
     const card = getPackageCard(page, packageTitle);
     const circles = card.locator(".difficulty-circle");
+    const title = card.locator(".package-card__title");
+    const headerIndicators = card.locator(
+      ".package-card__header > .package-progress-panel",
+    );
+
+    await expect(
+      card.getByText("Previously completed difficulties", { exact: true }),
+    ).toBeHidden();
+    await expect(
+      card.getByText("Shows your best previous test outcome for each difficulty.", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(card.getByText("v1.0.0", { exact: true })).toHaveCount(0);
+    await expect(title).toBeVisible();
+    await expect(headerIndicators).toBeVisible();
 
     await expect(circles).toHaveCount(4);
     await expect(circles).toHaveClass([
@@ -366,9 +465,7 @@ test.describe("Package Selection Screen", () => {
     }
 
     await page.getByRole("button", { name: "Finish" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Test Complete" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
 
     await page
       .locator(".test-results__actions")
@@ -382,9 +479,7 @@ test.describe("Package Selection Screen", () => {
     );
 
     await expect(easyCircle).toBeVisible();
-    await expect(easyCircle).toHaveClass(
-      /difficulty-circle--(passed|attempted)/,
-    );
+    await expect(easyCircle).toHaveClass(/difficulty-circle--(passed|attempted)/);
 
     const statsStrip = refreshedCard.locator(".package-stats-strip");
     await expect(statsStrip).toBeVisible();
@@ -392,21 +487,20 @@ test.describe("Package Selection Screen", () => {
     await expect(statsStrip).toContainText(/\d+%/);
   });
 
-  test("difficulty circles expose descriptive aria-label text", async ({
+  test("difficulty indicators expose difficulty and status in aria-label text", async ({
     page,
   }) => {
     await page.goto("/");
     await checkA11y(page);
 
     const card = getPackageCard(page, packageTitle);
-    const notAttemptedCircle = card
-      .locator('.difficulty-circle[aria-label*="Not attempted"]')
-      .first();
+    const easyIndicator = card.locator('.difficulty-circle[data-difficulty="easy"]');
 
-    await expect(notAttemptedCircle).toBeVisible();
-    await expect(notAttemptedCircle).toHaveAttribute(
-      "aria-label",
-      /Not attempted/,
+    await expect(easyIndicator).toBeVisible();
+    await expect(easyIndicator).toHaveAttribute("aria-label", /Easy: Not attempted/);
+    await expect(easyIndicator).toHaveAttribute(
+      "title",
+      "Easy difficulty: not attempted yet.",
     );
   });
 
@@ -537,32 +631,29 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(
-      page.getByRole("button", { name: "My Library" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "My Library" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(getPackageCard(page, MOCK_PACKAGES[0].title)).toBeVisible();
 
     await page.getByRole("button", { name: "Full catalogue" }).click();
-    await expect(
-      page.getByRole("button", { name: "Full catalogue" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Full catalogue" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     const availableCard = getPackageCard(page, MOCK_PACKAGES[0].title);
-    const unavailableCard = getPackageCard(
-      page,
-      MOCK_UNAVAILABLE_PACKAGE.title,
-    );
+    const unavailableCard = getPackageCard(page, MOCK_UNAVAILABLE_PACKAGE.title);
     await expect(availableCard).toBeVisible();
     await expect(unavailableCard).toBeVisible();
     await expect(
       availableCard.getByRole("button", { name: "Start Learning" }),
     ).toHaveCount(0);
-    await expect(
-      availableCard.getByRole("button", { name: "Take Test" }),
-    ).toHaveCount(0);
-    await expect(availableCard.locator(".package-progress-panel")).toHaveCount(
+    await expect(availableCard.getByRole("button", { name: "Take Test" })).toHaveCount(
       0,
     );
+    await expect(availableCard.locator(".package-progress-panel")).toHaveCount(0);
   });
 
   test("anonymous users keep global catalogue behaviour without scope toggle", async ({
@@ -570,9 +661,7 @@ test.describe("Package Selection Screen", () => {
   }) => {
     await page.goto("/");
     await checkA11y(page);
-    await expect(page.getByRole("button", { name: "My Library" })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole("button", { name: "My Library" })).toHaveCount(0);
     await expect(getPackageCard(page, MOCK_PACKAGES[0].title)).toBeVisible();
   });
 });
@@ -644,31 +733,23 @@ test.describe("Package search and filter", () => {
   test("searches packages by description", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("goroutines");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("goroutines");
     await assertVisibleTitles(page, [titles.incomplete]);
   });
 
   test("searches packages by tag", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await assertVisibleTitles(page, [titles.completed]);
   });
 
-  test("clear button clears query and restores package list", async ({
-    page,
-  }) => {
+  test("clear button clears query and restores package list", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
     const input = page.getByRole("searchbox", { name: "Search packages" });
     await input.fill("rust");
-    await expect(
-      page.getByRole("button", { name: "Clear search" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(input).toHaveValue("");
     await assertVisibleTitles(page, [
@@ -681,20 +762,16 @@ test.describe("Package search and filter", () => {
   test("updates the q query parameter while typing", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await expect(page).toHaveURL(/\?q=python/);
   });
 
-  test("prefills and filters when loading with q query parameter", async ({
-    page,
-  }) => {
+  test("prefills and filters when loading with q query parameter", async ({ page }) => {
     await page.goto("/?q=rust");
     await checkA11y(page);
-    await expect(
-      page.getByRole("searchbox", { name: "Search packages" }),
-    ).toHaveValue("rust");
+    await expect(page.getByRole("searchbox", { name: "Search packages" })).toHaveValue(
+      "rust",
+    );
     await assertVisibleTitles(page, [titles.failed]);
   });
 
@@ -702,18 +779,10 @@ test.describe("Package search and filter", () => {
     await page.goto("/");
     await checkA11y(page);
     await expect(page.getByRole("button", { name: /All\s*3/i })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Incomplete\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Failed\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Completed\s*1/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Unavailable\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Failed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Unavailable\s*1/i })).toBeVisible();
   });
 
   test("completed filter shows only completed packages", async ({ page }) => {
@@ -730,18 +799,14 @@ test.describe("Package search and filter", () => {
     await assertVisibleTitles(page, [titles.failed]);
   });
 
-  test("incomplete filter shows only unattempted packages", async ({
-    page,
-  }) => {
+  test("incomplete filter shows only unattempted packages", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
     await page.getByRole("button", { name: /Incomplete/i }).click();
     await assertVisibleTitles(page, [titles.incomplete]);
   });
 
-  test("unavailable filter shows only unavailable packages", async ({
-    page,
-  }) => {
+  test("unavailable filter shows only unavailable packages", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
     await page.getByRole("button", { name: /Unavailable/i }).click();
@@ -772,9 +837,10 @@ test.describe("Package search and filter", () => {
     await page.goto("/?filter=completed");
     await checkA11y(page);
     await assertVisibleTitles(page, [titles.completed]);
-    await expect(
-      page.getByRole("button", { name: /Completed/i }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /Completed/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   test("supports combined search and filter with matching and empty states", async ({
@@ -782,9 +848,7 @@ test.describe("Package search and filter", () => {
   }) => {
     await page.goto("/");
     await checkA11y(page);
-    await page
-      .getByRole("searchbox", { name: "Search packages" })
-      .fill("python");
+    await page.getByRole("searchbox", { name: "Search packages" }).fill("python");
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [titles.completed]);
 
@@ -793,9 +857,7 @@ test.describe("Package search and filter", () => {
     await expect(page.getByText("No packages match 'python'")).toBeVisible();
   });
 
-  test("shows filtered count text when results are narrowed", async ({
-    page,
-  }) => {
+  test("shows filtered count text when results are narrowed", async ({ page }) => {
     await page.goto("/");
     await checkA11y(page);
     const filteredCount = page.locator(".package-list-page__count");
@@ -807,9 +869,7 @@ test.describe("Package search and filter", () => {
     await expect(filteredCount).toHaveCount(0);
   });
 
-  test("anonymous users keep localStorage-derived package status", async ({
-    page,
-  }) => {
+  test("anonymous users keep localStorage-derived package status", async ({ page }) => {
     await page.route(`${API_BASE_URL}/users/me/progress**`, (route) => {
       route.fulfill({ status: 500, body: "Should not be called" });
     });
@@ -926,20 +986,17 @@ test.describe("Package search and filter", () => {
       });
     });
 
-    await page.route(
-      `${API_BASE_URL}/users/me/streak/mark-practised`,
-      (route) => {
-        streakCount += 1;
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            streak_count: streakCount,
-            last_practised_date: "2026-05-24",
-          }),
-        });
-      },
-    );
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakCount += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: streakCount,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
 
     await page.route("**/packages", (route) => {
       route.fulfill({
@@ -990,9 +1047,7 @@ test.describe("Package search and filter", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.getByRole("button", { name: /Incomplete\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
     await page.getByRole("button", { name: /Incomplete/i }).click();
     await assertVisibleTitles(page, [authPackage.title]);
 
@@ -1006,9 +1061,7 @@ test.describe("Package search and filter", () => {
       .getByRole("button", { name: "Back to packages", exact: true })
       .click();
 
-    await expect(
-      page.getByRole("button", { name: /Completed\s*1/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [authPackage.title]);
   });
@@ -1209,9 +1262,7 @@ test.describe("Library management — authenticated users", () => {
     await page.getByRole("button", { name: "Full catalogue" }).click();
 
     const card = getCard(page, LM_PACKAGE_UNSELECTED.title);
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toBeVisible();
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
   });
 
   test("catalogue view shows Remove from Library for already-selected packages", async ({
@@ -1243,9 +1294,7 @@ test.describe("Library management — authenticated users", () => {
     await expect(
       card.getByRole("button", { name: /Remove from Library/i }),
     ).toBeVisible();
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toHaveCount(0);
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
   });
 
   test("clicking Add to Library calls PUT /users/me/library/:id and reloads", async ({
@@ -1321,9 +1370,7 @@ test.describe("Library management — authenticated users", () => {
 
     await card.getByRole("button", { name: /Remove from Library/i }).click();
     await expect.poll(() => deleteCalled).toBe(true);
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toBeVisible();
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
   });
 
   test("library view shows top-right remove control for each course", async ({
@@ -1400,9 +1447,7 @@ test.describe("Library management — authenticated users", () => {
     await expect(page.getByText(/Progress was reset/i)).toBeVisible();
   });
 
-  test("library view does not show Add to Library buttons", async ({
-    page,
-  }) => {
+  test("library view does not show Add to Library buttons", async ({ page }) => {
     await seedAuthSession(page);
 
     await page.route(`${API_BASE_URL}/users/me/library`, (route) => {
@@ -1416,14 +1461,10 @@ test.describe("Library management — authenticated users", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(
-      page.getByRole("button", { name: /Add to Library/i }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
   });
 
-  test("anonymous users see no Add to Library or Remove buttons", async ({
-    page,
-  }) => {
+  test("anonymous users see no Add to Library or Remove buttons", async ({ page }) => {
     await page.route(`${API_BASE_URL}/packages`, (route) => {
       route.fulfill({
         status: 200,
@@ -1435,9 +1476,7 @@ test.describe("Library management — authenticated users", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(
-      page.getByRole("button", { name: /Add to Library/i }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Add to Library/i })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /Remove from library/i }),
     ).toHaveCount(0);
@@ -1470,15 +1509,9 @@ test.describe("Library management — authenticated users", () => {
     await page.getByRole("button", { name: /Unavailable/i }).click();
 
     const card = getCard(page, LM_PACKAGE_UNAVAILABLE_UNSELECTED.title);
-    await expect(
-      card.getByRole("button", { name: /Add to Library/i }),
-    ).toBeVisible();
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toHaveCount(0);
-    await expect(card.getByRole("button", { name: "Take Test" })).toHaveCount(
-      0,
-    );
+    await expect(card.getByRole("button", { name: /Add to Library/i })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Take Test" })).toHaveCount(0);
     await expect(card.locator(".package-progress-panel")).toHaveCount(0);
   });
 
@@ -1510,15 +1543,11 @@ test.describe("Library management — authenticated users", () => {
     await expect(
       page.getByRole("searchbox", { name: "Search packages" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Unavailable" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unavailable" })).toBeVisible();
     await expect(page.getByRole("button", { name: "..." })).toBeVisible();
 
     await page.getByRole("button", { name: "..." }).click();
-    await expect(
-      page.getByRole("menu", { name: "More package tags" }),
-    ).toBeVisible();
+    await expect(page.getByRole("menu", { name: "More package tags" })).toBeVisible();
 
     await page.getByRole("menuitemradio", { name: "sql" }).click();
     await expect(page).toHaveURL(/tag=sql/);
@@ -1566,12 +1595,11 @@ test.describe("Library management — authenticated users", () => {
     await checkA11y(page);
     await page.getByRole("button", { name: "Full catalogue" }).click();
 
-    await expect(
-      page.getByRole("button", { name: "Unavailable" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(
-      getCard(page, unavailableCataloguePackage.title),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unavailable" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(getCard(page, unavailableCataloguePackage.title)).toBeVisible();
     await expect(page.locator("article.package-card")).toHaveCount(1);
   });
 
@@ -1596,11 +1624,7 @@ test.describe("Library management — authenticated users", () => {
     await expect(
       card.getByRole("button", { name: /Remove from library/i }),
     ).toHaveCount(0);
-    await expect(
-      card.getByRole("button", { name: "Start Learning" }),
-    ).toBeDisabled();
-    await expect(
-      card.getByRole("button", { name: "Take Test" }),
-    ).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Start Learning" })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Take Test" })).toBeDisabled();
   });
 });

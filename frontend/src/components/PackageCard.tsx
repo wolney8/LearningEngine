@@ -1,3 +1,4 @@
+import { LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -28,6 +29,13 @@ export function PackageCard({
   const isActionEnabled = pkg.availability === "available";
   const [libraryPending, setLibraryPending] = useState(false);
   const [libraryError, setLibraryError] = useState("");
+  const [areTagsExpanded, setAreTagsExpanded] = useState(false);
+  const hasTagOverflow = pkg.tags.length > 3;
+  const visibleTags = hasTagOverflow
+    ? areTagsExpanded
+      ? pkg.tags
+      : pkg.tags.slice(0, 3)
+    : pkg.tags;
 
   async function handleLibraryAction(action: () => Promise<void>) {
     setLibraryError("");
@@ -45,25 +53,36 @@ export function PackageCard({
     <article
       className={`package-card ${isUnavailable ? "package-card--unavailable" : ""} ${isCatalogueCard ? "package-card--catalogue" : "package-card--learning"}`.trim()}
     >
-      {isLearningCard && onRemove && (
-        <button
-          type="button"
-          className="package-card__remove-control"
-          onClick={() => void handleLibraryAction(onRemove)}
-          disabled={libraryPending}
-          aria-busy={libraryPending}
-          aria-label={`Remove from library: ${pkg.title}`}
-          title="Remove from library"
-        >
-          {libraryPending ? "..." : "X"}
-        </button>
-      )}
-
       <div className="package-card__content">
         <div className="package-card__header">
-          <h2 className="package-card__title">{pkg.title}</h2>
+          <div className="package-card__header-top-row">
+            <h2 className="package-card__title">{pkg.title}</h2>
+            {isLearningCard && onRemove && (
+              <button
+                type="button"
+                className="package-card__remove-control"
+                onClick={() => void handleLibraryAction(onRemove)}
+                disabled={libraryPending}
+                aria-busy={libraryPending}
+                aria-label={`Remove from library: ${pkg.title}`}
+                title="Remove from library"
+              >
+                {libraryPending ? (
+                  <LoaderCircle
+                    size={13}
+                    aria-hidden="true"
+                    className="package-card__remove-spinner"
+                  />
+                ) : (
+                  <X size={13} aria-hidden="true" />
+                )}
+              </button>
+            )}
+          </div>
+          {isLearningCard && !isUnavailable && (
+            <PackageProgressPanel results={results} showStats={false} />
+          )}
         </div>
-        <span className="package-card__version">v{pkg.version}</span>
 
         <p className="package-card__description">{pkg.description}</p>
 
@@ -74,18 +93,44 @@ export function PackageCard({
         </div>
 
         {pkg.tags.length > 0 && (
-          <ul className="package-card__tags" aria-label="Tags">
-            {pkg.tags.map((tag) => (
-              <li key={`${pkg.id}-${tag}`} className="package-card__tag">
-                {tag}
-              </li>
-            ))}
-          </ul>
+          <div className="package-card__tags-wrap">
+            <ul
+              id={`package-card-tags-${pkg.id}`}
+              className="package-card__tags"
+              aria-label="Tags"
+            >
+              {visibleTags.map((tag) => (
+                <li key={`${pkg.id}-${tag}`} className="package-card__tag">
+                  {tag}
+                </li>
+              ))}
+            </ul>
+            {hasTagOverflow && (
+              <button
+                type="button"
+                className="package-card__tags-toggle"
+                onClick={() => setAreTagsExpanded((value) => !value)}
+                aria-expanded={areTagsExpanded}
+                aria-controls={`package-card-tags-${pkg.id}`}
+                aria-label={
+                  areTagsExpanded
+                    ? `Show fewer tags for ${pkg.title}`
+                    : `Show all tags for ${pkg.title}`
+                }
+              >
+                {areTagsExpanded
+                  ? "Show less"
+                  : `+${pkg.tags.length - visibleTags.length} more`}
+              </button>
+            )}
+          </div>
         )}
 
         {isUnavailable && <p className="package-card__status">Unavailable</p>}
 
-        {isLearningCard && !isUnavailable && <PackageProgressPanel results={results} />}
+        {isLearningCard && !isUnavailable && (
+          <PackageProgressPanel results={results} showIndicators={false} />
+        )}
       </div>
 
       {(isLearningCard || onAdd || (isCatalogueCard && onRemove)) && (

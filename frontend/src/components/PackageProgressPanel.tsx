@@ -1,3 +1,12 @@
+import {
+  CircleCheck,
+  Compass,
+  Crown,
+  type LucideIcon,
+  Mountain,
+  Sprout,
+  XCircle,
+} from "lucide-react";
 import type { Difficulty } from "../types/difficulty";
 import { DIFFICULTY_LABEL as difficultyLabel } from "../types/difficulty";
 import type { PackageTestResults } from "../types/testResult";
@@ -5,14 +14,16 @@ import "./PackageProgressPanel.css";
 
 interface PackageProgressPanelProps {
   results: PackageTestResults;
+  showIndicators?: boolean;
+  showStats?: boolean;
 }
 
 const DIFFICULTIES: Difficulty[] = ["easy", "normal", "hard", "expert"];
-const DIFFICULTY_INITIAL: Record<Difficulty, string> = {
-  easy: "E",
-  normal: "N",
-  hard: "H",
-  expert: "X",
+const DIFFICULTY_ICON: Record<Difficulty, LucideIcon> = {
+  easy: Sprout,
+  normal: Compass,
+  hard: Mountain,
+  expert: Crown,
 };
 
 function buildAriaLabel(
@@ -32,7 +43,28 @@ function buildAriaLabel(
   return `${label}: Passed — best score ${result.bestScore}%`;
 }
 
-export function PackageProgressPanel({ results }: PackageProgressPanelProps) {
+function buildTooltipText(
+  difficulty: Difficulty,
+  result: PackageTestResults[Difficulty],
+): string {
+  const label = difficultyLabel[difficulty];
+
+  if (!result) {
+    return `${label} difficulty: not attempted yet.`;
+  }
+
+  if (!result.passed) {
+    return `${label} difficulty: attempted, best score ${result.bestScore}%.`;
+  }
+
+  return `${label} difficulty: passed, best score ${result.bestScore}%.`;
+}
+
+export function PackageProgressPanel({
+  results,
+  showIndicators = true,
+  showStats = true,
+}: PackageProgressPanelProps) {
   const attemptedDifficulties = DIFFICULTIES.filter((difficulty) =>
     Boolean(results[difficulty]),
   );
@@ -56,31 +88,55 @@ export function PackageProgressPanel({ results }: PackageProgressPanelProps) {
   }, 0);
 
   return (
-    <>
-      <div className="difficulty-indicators">
-        {DIFFICULTIES.map((difficulty) => {
-          const result = results[difficulty];
-          const stateClass = !result
-            ? "difficulty-circle--not-attempted"
-            : result.passed
-              ? `difficulty-circle--passed difficulty-circle--passed-${difficulty}`
-              : "difficulty-circle--attempted";
+    <div className="package-progress-panel">
+      {showIndicators && (
+        <fieldset
+          className="difficulty-indicators-wrap"
+          aria-label="Previously completed difficulties"
+        >
+          <div className="difficulty-indicators">
+            {DIFFICULTIES.map((difficulty) => {
+              const result = results[difficulty];
+              const stateClass = !result
+                ? "difficulty-circle--not-attempted"
+                : result.passed
+                  ? `difficulty-circle--passed difficulty-circle--passed-${difficulty}`
+                  : "difficulty-circle--attempted";
+              const DifficultyIcon = DIFFICULTY_ICON[difficulty];
 
-          return (
-            <span
-              key={difficulty}
-              className={`difficulty-circle ${stateClass}`}
-              role="img"
-              aria-label={buildAriaLabel(difficulty, result)}
-              data-difficulty={difficulty}
-            >
-              {DIFFICULTY_INITIAL[difficulty]}
-            </span>
-          );
-        })}
-      </div>
+              return (
+                <span
+                  key={difficulty}
+                  className={`difficulty-circle ${stateClass}`}
+                  role="img"
+                  aria-label={buildAriaLabel(difficulty, result)}
+                  title={buildTooltipText(difficulty, result)}
+                  data-difficulty={difficulty}
+                >
+                  <DifficultyIcon
+                    className="difficulty-circle__icon"
+                    aria-hidden="true"
+                  />
+                  {result && (
+                    <span
+                      className="difficulty-circle__status-badge"
+                      aria-hidden="true"
+                    >
+                      {result.passed ? (
+                        <CircleCheck size={12} />
+                      ) : (
+                        <XCircle size={12} />
+                      )}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
 
-      {Object.keys(results).length > 0 && lastDifficulty && (
+      {showStats && Object.keys(results).length > 0 && lastDifficulty && (
         <div className="package-stats-strip">
           <span className="package-stats-strip__last-test">
             Last test: {difficultyLabel[lastDifficulty]} — {lastScore}%
@@ -88,6 +144,6 @@ export function PackageProgressPanel({ results }: PackageProgressPanelProps) {
           <span className="package-stats-strip__xp">{totalBestXp} XP</span>
         </div>
       )}
-    </>
+    </div>
   );
 }
