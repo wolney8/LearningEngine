@@ -33,24 +33,36 @@
   display: block;
 }
 
+.package-card__header-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.package-card__header-top-row .package-progress-panel {
+  flex: 1;
+  min-width: 0;
+}
+
 .package-card__remove-control {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  width: 1.7rem;
-  height: 1.7rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  flex-shrink: 0;
   border-radius: 999px;
   border: 1px solid #fdba74;
   background: #fff7ed;
   color: #c2410c;
-  font-family: "Nunito", "Segoe UI", sans-serif;
-  font-size: 0.8rem;
-  font-weight: 800;
-  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.package-card__remove-spinner {
+  animation: package-card-spin 0.9s linear infinite;
 }
 
 .package-card__remove-control:hover:not(:disabled) {
@@ -68,6 +80,16 @@
   border-color: #cbd5e1;
   color: #64748b;
   background: #f1f5f9;
+}
+
+@keyframes package-card-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .package-card__title {

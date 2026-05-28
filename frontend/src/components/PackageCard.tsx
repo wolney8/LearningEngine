@@ -1,3 +1,4 @@
+import { LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -45,22 +46,36 @@ export function PackageCard({
     <article
       className={`package-card ${isUnavailable ? "package-card--unavailable" : ""} ${isCatalogueCard ? "package-card--catalogue" : "package-card--learning"}`.trim()}
     >
-      {isLearningCard && onRemove && (
-        <button
-          type="button"
-          className="package-card__remove-control"
-          onClick={() => void handleLibraryAction(onRemove)}
-          disabled={libraryPending}
-          aria-busy={libraryPending}
-          aria-label={`Remove from library: ${pkg.title}`}
-          title="Remove from library"
-        >
-          {libraryPending ? "..." : "X"}
-        </button>
-      )}
-
       <div className="package-card__content">
         <div className="package-card__header">
+          {isLearningCard && (
+            <div className="package-card__header-top-row">
+              {!isUnavailable && (
+                <PackageProgressPanel results={results} showStats={false} />
+              )}
+              {onRemove && (
+                <button
+                  type="button"
+                  className="package-card__remove-control"
+                  onClick={() => void handleLibraryAction(onRemove)}
+                  disabled={libraryPending}
+                  aria-busy={libraryPending}
+                  aria-label={`Remove from library: ${pkg.title}`}
+                  title="Remove from library"
+                >
+                  {libraryPending ? (
+                    <LoaderCircle
+                      size={13}
+                      aria-hidden="true"
+                      className="package-card__remove-spinner"
+                    />
+                  ) : (
+                    <X size={13} aria-hidden="true" />
+                  )}
+                </button>
+              )}
+            </div>
+          )}
           <h2 className="package-card__title">{pkg.title}</h2>
         </div>
         <span className="package-card__version">v{pkg.version}</span>
@@ -85,7 +100,9 @@ export function PackageCard({
 
         {isUnavailable && <p className="package-card__status">Unavailable</p>}
 
-        {isLearningCard && !isUnavailable && <PackageProgressPanel results={results} />}
+        {isLearningCard && !isUnavailable && (
+          <PackageProgressPanel results={results} showIndicators={false} />
+        )}
       </div>
 
       {(isLearningCard || onAdd || (isCatalogueCard && onRemove)) && (
