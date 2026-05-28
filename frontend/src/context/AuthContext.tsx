@@ -178,9 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await upsertMyProgressForPackage(nextToken, localRow.package_id, {
               latest_weighted_score: mergedLatestWeightedScore,
               completed: mergedCompleted,
-              ...(mergedAttemptCount > 0
-                ? { attempt_count: mergedAttemptCount }
-                : {}),
+              ...(mergedAttemptCount > 0 ? { attempt_count: mergedAttemptCount } : {}),
             });
           }
         } catch {

@@ -124,7 +124,9 @@ async function completeLessonRun(page: Page): Promise<void> {
   await page.getByRole("button", { name: /Start Questions/i }).click();
   await page.getByRole("button", { name: "Correct" }).click();
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Lesson complete!" }),
+  ).toBeVisible();
 }
 
 test.describe("XP persistence", () => {
@@ -181,12 +183,22 @@ test.describe("XP persistence", () => {
 
     await page.route(`${API_BASE_URL}/users/me/xp`, async (route) => {
       const request = route.request();
+      if (request.method() === "OPTIONS") {
+        await route.fulfill({ status: 204 });
+        return;
+      }
+
       if (request.method() === "GET") {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({ xp: serverXP }),
         });
+        return;
+      }
+
+      if (request.method() !== "PUT") {
+        await route.fulfill({ status: 405 });
         return;
       }
 
@@ -204,7 +216,9 @@ test.describe("XP persistence", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(serverProgress.attempt_count > 0 ? [serverProgress] : []),
+        body: JSON.stringify(
+          serverProgress.attempt_count > 0 ? [serverProgress] : [],
+        ),
       });
     });
 
@@ -276,7 +290,9 @@ test.describe("XP persistence", () => {
 
     await completeLessonRun(page);
 
-    const localXPAfterRun = await page.evaluate(() => localStorage.getItem("lle_xp"));
+    const localXPAfterRun = await page.evaluate(() =>
+      localStorage.getItem("lle_xp"),
+    );
     expect(localXPAfterRun).toBe("30");
     expect(serverXPCalls).toBe(0);
 
@@ -289,7 +305,9 @@ test.describe("XP persistence", () => {
     expect(serverXPCalls).toBe(0);
   });
 
-  test("xp widget stays visible in app shell for anonymous users", async ({ page }) => {
+  test("xp widget stays visible in app shell for anonymous users", async ({
+    page,
+  }) => {
     await page.addInitScript(() => {
       localStorage.setItem("lle_xp", "35");
     });
@@ -415,16 +433,19 @@ test.describe("XP persistence", () => {
       });
     });
 
-    await page.route(`${API_BASE_URL}/users/me/progress/${PACKAGE_ID}`, (route) => {
-      if (route.request().method() === "PUT") {
-        progressPutCalls += 1;
-      }
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(serverProgressRow),
-      });
-    });
+    await page.route(
+      `${API_BASE_URL}/users/me/progress/${PACKAGE_ID}`,
+      (route) => {
+        if (route.request().method() === "PUT") {
+          progressPutCalls += 1;
+        }
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(serverProgressRow),
+        });
+      },
+    );
 
     await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
       if (route.request().method() === "PUT") {

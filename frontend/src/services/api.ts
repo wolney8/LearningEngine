@@ -103,9 +103,7 @@ export async function fetchMyLibrary(token: string): Promise<PackageSummary[]> {
   return z.array(PackageSummarySchema).parse(data);
 }
 
-export async function fetchMyCatalogue(
-  token: string,
-): Promise<PackageSummary[]> {
+export async function fetchMyCatalogue(token: string): Promise<PackageSummary[]> {
   const response = await fetchWithTimeout(`${BASE_URL}/users/me/catalogue`, {
     headers: getAuthHeaders(token),
   });
@@ -121,13 +119,10 @@ export async function addToLibrary(
   packageId: string,
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
-  const response = await fetchWithTimeout(
-    `${BASE_URL}/users/me/library/${encodedId}`,
-    {
-      method: "PUT",
-      headers: getAuthHeaders(token),
-    },
-  );
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/library/${encodedId}`, {
+    method: "PUT",
+    headers: getAuthHeaders(token),
+  });
   if (!response.ok) {
     throw new Error(`Failed to add to library: ${response.status}`);
   }
@@ -140,13 +135,10 @@ export async function removeFromLibrary(
   packageId: string,
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
-  const response = await fetchWithTimeout(
-    `${BASE_URL}/users/me/library/${encodedId}`,
-    {
-      method: "DELETE",
-      headers: getAuthHeaders(token),
-    },
-  );
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/library/${encodedId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(token),
+  });
   if (!response.ok) {
     throw new Error(`Failed to remove from library: ${response.status}`);
   }
@@ -362,10 +354,7 @@ function readAnonymousResultSnapshot(packageId: string): {
         lastAttemptedAt?: unknown;
       };
 
-      if (
-        typeof result.bestScore === "number" &&
-        Number.isFinite(result.bestScore)
-      ) {
+      if (typeof result.bestScore === "number" && Number.isFinite(result.bestScore)) {
         highestScore = Math.max(highestScore, result.bestScore);
       }
 
@@ -408,11 +397,7 @@ export function readAnonymousProgressSeeds(): AnonymousProgressSeed[] {
       const resultsSnapshot = readAnonymousResultSnapshot(packageId);
       const completed = completionFlag || resultsSnapshot.completed;
 
-      if (
-        attemptCount <= 0 &&
-        !completed &&
-        resultsSnapshot.latestWeightedScore <= 0
-      ) {
+      if (attemptCount <= 0 && !completed && resultsSnapshot.latestWeightedScore <= 0) {
         continue;
       }
 
@@ -436,13 +421,9 @@ export function readAnonymousStreakSnapshot(): AnonymousStreakSnapshot {
     const rawStreak = localStorage.getItem(ANONYMOUS_DAILY_STREAK_KEY);
     const streakNumber = Number(rawStreak);
     const streakCount =
-      Number.isFinite(streakNumber) && streakNumber >= 0
-        ? Math.floor(streakNumber)
-        : 0;
+      Number.isFinite(streakNumber) && streakNumber >= 0 ? Math.floor(streakNumber) : 0;
 
-    const rawLastPractisedDate = localStorage.getItem(
-      ANONYMOUS_LAST_ACTIVE_KEY,
-    );
+    const rawLastPractisedDate = localStorage.getItem(ANONYMOUS_LAST_ACTIVE_KEY);
     const lastPractisedDate =
       typeof rawLastPractisedDate === "string" &&
       ISO_LOCAL_DATE_RE.test(rawLastPractisedDate)
@@ -514,9 +495,7 @@ export function markXPReconciliationDecision(userId: number): void {
   }
 }
 
-export async function registerUser(
-  payload: RegisterRequest,
-): Promise<AuthResponse> {
+export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
   const parsed = RegisterRequestSchema.parse(payload);
   const response = await fetchWithTimeout(`${BASE_URL}/auth/register`, {
     method: "POST",
@@ -557,9 +536,7 @@ export async function fetchCurrentUser(token: string): Promise<User> {
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(
-      `Could not fetch current user (${response.status}): ${detail}`,
-    );
+    throw new Error(`Could not fetch current user (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();
@@ -609,9 +586,7 @@ export async function fetchMyStreak(token: string): Promise<{
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(
-      `Could not fetch user streak (${response.status}): ${detail}`,
-    );
+    throw new Error(`Could not fetch user streak (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();
@@ -632,9 +607,7 @@ export async function markMyStreakPractisedToday(token: string): Promise<{
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(
-      `Could not update user streak (${response.status}): ${detail}`,
-    );
+    throw new Error(`Could not update user streak (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();
@@ -662,27 +635,21 @@ export async function updateMyStreakSnapshot(
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(
-      `Could not update user streak (${response.status}): ${detail}`,
-    );
+    throw new Error(`Could not update user streak (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();
   return UserStreakSchema.parse(data);
 }
 
-export async function fetchMyProgress(
-  token: string,
-): Promise<UserProgressRecord[]> {
+export async function fetchMyProgress(token: string): Promise<UserProgressRecord[]> {
   const response = await fetchWithTimeout(`${BASE_URL}/users/me/progress`, {
     headers: getAuthHeaders(token),
   });
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(
-      `Could not fetch user progress (${response.status}): ${detail}`,
-    );
+    throw new Error(`Could not fetch user progress (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();
@@ -756,9 +723,7 @@ export async function updateAdminSettings(
   return SettingsSchema.parse(data);
 }
 
-export async function fetchAdminPackages(
-  token: string,
-): Promise<PackageSummary[]> {
+export async function fetchAdminPackages(token: string): Promise<PackageSummary[]> {
   const response = await fetchWithTimeout(`${BASE_URL}/admin/packages`, {
     headers: getAdminHeaders(token),
   });
@@ -781,19 +746,14 @@ export async function updateAdminPackage(
   },
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
-  const response = await fetchWithTimeout(
-    `${BASE_URL}/admin/packages/${encodedId}`,
-    {
-      method: "PATCH",
-      headers: getAdminHeaders(token),
-      body: JSON.stringify(patch),
-    },
-  );
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/packages/${encodedId}`, {
+    method: "PATCH",
+    headers: getAdminHeaders(token),
+    body: JSON.stringify(patch),
+  });
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to update package '${packageId}': ${response.status}`,
-    );
+    throw new Error(`Failed to update package '${packageId}': ${response.status}`);
   }
 
   const data: unknown = await response.json();

@@ -50,11 +50,8 @@ export function PackageListPage() {
   const { dailyStreak } = useStreak();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
   const [libraryNotice, setLibraryNotice] = useState("");
-  const [status, setStatus] = useState<"loading" | "error" | "loaded">(
-    "loading",
-  );
-  const [authenticatedScope, setAuthenticatedScope] =
-    useState<PackageScope>("library");
+  const [status, setStatus] = useState<"loading" | "error" | "loaded">("loading");
+  const [authenticatedScope, setAuthenticatedScope] = useState<PackageScope>("library");
   const [isOverflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -148,9 +145,7 @@ export function PackageListPage() {
     if (!activeTagParam) {
       return "";
     }
-    const isValid = catalogueTagOptions.some(
-      (tag) => tag.key === activeTagParam,
-    );
+    const isValid = catalogueTagOptions.some((tag) => tag.key === activeTagParam);
     return isValid ? activeTagParam : "";
   }, [activeTagParam, catalogueTagOptions]);
 
@@ -237,8 +232,7 @@ export function PackageListPage() {
   }, [isOverflowMenuOpen]);
 
   const statusFilteredPackages = useMemo(() => {
-    const includeUnavailableInAll =
-      isAuthenticated && effectiveScope === "catalogue";
+    const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
 
     if (activeFilter === "unavailable") {
       return unavailablePackages;
@@ -248,9 +242,7 @@ export function PackageListPage() {
         ? [...availablePackages, ...unavailablePackages]
         : availablePackages;
     }
-    return availablePackages.filter(
-      (pkg) => progressMap.get(pkg.id) === activeFilter,
-    );
+    return availablePackages.filter((pkg) => progressMap.get(pkg.id) === activeFilter);
   }, [
     activeFilter,
     availablePackages,
@@ -290,8 +282,7 @@ export function PackageListPage() {
   }, [filterBasePackages, query]);
 
   const filterCounts = useMemo(() => {
-    const includeUnavailableInAll =
-      isAuthenticated && effectiveScope === "catalogue";
+    const includeUnavailableInAll = isAuthenticated && effectiveScope === "catalogue";
     const counts: Record<FilterKey, number> = {
       all: includeUnavailableInAll
         ? availablePackages.length + unavailablePackages.length
@@ -387,10 +378,7 @@ export function PackageListPage() {
       )}
 
       {isAuthenticated && (
-        <div
-          className="package-list-page__scope-toggle"
-          aria-label="Package scope"
-        >
+        <div className="package-list-page__scope-toggle" aria-label="Package scope">
           <button
             type="button"
             className="package-list-page__scope-button"
@@ -553,9 +541,7 @@ export function PackageListPage() {
                       : "learning"
                   }
                   onAdd={
-                    isAuthenticated &&
-                    effectiveScope === "catalogue" &&
-                    !pkg.selected
+                    isAuthenticated && effectiveScope === "catalogue" && !pkg.selected
                       ? async () => {
                           setLibraryNotice("");
                           await addToLibrary(token as string, pkg.id);

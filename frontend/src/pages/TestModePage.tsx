@@ -137,9 +137,7 @@ export function TestModePage() {
 
       let pool: typeof pkg.questions;
       if (isTaggedPackage) {
-        const filtered = pkg.questions.filter(
-          (q) => q.difficulty === difficulty,
-        );
+        const filtered = pkg.questions.filter((q) => q.difficulty === difficulty);
         if (filtered.length === 0) {
           console.warn(
             `[TestModePage] No questions tagged "${difficulty}" in package "${pkg.id}". Falling back to full question set.`,
@@ -206,10 +204,7 @@ export function TestModePage() {
           return;
         }
 
-        if (
-          (difficulty === "hard" || difficulty === "expert") &&
-          answeredCount <= 1
-        ) {
+        if ((difficulty === "hard" || difficulty === "expert") && answeredCount <= 1) {
           setSubmitWarning("few-answer");
           return;
         }
@@ -225,10 +220,7 @@ export function TestModePage() {
         (sum, q) => (answers[q.id] === q.correct_answer ? sum + q.weight : sum),
         0,
       );
-      const totalPossibleWeight = shuffledQuestions.reduce(
-        (s, q) => s + q.weight,
-        0,
-      );
+      const totalPossibleWeight = shuffledQuestions.reduce((s, q) => s + q.weight, 0);
       const correctCount = shuffledQuestions.filter(
         (q) => answers[q.id] === q.correct_answer,
       ).length;
@@ -245,9 +237,7 @@ export function TestModePage() {
         ] ?? 0;
       const diffMult = settings.difficulty.xp_multiplier[difficulty];
       const mult = attemptMult * diffMult;
-      let earned = minimumAnswerGateApplies
-        ? 0
-        : Math.round(weightScore * mult);
+      let earned = minimumAnswerGateApplies ? 0 : Math.round(weightScore * mult);
       const wasFirst = activeIsFirstCompletion;
       const awardFirstCompletionBonus = wasFirst && !minimumAnswerGateApplies;
 
@@ -457,8 +447,8 @@ export function TestModePage() {
         <section className="test-mode-page__warning-callout" aria-live="polite">
           <h2>⚠ {DIFFICULTY_LABEL[difficulty]} Mode</h2>
           <p>
-            If you leave or cancel this exam mid-way, you will automatically
-            fail and lose {settings.xp.hard_expert_exit_penalty} XP.
+            If you leave or cancel this exam mid-way, you will automatically fail and
+            lose {settings.xp.hard_expert_exit_penalty} XP.
           </p>
           <div className="test-mode-page__warning-actions">
             <button
@@ -499,10 +489,8 @@ export function TestModePage() {
       }
     });
 
-    const unansweredCount =
-      phase.shuffledQuestions.length - answeredIndexes.size;
-    const isLastQuestion =
-      phase.currentIndex === phase.shuffledQuestions.length - 1;
+    const unansweredCount = phase.shuffledQuestions.length - answeredIndexes.size;
+    const isLastQuestion = phase.currentIndex === phase.shuffledQuestions.length - 1;
 
     return (
       <main className="test-mode-page">
@@ -525,9 +513,7 @@ export function TestModePage() {
           timeRemaining={timeRemaining}
           onNavigate={(index) =>
             setPhase((prev) =>
-              prev.kind === "in-progress"
-                ? { ...prev, currentIndex: index }
-                : prev,
+              prev.kind === "in-progress" ? { ...prev, currentIndex: index } : prev,
             )
           }
         />
@@ -609,9 +595,7 @@ export function TestModePage() {
                     : prev,
                 )
               }
-              disabled={
-                phase.currentIndex >= phase.shuffledQuestions.length - 1
-              }
+              disabled={phase.currentIndex >= phase.shuffledQuestions.length - 1}
             >
               Next
             </button>
@@ -637,9 +621,7 @@ export function TestModePage() {
                     });
                   }}
                 >
-                  {submitWarning === "few-answer"
-                    ? "Continue"
-                    : "Submit anyway"}
+                  {submitWarning === "few-answer" ? "Continue" : "Submit anyway"}
                 </button>
                 <button
                   type="button"
@@ -682,9 +664,7 @@ export function TestModePage() {
         passed={phase.passed}
         passingScore={phase.pkg.passing_score}
         difficulty={phase.difficulty}
-        difficultyMultiplier={
-          settings.difficulty.xp_multiplier[phase.difficulty]
-        }
+        difficultyMultiplier={settings.difficulty.xp_multiplier[phase.difficulty]}
         xpEarned={phase.xpEarned}
         attemptNumber={phase.attemptNumber}
         isFirstCompletion={phase.wasFirstCompletion}

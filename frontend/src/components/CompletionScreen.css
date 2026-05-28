@@ -69,9 +69,7 @@
   cursor: pointer;
   min-height: 44px;
   border: 2px solid transparent;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease;
+  transition: background 150ms ease, border-color 150ms ease;
 }
 
 .completion-screen__btn--primary {

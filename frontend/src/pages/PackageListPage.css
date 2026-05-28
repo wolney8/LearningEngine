@@ -135,10 +135,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition:
-    background 150ms ease,
-    color 150ms ease,
-    border-color 150ms ease;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
 .package-list-page__tag-chip:hover:not(.package-list-page__tag-chip--active) {
