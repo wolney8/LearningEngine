@@ -29,6 +29,13 @@ export function PackageCard({
   const isActionEnabled = pkg.availability === "available";
   const [libraryPending, setLibraryPending] = useState(false);
   const [libraryError, setLibraryError] = useState("");
+  const [areTagsExpanded, setAreTagsExpanded] = useState(false);
+  const hasTagOverflow = pkg.tags.length > 3;
+  const visibleTags = hasTagOverflow
+    ? areTagsExpanded
+      ? pkg.tags
+      : pkg.tags.slice(0, 3)
+    : pkg.tags;
 
   async function handleLibraryAction(action: () => Promise<void>) {
     setLibraryError("");
@@ -86,13 +93,37 @@ export function PackageCard({
         </div>
 
         {pkg.tags.length > 0 && (
-          <ul className="package-card__tags" aria-label="Tags">
-            {pkg.tags.map((tag) => (
-              <li key={`${pkg.id}-${tag}`} className="package-card__tag">
-                {tag}
-              </li>
-            ))}
-          </ul>
+          <div className="package-card__tags-wrap">
+            <ul
+              id={`package-card-tags-${pkg.id}`}
+              className="package-card__tags"
+              aria-label="Tags"
+            >
+              {visibleTags.map((tag) => (
+                <li key={`${pkg.id}-${tag}`} className="package-card__tag">
+                  {tag}
+                </li>
+              ))}
+            </ul>
+            {hasTagOverflow && (
+              <button
+                type="button"
+                className="package-card__tags-toggle"
+                onClick={() => setAreTagsExpanded((value) => !value)}
+                aria-expanded={areTagsExpanded}
+                aria-controls={`package-card-tags-${pkg.id}`}
+                aria-label={
+                  areTagsExpanded
+                    ? `Show fewer tags for ${pkg.title}`
+                    : `Show all tags for ${pkg.title}`
+                }
+              >
+                {areTagsExpanded
+                  ? "Show less"
+                  : `+${pkg.tags.length - visibleTags.length} more`}
+              </button>
+            )}
+          </div>
         )}
 
         {isUnavailable && <p className="package-card__status">Unavailable</p>}

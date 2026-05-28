@@ -33,6 +33,22 @@ const MOCK_UNAVAILABLE_PACKAGE = {
   xp_threshold: null,
 };
 
+const MOCK_LONG_TEXT_PACKAGE = {
+  id: "long-text-package",
+  title:
+    "Foundations of Secure Systems Engineering for Distributed Teams and Enterprise Governance",
+  description:
+    "This intentionally long package description validates clamping behaviour across cards with complex narrative content, multiple clauses, and enough text volume to exceed three rendered lines in compact card widths.",
+  version: "1.0.0",
+  tags: ["tag-one", "tag-two", "tag-three", "tag-four", "tag-five"],
+  passing_score: 0.75,
+  page_count: 7,
+  question_count: 9,
+  availability: "available",
+  enabled: true,
+  xp_threshold: null,
+};
+
 const MOCK_FULL_PACKAGE = {
   id: "python-basics",
   title: "Python Basics",
@@ -254,6 +270,85 @@ test.describe("Package Selection Screen", () => {
     await checkA11y(page);
     await expect(page.getByText("3 pages")).toBeVisible();
     await expect(page.getByText("4 questions")).toBeVisible();
+  });
+
+  test("applies title and description truncation structure for long card text", async ({
+    page,
+  }) => {
+    await page.unrouteAll({ behavior: "wait" });
+    await page.route("**/packages", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_LONG_TEXT_PACKAGE]),
+      });
+    });
+
+    await page.goto("/");
+    await checkA11y(page);
+
+    const card = getPackageCard(page, MOCK_LONG_TEXT_PACKAGE.title);
+    const title = card.locator(".package-card__title");
+    const description = card.locator(".package-card__description");
+
+    await expect(card).toBeVisible();
+    await expect(title).toBeVisible();
+    await expect(description).toBeVisible();
+
+    const titleClamp = await title.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue("-webkit-line-clamp").trim(),
+    );
+    const descriptionClamp = await description.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue("-webkit-line-clamp").trim(),
+    );
+    const titleOverflow = await title.evaluate(
+      (node) => getComputedStyle(node).overflow,
+    );
+    const descriptionOverflow = await description.evaluate(
+      (node) => getComputedStyle(node).overflow,
+    );
+
+    expect(titleClamp).toBe("2");
+    expect(descriptionClamp).toBe("3");
+    expect(titleOverflow).toBe("hidden");
+    expect(descriptionOverflow).toBe("hidden");
+  });
+
+  test("shows compact tag overflow control and toggles full tag list", async ({
+    page,
+  }) => {
+    await page.unrouteAll({ behavior: "wait" });
+    await page.route("**/packages", (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([MOCK_LONG_TEXT_PACKAGE]),
+      });
+    });
+
+    await page.goto("/");
+    await checkA11y(page);
+
+    const card = getPackageCard(page, MOCK_LONG_TEXT_PACKAGE.title);
+    const tags = card.locator(".package-card__tag");
+    const overflowButton = card.locator(".package-card__tags-toggle");
+
+    await expect(card).toBeVisible();
+    await expect(tags).toHaveCount(3);
+    await expect(card.getByText("tag-four", { exact: true })).toHaveCount(0);
+    await expect(overflowButton).toHaveText("+2 more");
+    await expect(overflowButton).toHaveAttribute("aria-expanded", "false");
+
+    await overflowButton.click();
+    await expect(tags).toHaveCount(5);
+    await expect(card.getByText("tag-four", { exact: true })).toBeVisible();
+    await expect(overflowButton).toHaveText("Show less");
+    await expect(overflowButton).toHaveAttribute("aria-expanded", "true");
+
+    await overflowButton.click();
+    await expect(tags).toHaveCount(3);
+    await expect(overflowButton).toHaveText("+2 more");
+    await expect(overflowButton).toHaveAttribute("aria-expanded", "false");
   });
 
   test("unavailable packages are greyed and learner actions are disabled", async ({
