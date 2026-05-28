@@ -1,7 +1,12 @@
-import { Route, Routes } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Route, Routes, matchPath, useLocation } from "react-router-dom";
 import { AdminGuard } from "./components/AdminGuard";
+import { LevelUpOverlay } from "./components/LevelUpOverlay";
+import { XPWidget } from "./components/XPWidget";
 import { AuthProvider } from "./context/AuthContext";
+import { XPProvider } from "./context/XPContext";
 import { useAuth } from "./hooks/useAuth";
+import { useXP } from "./hooks/useXP";
 import { AdminPackagesPage } from "./pages/AdminPackagesPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { LessonPage } from "./pages/LessonPage";
@@ -10,13 +15,65 @@ import { PackageListPage } from "./pages/PackageListPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { TestModePage } from "./pages/TestModePage";
 
+function isPrimaryLearningRoute(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    Boolean(matchPath("/packages/:id", pathname)) ||
+    Boolean(matchPath("/test/exam/:id", pathname))
+  );
+}
+
 function AppRoutes() {
+  const { pathname } = useLocation();
   const { status, user } = useAuth();
+  const { xp, levelProgress, lastChangeKind } = useXP();
+  const [levelUpState, setLevelUpState] = useState<{
+    level: number;
+    totalXP: number;
+  } | null>(null);
+  const previousLevelRef = useRef<number | null>(null);
+  const announcedLevelRef = useRef<number>(0);
   const authBoundaryKey =
     status === "authenticated" && user ? `auth-${user.id}` : "anonymous";
+  const showXPWidget = isPrimaryLearningRoute(pathname);
+
+  useEffect(() => {
+    if (!showXPWidget) {
+      previousLevelRef.current = null;
+      setLevelUpState(null);
+      return;
+    }
+
+    if (previousLevelRef.current == null) {
+      previousLevelRef.current = levelProgress.level;
+      return;
+    }
+
+    if (lastChangeKind !== "add") {
+      previousLevelRef.current = levelProgress.level;
+      return;
+    }
+
+    if (
+      levelProgress.level > previousLevelRef.current &&
+      announcedLevelRef.current < levelProgress.level
+    ) {
+      announcedLevelRef.current = levelProgress.level;
+      setLevelUpState({ level: levelProgress.level, totalXP: xp });
+    }
+
+    previousLevelRef.current = levelProgress.level;
+  }, [lastChangeKind, levelProgress.level, showXPWidget, xp]);
 
   return (
     <div key={authBoundaryKey} data-auth-status={status}>
+      {showXPWidget && <XPWidget xp={xp} levelProgress={levelProgress} />}
+      <LevelUpOverlay
+        isOpen={levelUpState != null}
+        level={levelUpState?.level ?? levelProgress.level}
+        totalXP={levelUpState?.totalXP ?? xp}
+        onDismiss={() => setLevelUpState(null)}
+      />
       <Routes>
         <Route path="/" element={<PackageListPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -44,7 +101,9 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <XPProvider>
+        <AppRoutes />
+      </XPProvider>
     </AuthProvider>
   );
 }
