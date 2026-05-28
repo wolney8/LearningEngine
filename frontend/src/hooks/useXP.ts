@@ -5,7 +5,9 @@ import {
   updateMyXP,
   writeAnonymousXP,
 } from "../services/api";
+import { type LevelProgress, deriveLevelProgress } from "../utils/levelProgress";
 import { useAuth } from "./useAuth";
+import { useSettings } from "./useSettings";
 
 function readXP(): number {
   return readAnonymousXP() ?? 0;
@@ -19,8 +21,10 @@ export function useXP(): {
   xp: number;
   addXP: (amount: number) => void;
   subtractXP: (amount: number) => void;
+  levelProgress: LevelProgress;
 } {
   const { token, status } = useAuth();
+  const { settings } = useSettings();
   const [xp, setXP] = useState<number>(readXP);
   const requestChain = useRef<Promise<void>>(Promise.resolve());
   const xpRef = useRef<number>(xp);
@@ -101,5 +105,7 @@ export function useXP(): {
     writeXP(next);
   }
 
-  return { xp, addXP, subtractXP };
+  const levelProgress = deriveLevelProgress(xp, settings.xp.base_xp_per_level);
+
+  return { xp, addXP, subtractXP, levelProgress };
 }

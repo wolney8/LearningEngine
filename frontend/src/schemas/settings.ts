@@ -12,6 +12,7 @@ const MinCorrectForXPSettingsSchema = z
 const XPSettingsSchema = z
   .object({
     lesson_base_xp_per_correct: z.number().int().nonnegative(),
+    base_xp_per_level: z.number().int().positive().default(500),
     first_completion_bonus: z.number().int().nonnegative(),
     attempt_multipliers: z
       .object({
