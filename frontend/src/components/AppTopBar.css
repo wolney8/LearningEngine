@@ -21,8 +21,9 @@
   color: #1e1b4b;
   text-decoration: none;
   font-family: "Nunito", sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.32rem;
   font-weight: 800;
+  line-height: 1.1;
   letter-spacing: 0.01em;
 }
 
@@ -135,6 +136,6 @@
   }
 
   .app-top-bar__brand {
-    font-size: 0.95rem;
+    font-size: 1.08rem;
   }
 }
