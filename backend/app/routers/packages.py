@@ -3,12 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 
 from app.models.package import Package, PackageSummary
+from app.models.settings import GameSettings
 from app.services.ai_generator import AIGenerationError, generate_package
 from app.services.overrides_loader import (
     PackageOverride,
     derive_enabled_from_availability,
     resolve_effective_availability,
 )
+from app.services.settings_loader import load_settings
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 
@@ -42,6 +44,14 @@ def get_packages_cache(request: Request) -> dict[str, Package]:
 def get_package_overrides(request: Request) -> dict[str, PackageOverride]:
     """Dependency — extracts package overrides from app.state."""
     return request.app.state.package_overrides
+
+
+def get_settings_cache(request: Request) -> GameSettings:
+    settings = getattr(request.app.state, "settings", None)
+    if settings is None:
+        settings = load_settings()
+        request.app.state.settings = settings
+    return settings
 
 
 def build_package_summary(
@@ -105,7 +115,10 @@ async def validate_package(body: ValidateRequest) -> ValidateResponse:
 
 
 @router.post("/generate", response_model=GenerateResponse)
-async def generate_package_endpoint(body: GenerateRequest) -> GenerateResponse:
+async def generate_package_endpoint(
+    body: GenerateRequest,
+    settings: GameSettings = Depends(get_settings_cache),
+) -> GenerateResponse:
     """Generate a training package YAML using AI. Does not save to disk."""
     try:
         yaml_content = await generate_package(
@@ -113,6 +126,7 @@ async def generate_package_endpoint(body: GenerateRequest) -> GenerateResponse:
             audience=body.audience,
             num_pages=body.num_pages,
             num_questions=body.num_questions,
+            settings=settings,
         )
     except AIGenerationError as exc:
         if "GEMINI_API_KEY is not set" in str(exc):

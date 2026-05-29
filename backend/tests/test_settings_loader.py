@@ -45,6 +45,8 @@ def test_load_settings_reads_valid_yaml(tmp_path: Path) -> None:
     assert settings.xp.first_completion_bonus == 20
     assert settings.xp.base_xp_per_level == 500
     assert settings.difficulty.xp_multiplier.hard == 1.5
+    assert settings.ai.provider == "gemini"
+    assert settings.ai.model == "gemini-2.0-flash-exp"
 
 
 def test_load_settings_raises_when_file_missing(tmp_path: Path) -> None:

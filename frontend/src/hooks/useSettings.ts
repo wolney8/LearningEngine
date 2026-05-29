@@ -36,6 +36,13 @@ export const DEFAULT_SETTINGS: Settings = {
       expert: 2.0,
     },
   },
+  content_refresh: {
+    stale_after_days: 90,
+  },
+  ai: {
+    provider: "gemini",
+    model: "gemini-2.0-flash-exp",
+  },
 };
 
 let cachedSettings: Settings | null = null;

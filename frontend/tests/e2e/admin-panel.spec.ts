@@ -55,6 +55,12 @@ const PACKAGE_LIST = [
   },
 ];
 
+const AI_CONFIG_PAYLOAD = {
+  provider: "gemini",
+  model: "gemini-2.0-flash-exp",
+  key_present: true,
+} as const;
+
 async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
@@ -93,6 +99,42 @@ test.describe("Admin panel", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify(PACKAGE_LIST),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/admin/ai-config`, (route) => {
+      if (route.request().method() === "PATCH") {
+        const patch = route.request().postDataJSON() as {
+          provider: "gemini";
+          model: string;
+        };
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            provider: patch.provider,
+            model: patch.model,
+            key_present: true,
+          }),
+        });
+        return;
+      }
+
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(AI_CONFIG_PAYLOAD),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/admin/ai-config/test`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          message: "Connection test succeeded.",
+        }),
       });
     });
 
@@ -161,6 +203,15 @@ test.describe("Admin panel", () => {
     await page.getByRole("button", { name: "Save Settings" }).click();
 
     await expect(page.getByText("Settings saved.")).toBeVisible();
+
+    const keyInput = page.getByLabel("Connection test API key (write-only)");
+    await expect(keyInput).toHaveValue("");
+
+    await keyInput.fill("temporary-key");
+    await page.getByRole("button", { name: "Test AI Connection" }).click();
+
+    await expect(page.getByText("Connection test succeeded.")).toBeVisible();
+    await expect(keyInput).toHaveValue("");
   });
 
   test("packages page can set hidden then available", async ({ page }) => {

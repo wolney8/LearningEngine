@@ -219,8 +219,11 @@ async def test_refresh_dry_run_no_disk_write(monkeypatch) -> None:
 
     pkg = _sample_package()
 
-    async def fake_refresh_package(existing: Package) -> str:
+    async def fake_refresh_package(
+        existing: Package, settings: GameSettings | None = None
+    ) -> str:
         assert existing.id == pkg.id
+        assert settings is not None
         return _refreshed_yaml()
 
     def fail_if_called(*args, **kwargs):
@@ -256,8 +259,11 @@ async def test_refresh_validation_failure_returns_422(monkeypatch) -> None:
 
     pkg = _sample_package()
 
-    async def fake_refresh_package(existing: Package) -> str:
+    async def fake_refresh_package(
+        existing: Package, settings: GameSettings | None = None
+    ) -> str:
         assert existing.id == pkg.id
+        assert settings is not None
         return "id: bad: yaml"
 
     from app.routers import admin as admin_router
@@ -285,8 +291,11 @@ async def test_refresh_ai_error_returns_502(monkeypatch) -> None:
 
     pkg = _sample_package()
 
-    async def fake_refresh_package(existing: Package) -> str:
+    async def fake_refresh_package(
+        existing: Package, settings: GameSettings | None = None
+    ) -> str:
         assert existing.id == pkg.id
+        assert settings is not None
         raise AIGenerationError("Gemini API call failed: boom")
 
     from app.routers import admin as admin_router

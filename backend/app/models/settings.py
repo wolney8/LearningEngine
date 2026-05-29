@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -101,6 +101,13 @@ class ContentRefreshSettings(BaseModel):
     stale_after_days: int = Field(default=90, ge=1)
 
 
+class AISettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["gemini"] = "gemini"
+    model: str = Field(default="gemini-2.0-flash-exp", min_length=1)
+
+
 class GameSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -110,3 +117,4 @@ class GameSettings(BaseModel):
     content_refresh: ContentRefreshSettings = Field(
         default_factory=ContentRefreshSettings
     )
+    ai: AISettings = Field(default_factory=AISettings)

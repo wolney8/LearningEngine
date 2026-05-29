@@ -249,9 +249,10 @@ async def test_generate_package_passes_request_values_to_service(
     response = await client_empty.post("/packages/generate", json=payload)
 
     assert response.status_code == 200
-    mock_generate.assert_awaited_once_with(
-        topic=payload["topic"],
-        audience=payload["audience"],
-        num_pages=payload["num_pages"],
-        num_questions=payload["num_questions"],
-    )
+    mock_generate.assert_awaited_once()
+    called_kwargs = mock_generate.await_args.kwargs
+    assert called_kwargs["topic"] == payload["topic"]
+    assert called_kwargs["audience"] == payload["audience"]
+    assert called_kwargs["num_pages"] == payload["num_pages"]
+    assert called_kwargs["num_questions"] == payload["num_questions"]
+    assert called_kwargs["settings"] is not None
