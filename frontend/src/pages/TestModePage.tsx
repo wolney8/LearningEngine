@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBlocker, useNavigate, useParams } from "react-router-dom";
+import { GuestLimitNotice } from "../components/GuestLimitNotice";
 import { QuestionCard } from "../components/QuestionCard";
 import { TestNavigator } from "../components/TestNavigator";
 import { TestResultsScreen } from "../components/TestResultsScreen";
@@ -12,13 +13,19 @@ import { useStreak } from "../hooks/useStreak";
 import { useTestResults } from "../hooks/useTestResults";
 import { useXP } from "../hooks/useXP";
 import type { Package, Question } from "../schemas/package";
-import { fetchPackage } from "../services/api";
+import {
+  ANONYMOUS_GUEST_PACKAGE_CAP,
+  fetchPackage,
+  getAnonymousGuestPackageCapStatus,
+  markAnonymousGuestPackageEngaged,
+} from "../services/api";
 import { DIFFICULTY_LABEL, type Difficulty } from "../types/difficulty";
 import { shuffleArray } from "../utils/randomise";
 import "./TestModePage.css";
 
 type LoadingPhase = { kind: "loading" };
 type ErrorPhase = { kind: "error"; message: string };
+type GuestLimitPhase = { kind: "guest-limit"; message: string };
 type DifficultySelectPhase = { kind: "difficulty-select"; pkg: Package };
 type HardExpertWarningPhase = {
   kind: "hard-expert-warning";
@@ -52,6 +59,7 @@ type CompletePhase = {
 type TestPhase =
   | LoadingPhase
   | ErrorPhase
+  | GuestLimitPhase
   | DifficultySelectPhase
   | HardExpertWarningPhase
   | InProgressPhase
@@ -89,6 +97,10 @@ export function TestModePage() {
   const countdownArmedRef = useRef(false);
   const exitPenaltyAppliedRef = useRef(false);
 
+  const showGuestLimit = useCallback((message: string): void => {
+    setPhase({ kind: "guest-limit", message });
+  }, []);
+
   const applyExitPenalty = useCallback((): void => {
     if (exitPenaltyAppliedRef.current) return;
     exitPenaltyAppliedRef.current = true;
@@ -105,6 +117,22 @@ export function TestModePage() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!isAuthenticated && id) {
+      const capState = getAnonymousGuestPackageCapStatus(id);
+      if (
+        !capState.hasPackageEngagement &&
+        capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+      ) {
+        showGuestLimit(
+          `Guest mode allows only ${ANONYMOUS_GUEST_PACKAGE_CAP} packages. Create an account to start additional test tracks and save progress.`,
+        );
+        return;
+      }
+
+      markAnonymousGuestPackageEngaged(id);
+    }
+
     setPhase({ kind: "loading" });
 
     fetchPackage(id)
@@ -129,7 +157,7 @@ export function TestModePage() {
     return () => {
       cancelled = true;
     };
-  }, [id, navigate]);
+  }, [id, isAuthenticated, navigate, showGuestLimit]);
 
   const startExam = useCallback(
     (pkg: Package, difficulty: Difficulty): void => {
@@ -175,6 +203,20 @@ export function TestModePage() {
     (difficulty: Difficulty): void => {
       if (phase.kind !== "difficulty-select") return;
 
+      if (!isAuthenticated) {
+        const capState = getAnonymousGuestPackageCapStatus(id);
+        if (
+          activeAttemptNumber > 1 &&
+          capState.hasPackageEngagement &&
+          capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+        ) {
+          showGuestLimit(
+            "You reached the guest package cap. Create an account to continue re-attempts in test mode.",
+          );
+          return;
+        }
+      }
+
       if (difficulty === "hard" || difficulty === "expert") {
         setPhase({ kind: "hard-expert-warning", pkg: phase.pkg, difficulty });
         return;
@@ -182,7 +224,7 @@ export function TestModePage() {
 
       startExam(phase.pkg, difficulty);
     },
-    [phase, startExam],
+    [activeAttemptNumber, id, isAuthenticated, phase, showGuestLimit, startExam],
   );
 
   const handleSubmit = useCallback(
@@ -380,6 +422,17 @@ export function TestModePage() {
     return (
       <main className="test-mode-page">
         <p>{phase.message}</p>
+        <button type="button" onClick={() => navigate("/")}>
+          Back to packages
+        </button>
+      </main>
+    );
+  }
+
+  if (phase.kind === "guest-limit") {
+    return (
+      <main className="test-mode-page">
+        <GuestLimitNotice message={phase.message} />
         <button type="button" onClick={() => navigate("/")}>
           Back to packages
         </button>
@@ -670,7 +723,22 @@ export function TestModePage() {
         isFirstCompletion={phase.wasFirstCompletion}
         firstCompletionBonus={settings.xp.first_completion_bonus}
         timedOut={phase.timedOut}
-        onRetry={() => setPhase({ kind: "difficulty-select", pkg: phase.pkg })}
+        onRetry={() => {
+          if (!isAuthenticated) {
+            const capState = getAnonymousGuestPackageCapStatus(id);
+            if (
+              capState.hasPackageEngagement &&
+              capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+            ) {
+              showGuestLimit(
+                "You reached the guest package cap. Create an account to continue re-attempts in test mode.",
+              );
+              return;
+            }
+          }
+
+          setPhase({ kind: "difficulty-select", pkg: phase.pkg });
+        }}
         onBack={() => navigate("/")}
       />
     </main>

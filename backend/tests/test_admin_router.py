@@ -23,6 +23,7 @@ def _sample_settings(first_completion_bonus: int = 20) -> GameSettings:
             "version": 1,
             "xp": {
                 "lesson_base_xp_per_correct": 10,
+                "base_xp_per_level": 500,
                 "first_completion_bonus": first_completion_bonus,
                 "attempt_multipliers": {"1": 1.0, "2": 0.5, "3": 0.25},
                 "hard_expert_exit_penalty": 50,
@@ -141,6 +142,7 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
         )
         assert get_response.status_code == 200
         assert get_response.json()["xp"]["first_completion_bonus"] == 20
+        assert get_response.json()["xp"]["base_xp_per_level"] == 500
 
         payload = _sample_settings(first_completion_bonus=77).model_dump(mode="json")
         put_response = await client.put(
@@ -154,9 +156,11 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
 
     assert put_response.status_code == 200
     assert put_response.json()["xp"]["first_completion_bonus"] == 77
+    assert put_response.json()["xp"]["base_xp_per_level"] == 500
 
     saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
     assert saved["xp"]["first_completion_bonus"] == 77
+    assert saved["xp"]["base_xp_per_level"] == 500
 
 
 async def test_admin_package_patch_persists_override_and_merges_public_list(

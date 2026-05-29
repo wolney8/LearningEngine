@@ -51,10 +51,10 @@ lint:    cd backend && ruff check .                    |   cd frontend && pnpm e
 
 The GitHub MCP integration provides two categories of tools. Agents **must not** cross this boundary:
 
-| Category              | Permitted tools                                                                 | Examples |
-| --------------------- | ------------------------------------------------------------------------------- | -------- |
+| Category               | Permitted tools                                                                                                                                                                                         | Examples                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | **Project management** | `issue_write`, `issue_read`, `create_pull_request`, `list_branches`, `create_branch`, `merge_pull_request`, `list_issues`, `search_issues`, `sub_issue_write`, `update_pull_request`, `list_milestones` | Creating issues, opening PRs, assigning milestones, labelling |
-| **FORBIDDEN for code** | `push_files`, `create_or_update_file`, `delete_file` | Writing, updating, or deleting source code files |
+| **FORBIDDEN for code** | `push_files`, `create_or_update_file`, `delete_file`                                                                                                                                                    | Writing, updating, or deleting source code files              |
 
 **`push_files` and `create_or_update_file` must never be used to write source code, configuration files, or tests.** The only exception is documentation-only commits (e.g., updating `brand-guidelines.instructions.md`) where no executable code is involved and no local testing is required.
 

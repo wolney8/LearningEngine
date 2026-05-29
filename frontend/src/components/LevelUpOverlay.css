@@ -1,0 +1,100 @@
+.level-up-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.level-up-overlay__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(15 23 42 / 0.56);
+}
+
+.level-up-overlay__dialog {
+  position: relative;
+  width: min(32rem, 100%);
+  margin: 0;
+  border: 1px solid #c7d2fe;
+  border-radius: 1rem;
+  background: radial-gradient(circle at top, #eef2ff 0%, #ffffff 70%);
+  box-shadow: 0 24px 50px rgb(15 23 42 / 0.25);
+  padding: 1.4rem 1.3rem;
+  display: grid;
+  gap: 0.75rem;
+  text-align: left;
+  animation: level-up-enter 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.level-up-overlay__eyebrow {
+  margin: 0;
+  color: #0284c7;
+  font-family: "Inter", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.level-up-overlay__dialog h2 {
+  margin: 0;
+  color: #1e1b4b;
+  font-family: "Nunito", sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.level-up-overlay__dialog p {
+  margin: 0;
+  color: #334155;
+  font-family: "Inter", sans-serif;
+  font-size: 0.98rem;
+}
+
+.level-up-overlay__cta {
+  margin-top: 0.3rem;
+  min-height: 44px;
+  justify-self: start;
+  border: none;
+  border-radius: 9999px;
+  background: #312e81;
+  color: #ffffff;
+  font-family: "Nunito", sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 0.6rem 1.1rem;
+}
+
+.level-up-overlay__cta:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+@keyframes level-up-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-up-overlay__dialog {
+    animation: level-up-fade 150ms linear;
+  }
+}
+
+@keyframes level-up-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

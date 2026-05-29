@@ -34,8 +34,10 @@ const ANONYMOUS_LAST_ACTIVE_KEY = "lle_last_active";
 const ANONYMOUS_ATTEMPT_KEY_PREFIX = "lle_attempt_";
 const ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX = "lle_completed_";
 const ANONYMOUS_TEST_RESULTS_KEY_PREFIX = "lle_test_results_";
+const ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY = "lle_guest_engaged_packages";
 const XP_RECONCILIATION_DECISION_KEY_PREFIX = "lle_xp_reconciled_user_";
 const ISO_LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+export const ANONYMOUS_GUEST_PACKAGE_CAP = 3;
 export const ANONYMOUS_LOCAL_STORAGE_KEYS = {
   xp: ANONYMOUS_XP_KEY,
   dailyStreak: ANONYMOUS_DAILY_STREAK_KEY,
@@ -43,6 +45,7 @@ export const ANONYMOUS_LOCAL_STORAGE_KEYS = {
   attemptPrefix: ANONYMOUS_ATTEMPT_KEY_PREFIX,
   firstCompletionPrefix: ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX,
   testResultsPrefix: ANONYMOUS_TEST_RESULTS_KEY_PREFIX,
+  guestEngagedPackages: ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY,
 } as const;
 
 export interface AnonymousProgressSeed {
@@ -442,6 +445,72 @@ export function readAnonymousStreakSnapshot(): AnonymousStreakSnapshot {
   }
 }
 
+export function readAnonymousGuestEngagedPackages(): string[] {
+  try {
+    const raw = localStorage.getItem(ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const unique = new Set<string>();
+    for (const value of parsed) {
+      if (typeof value !== "string") {
+        continue;
+      }
+
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        unique.add(trimmed);
+      }
+    }
+
+    return [...unique];
+  } catch {
+    return [];
+  }
+}
+
+export function markAnonymousGuestPackageEngaged(packageId: string): void {
+  const trimmedPackageId = packageId.trim();
+  if (!trimmedPackageId) {
+    return;
+  }
+
+  try {
+    const currentIds = readAnonymousGuestEngagedPackages();
+    if (currentIds.includes(trimmedPackageId)) {
+      return;
+    }
+
+    localStorage.setItem(
+      ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY,
+      JSON.stringify([...currentIds, trimmedPackageId]),
+    );
+  } catch {
+    // Storage unavailable - silently no-op
+  }
+}
+
+export function getAnonymousGuestPackageCapStatus(packageId: string): {
+  cap: number;
+  engagedCount: number;
+  hasPackageEngagement: boolean;
+} {
+  const engagedPackages = readAnonymousGuestEngagedPackages();
+  const trimmedPackageId = packageId.trim();
+  return {
+    cap: ANONYMOUS_GUEST_PACKAGE_CAP,
+    engagedCount: engagedPackages.length,
+    hasPackageEngagement:
+      trimmedPackageId.length > 0 && engagedPackages.includes(trimmedPackageId),
+  };
+}
+
 function readAnonymousPrefixedKeys(): string[] {
   const keys: string[] = [];
   for (let index = 0; index < localStorage.length; index += 1) {
@@ -466,6 +535,7 @@ export function resetAnonymousLocalProgress(): void {
     localStorage.removeItem(ANONYMOUS_XP_KEY);
     localStorage.removeItem(ANONYMOUS_DAILY_STREAK_KEY);
     localStorage.removeItem(ANONYMOUS_LAST_ACTIVE_KEY);
+    localStorage.removeItem(ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY);
 
     for (const key of readAnonymousPrefixedKeys()) {
       localStorage.removeItem(key);

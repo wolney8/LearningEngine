@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { GuestLimitNotice } from "../components/GuestLimitNotice";
 import { PackageCard } from "../components/PackageCard";
 import { PackageFilterBar } from "../components/PackageFilterBar";
 import type { FilterKey, FilterOption } from "../components/PackageFilterBar";
@@ -11,11 +12,14 @@ import { useStreak } from "../hooks/useStreak";
 import { removeCachedProgressForPackage } from "../hooks/useTestResults";
 import type { PackageSummary } from "../schemas/package";
 import {
+  ANONYMOUS_GUEST_PACKAGE_CAP,
   addToLibrary,
   clearAnonymousPackageProgress,
   fetchMyCatalogue,
   fetchMyLibrary,
   fetchPackages,
+  getAnonymousGuestPackageCapStatus,
+  markAnonymousGuestPackageEngaged,
   removeFromLibrary,
 } from "../services/api";
 import "./PackageListPage.css";
@@ -46,10 +50,12 @@ function parseFilter(value: string | null): FilterKey {
 }
 
 export function PackageListPage() {
-  const { status: authStatus, token, user, logout } = useAuth();
+  const { status: authStatus, token, user } = useAuth();
+  const navigate = useNavigate();
   const { dailyStreak } = useStreak();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
   const [libraryNotice, setLibraryNotice] = useState("");
+  const [guestLimitMessage, setGuestLimitMessage] = useState("");
   const [status, setStatus] = useState<"loading" | "error" | "loaded">("loading");
   const [authenticatedScope, setAuthenticatedScope] = useState<PackageScope>("library");
   const [isOverflowMenuOpen, setOverflowMenuOpen] = useState(false);
@@ -328,6 +334,48 @@ export function PackageListPage() {
         : availablePackages;
   const isFiltered = filteredPackages.length < countBase.length;
 
+  const handlePackageStart = useCallback(
+    (
+      packageId: string,
+      routePath: string,
+      options?: { isReattempt?: boolean },
+    ): void => {
+      if (isAuthenticated) {
+        navigate(routePath);
+        return;
+      }
+
+      const capState = getAnonymousGuestPackageCapStatus(packageId);
+      const isReattempt = options?.isReattempt === true;
+
+      if (
+        !capState.hasPackageEngagement &&
+        capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+      ) {
+        setGuestLimitMessage(
+          `Guest mode allows ${ANONYMOUS_GUEST_PACKAGE_CAP} packages. Create an account to start more packages and keep your progress.`,
+        );
+        return;
+      }
+
+      if (
+        isReattempt &&
+        capState.hasPackageEngagement &&
+        capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+      ) {
+        setGuestLimitMessage(
+          "You reached the guest package cap. Create an account to continue re-attempts and keep progress synced across devices.",
+        );
+        return;
+      }
+
+      markAnonymousGuestPackageEngaged(packageId);
+      setGuestLimitMessage("");
+      navigate(routePath);
+    },
+    [isAuthenticated, navigate],
+  );
+
   function getEmptyMessage(): string {
     if (query) return `No packages match '${query}'`;
     if (isFullCatalogue && activeCatalogueTag === UNAVAILABLE_TAG_KEY) {
@@ -341,31 +389,14 @@ export function PackageListPage() {
 
   return (
     <main className="package-list-page">
-      <h1>Local Learning Engine</h1>
       <p className="package-list-page__subtitle">
         {isAuthenticated && effectiveScope === "library"
           ? "Your selected courses"
           : "Pick a package to start learning"}
       </p>
-      {authStatus === "authenticated" && user ? (
-        <p className="package-list-page__auth-links" aria-live="polite">
-          <span className="package-list-page__auth-user">
-            Signed in as {user.username}
-          </span>
-          <button
-            type="button"
-            className="package-list-page__auth-action"
-            onClick={logout}
-            aria-label="Sign out"
-          >
-            Sign out
-          </button>
-        </p>
-      ) : (
-        <p className="package-list-page__auth-links">
-          <Link to="/login">Sign in</Link>
-          <span aria-hidden="true">|</span>
-          <Link to="/register">Create account</Link>
+      {authStatus === "authenticated" && user && (
+        <p className="package-list-page__auth-status" aria-live="polite">
+          Signed in as {user.username}
         </p>
       )}
       {dailyStreak > 0 && (
@@ -430,6 +461,8 @@ export function PackageListPage() {
               {libraryNotice}
             </output>
           )}
+
+          {guestLimitMessage && <GuestLimitNotice message={guestLimitMessage} />}
 
           <div className="package-list-page__controls">
             <PackageSearchBar
@@ -531,59 +564,74 @@ export function PackageListPage() {
               className="package-list-page__grid"
               aria-label="Available packages"
             >
-              {filteredPackages.map((pkg) => (
-                <PackageCard
-                  key={pkg.id}
-                  pkg={pkg}
-                  variant={
-                    isAuthenticated && effectiveScope === "catalogue"
-                      ? "catalogue"
-                      : "learning"
-                  }
-                  onAdd={
-                    isAuthenticated && effectiveScope === "catalogue" && !pkg.selected
-                      ? async () => {
-                          setLibraryNotice("");
-                          await addToLibrary(token as string, pkg.id);
-                          await loadPackages();
-                        }
-                      : undefined
-                  }
-                  onRemove={
-                    isAuthenticated &&
-                    effectiveScope === "library" &&
-                    pkg.availability !== "unavailable"
-                      ? async () => {
-                          const confirmed = window.confirm(
-                            `Remove '${pkg.title}' from My Library? This will reset your progress for this package.`,
-                          );
-                          if (!confirmed) {
-                            return;
-                          }
+              {filteredPackages.map((pkg) => {
+                const packageStatus = progressMap.get(pkg.id) ?? "incomplete";
+                const isReattempt = packageStatus !== "incomplete";
 
-                          await removeFromLibrary(token as string, pkg.id);
-                          clearAnonymousPackageProgress(pkg.id);
-                          removeCachedProgressForPackage(pkg.id);
-                          setLibraryNotice(
-                            `Removed '${pkg.title}' from My Library. Progress was reset.`,
-                          );
-                          await loadPackages();
-                        }
-                      : isAuthenticated &&
-                          effectiveScope === "catalogue" &&
-                          pkg.selected &&
-                          pkg.availability !== "unavailable"
+                return (
+                  <PackageCard
+                    key={pkg.id}
+                    pkg={pkg}
+                    variant={
+                      isAuthenticated && effectiveScope === "catalogue"
+                        ? "catalogue"
+                        : "learning"
+                    }
+                    onAdd={
+                      isAuthenticated && effectiveScope === "catalogue" && !pkg.selected
                         ? async () => {
                             setLibraryNotice("");
-                            await removeFromLibrary(token as string, pkg.id);
-                            clearAnonymousPackageProgress(pkg.id);
-                            removeCachedProgressForPackage(pkg.id);
+                            await addToLibrary(token as string, pkg.id);
                             await loadPackages();
                           }
                         : undefined
-                  }
-                />
-              ))}
+                    }
+                    onRemove={
+                      isAuthenticated &&
+                      effectiveScope === "library" &&
+                      pkg.availability !== "unavailable"
+                        ? async () => {
+                            const confirmed = window.confirm(
+                              `Remove '${pkg.title}' from My Library? This will reset your progress for this package.`,
+                            );
+                            if (!confirmed) {
+                              return;
+                            }
+
+                            await removeFromLibrary(token as string, pkg.id);
+                            clearAnonymousPackageProgress(pkg.id);
+                            removeCachedProgressForPackage(pkg.id);
+                            setLibraryNotice(
+                              `Removed '${pkg.title}' from My Library. Progress was reset.`,
+                            );
+                            await loadPackages();
+                          }
+                        : isAuthenticated &&
+                            effectiveScope === "catalogue" &&
+                            pkg.selected &&
+                            pkg.availability !== "unavailable"
+                          ? async () => {
+                              setLibraryNotice("");
+                              await removeFromLibrary(token as string, pkg.id);
+                              clearAnonymousPackageProgress(pkg.id);
+                              removeCachedProgressForPackage(pkg.id);
+                              await loadPackages();
+                            }
+                          : undefined
+                    }
+                    onStartLearning={() =>
+                      handlePackageStart(pkg.id, `/packages/${pkg.id}`, {
+                        isReattempt,
+                      })
+                    }
+                    onTakeTest={() =>
+                      handlePackageStart(pkg.id, `/test/exam/${pkg.id}`, {
+                        isReattempt,
+                      })
+                    }
+                  />
+                );
+              })}
             </section>
           )}
         </>

@@ -1,0 +1,8 @@
+.app-shell {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.app-shell__content {
+  padding-bottom: 1rem;
+}

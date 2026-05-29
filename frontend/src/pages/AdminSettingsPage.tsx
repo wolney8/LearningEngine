@@ -13,6 +13,7 @@ import "./AdminSettingsPage.css";
 type NumberPath =
   | "version"
   | "xp.lesson_base_xp_per_correct"
+  | "xp.base_xp_per_level"
   | "xp.first_completion_bonus"
   | "xp.attempt_multipliers.1"
   | "xp.attempt_multipliers.2"
@@ -40,6 +41,9 @@ function setNumberValue(settings: Settings, path: NumberPath, value: number): Se
       break;
     case "xp.lesson_base_xp_per_correct":
       next.xp.lesson_base_xp_per_correct = value;
+      break;
+    case "xp.base_xp_per_level":
+      next.xp.base_xp_per_level = value;
       break;
     case "xp.first_completion_bonus":
       next.xp.first_completion_bonus = value;
@@ -153,6 +157,7 @@ export function AdminSettingsPage() {
   const fields: Array<{ key: NumberPath; label: string; step?: string }> = [
     { key: "version", label: "Version" },
     { key: "xp.lesson_base_xp_per_correct", label: "XP per correct" },
+    { key: "xp.base_xp_per_level", label: "Base XP per level" },
     { key: "xp.first_completion_bonus", label: "First completion bonus" },
     {
       key: "xp.attempt_multipliers.1",
@@ -228,6 +233,8 @@ export function AdminSettingsPage() {
         return s.version;
       case "xp.lesson_base_xp_per_correct":
         return s.xp.lesson_base_xp_per_correct;
+      case "xp.base_xp_per_level":
+        return s.xp.base_xp_per_level;
       case "xp.first_completion_bonus":
         return s.xp.first_completion_bonus;
       case "xp.attempt_multipliers.1":

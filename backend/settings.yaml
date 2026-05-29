@@ -1,11 +1,12 @@
 version: 1
 xp:
   lesson_base_xp_per_correct: 10
+  base_xp_per_level: 500
   first_completion_bonus: 20
   attempt_multipliers:
-    '1': 1.0
-    '2': 0.5
-    '3': 0.25
+    "1": 1.0
+    "2": 0.5
+    "3": 0.25
   hard_expert_exit_penalty: 50
   hard_expert_low_answer_penalty: 50
   min_correct_for_xp:

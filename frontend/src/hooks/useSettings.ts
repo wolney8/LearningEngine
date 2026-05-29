@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS: Settings = {
   version: 1,
   xp: {
     lesson_base_xp_per_correct: 10,
+    base_xp_per_level: 500,
     first_completion_bonus: 20,
     attempt_multipliers: {
       "1": 1.0,

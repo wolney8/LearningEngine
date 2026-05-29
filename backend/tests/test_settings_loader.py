@@ -8,6 +8,7 @@ _VALID_YAML = """\
 version: 1
 xp:
   lesson_base_xp_per_correct: 10
+  base_xp_per_level: 500
   first_completion_bonus: 20
   attempt_multipliers:
     \"1\": 1.0
@@ -42,6 +43,7 @@ def test_load_settings_reads_valid_yaml(tmp_path: Path) -> None:
 
     assert settings.version == 1
     assert settings.xp.first_completion_bonus == 20
+    assert settings.xp.base_xp_per_level == 500
     assert settings.difficulty.xp_multiplier.hard == 1.5
 
 

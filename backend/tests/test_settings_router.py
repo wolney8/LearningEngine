@@ -10,6 +10,7 @@ def _settings_payload(first_completion_bonus: int = 20) -> dict:
         "version": 1,
         "xp": {
             "lesson_base_xp_per_correct": 10,
+            "base_xp_per_level": 500,
             "first_completion_bonus": first_completion_bonus,
             "attempt_multipliers": {"1": 1.0, "2": 0.5, "3": 0.25},
             "hard_expert_exit_penalty": 50,
@@ -54,6 +55,7 @@ async def test_get_settings_returns_expected_shape() -> None:
     body = response.json()
     assert body["version"] == 1
     assert body["xp"]["first_completion_bonus"] == 20
+    assert body["xp"]["base_xp_per_level"] == 500
     assert body["xp"]["attempt_multipliers"]["2"] == 0.5
     assert body["difficulty"]["seconds_per_question"]["expert"] == 10
 

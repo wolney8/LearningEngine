@@ -131,9 +131,7 @@ test.describe("Lesson Mode", () => {
   test("navigating to a package loads the lesson page", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
-    await expect(
-      page.getByRole("heading", { name: "Python Basics" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
   });
 
   test("first study page content is visible", async ({ page }) => {
@@ -153,9 +151,7 @@ test.describe("Lesson Mode", () => {
     await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
     await expect(page.getByText("Page 2 of 2")).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Variables" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Variables" })).toBeVisible();
   });
 
   test("clicking Start Questions on last page enters question phase", async ({
@@ -168,9 +164,7 @@ test.describe("Lesson Mode", () => {
     await expect(page.getByText("Question 1 of 2")).toBeVisible();
   });
 
-  test("answering a question correctly shows correct feedback", async ({
-    page,
-  }) => {
+  test("answering a question correctly shows correct feedback", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
@@ -193,9 +187,7 @@ test.describe("Lesson Mode", () => {
     await expect(page.getByText("Incorrect", { exact: true })).toBeVisible();
   });
 
-  test("completing all questions shows the completion screen", async ({
-    page,
-  }) => {
+  test("completing all questions shows the completion screen", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
@@ -203,9 +195,7 @@ test.describe("Lesson Mode", () => {
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Lesson complete!" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
     await expect(page.getByText("2 / 2 correct")).toBeVisible();
   });
 
@@ -430,19 +420,16 @@ test.describe("Lesson Mode", () => {
       });
     });
 
-    await page.route(
-      `${API_BASE_URL}/users/me/streak/mark-practised`,
-      (route) => {
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            streak_count: 5,
-            last_practised_date: "2026-05-24",
-          }),
-        });
-      },
-    );
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 5,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
@@ -519,20 +506,17 @@ test.describe("Lesson Mode", () => {
       });
     });
 
-    await page.route(
-      `${API_BASE_URL}/users/me/streak/mark-practised`,
-      (route) => {
-        streakMarkCalls += 1;
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            streak_count: 6,
-            last_practised_date: "2026-05-24",
-          }),
-        });
-      },
-    );
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakMarkCalls += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 6,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
@@ -542,9 +526,7 @@ test.describe("Lesson Mode", () => {
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
 
-    await expect(
-      page.getByRole("heading", { name: "Lesson complete!" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
     await expect.poll(() => streakMarkCalls).toBe(1);
   });
 });

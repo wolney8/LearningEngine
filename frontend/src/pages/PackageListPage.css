@@ -5,11 +5,7 @@
 }
 
 .package-list-page h1 {
-  margin-bottom: 0.25rem;
-  color: #1e1b4b;
-  font-family: "Nunito", sans-serif;
-  font-size: 2rem;
-  font-weight: 800;
+  display: none;
 }
 
 .package-list-page__subtitle {
@@ -20,23 +16,13 @@
   font-weight: 400;
 }
 
-.package-list-page__auth-links {
+.package-list-page__auth-status {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  margin: -1.25rem 0 1.25rem;
+  margin: -1.25rem 0 0.8rem;
   font-family: "Inter", sans-serif;
   font-size: 0.95rem;
-}
-
-.package-list-page__auth-links a {
-  color: #4338ca;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.package-list-page__auth-links a:hover {
-  text-decoration: underline;
 }
 
 .package-list-page__auth-user {
@@ -202,6 +188,10 @@
   font-family: "Inter", sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.guest-limit-notice {
+  margin-bottom: 1rem;
 }
 
 @media (min-width: 640px) {

@@ -18,6 +18,7 @@ class XPSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     lesson_base_xp_per_correct: int = Field(ge=0)
+    base_xp_per_level: int = Field(default=500, ge=1)
     first_completion_bonus: int = Field(ge=0)
     attempt_multipliers: dict[int, float]
     hard_expert_exit_penalty: int = Field(ge=0)

@@ -8,6 +8,7 @@ const SETTINGS = {
   version: 1,
   xp: {
     lesson_base_xp_per_correct: 10,
+    base_xp_per_level: 20,
     first_completion_bonus: 20,
     attempt_multipliers: {
       "1": 1.0,
@@ -129,6 +130,132 @@ async function completeLessonRun(page: Page): Promise<void> {
 }
 
 test.describe("XP persistence", () => {
+  test("top bar is present on key routes and shows anonymous auth CTAs", async ({
+    page,
+  }) => {
+    await registerPackageRoutes(page);
+
+    await page.goto("/");
+    const topBar = page.getByTestId("app-top-bar");
+    await expect(topBar).toBeVisible();
+    await expect(topBar.getByTestId("xp-widget")).toBeVisible();
+    await expect(
+      topBar.getByRole("link", { name: "Create account" }),
+    ).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Sign in" })).toBeVisible();
+
+    await page.goto("/login");
+    await expect(page.getByTestId("app-top-bar")).toBeVisible();
+    await expect(page.getByTestId("xp-widget")).toBeVisible();
+
+    await page.goto("/register");
+    await expect(page.getByTestId("app-top-bar")).toBeVisible();
+
+    await page.goto(`/packages/${PACKAGE_ID}`);
+    await expect(page.getByTestId("app-top-bar")).toBeVisible();
+    await expect(page.getByTestId("xp-widget")).toBeVisible();
+
+    await page.goto(`/test/exam/${PACKAGE_ID}`);
+    await expect(page.getByTestId("app-top-bar")).toBeVisible();
+  });
+
+  test("guest cap blocks new package starts and retry flow with account CTA", async ({
+    page,
+  }) => {
+    const cappedSummaries = [
+      {
+        ...PACKAGE_SUMMARY,
+        id: "pkg-1",
+        title: "Package One",
+      },
+      {
+        ...PACKAGE_SUMMARY,
+        id: "pkg-2",
+        title: "Package Two",
+      },
+      {
+        ...PACKAGE_SUMMARY,
+        id: "pkg-3",
+        title: "Package Three",
+      },
+      {
+        ...PACKAGE_SUMMARY,
+        id: "pkg-4",
+        title: "Package Four",
+      },
+    ];
+
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "lle_guest_engaged_packages",
+        JSON.stringify(["pkg-1", "pkg-2", "pkg-3"]),
+      );
+    });
+
+    await page.route(`${API_BASE_URL}/packages`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(cappedSummaries),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/packages/*`, (route) => {
+      const packageId = route.request().url().split("/").pop() ?? "pkg-1";
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...PACKAGE_DETAIL,
+          id: packageId,
+          title: `Package ${packageId.toUpperCase()}`,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/api/settings`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(SETTINGS),
+      });
+    });
+
+    await page.goto("/");
+    const packageFourCard = page
+      .locator("article.package-card")
+      .filter({ hasText: "Package Four" });
+    await packageFourCard
+      .getByRole("button", { name: "Start Learning" })
+      .click();
+
+    await expect(page.getByText("Guest limit reached")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Create account" }).first(),
+    ).toBeVisible();
+
+    await page.goto("/packages/pkg-1");
+    await page.getByRole("button", { name: /Start Questions/i }).click();
+    await page.getByRole("button", { name: "Correct" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Lesson complete!" }),
+    ).toBeVisible();
+
+    const continueLearningButton = page.getByRole("button", {
+      name: "Continue learning",
+    });
+    if (await continueLearningButton.isVisible()) {
+      await continueLearningButton.click();
+    }
+
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByText("Guest limit reached")).toBeVisible();
+    await expect(
+      page.getByText("continue re-attempting packages", { exact: false }),
+    ).toBeVisible();
+  });
+
   test("authenticated users persist XP on the server across reload/session", async ({
     page,
   }) => {
@@ -182,12 +309,22 @@ test.describe("XP persistence", () => {
 
     await page.route(`${API_BASE_URL}/users/me/xp`, async (route) => {
       const request = route.request();
+      if (request.method() === "OPTIONS") {
+        await route.fulfill({ status: 204 });
+        return;
+      }
+
       if (request.method() === "GET") {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({ xp: serverXP }),
         });
+        return;
+      }
+
+      if (request.method() !== "PUT") {
+        await route.fulfill({ status: 405 });
         return;
       }
 
@@ -292,6 +429,49 @@ test.describe("XP persistence", () => {
     );
     expect(localXPAfterReload).toBe("30");
     expect(serverXPCalls).toBe(0);
+  });
+
+  test("xp widget stays visible in app shell for anonymous users", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("lle_xp", "35");
+    });
+
+    await registerPackageRoutes(page);
+    await page.goto("/");
+
+    const widget = page.getByTestId("xp-widget");
+    await expect(widget).toBeVisible();
+    await expect(widget).toContainText("Level 2");
+    await expect(widget).toContainText("35 XP total");
+    await expect(widget).toHaveText(/Level 2\s*•\s*35 XP total/);
+    await expect(widget).not.toContainText("XP to next level");
+  });
+
+  test("level-up overlay is single-fire and supports reduced motion", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(() => {
+      localStorage.removeItem("lle_xp");
+    });
+
+    await registerPackageRoutes(page);
+    await completeLessonRun(page);
+
+    const overlay = page.getByTestId("level-up-overlay");
+    await expect(overlay).toBeVisible();
+    await expect(overlay).toContainText("Level up! You reached Level 2");
+    await expect(
+      page.locator("[data-testid='level-up-overlay'] dialog"),
+    ).toHaveAttribute("data-motion", "reduced");
+
+    await page.getByRole("button", { name: "Continue learning" }).click();
+    await expect(overlay).toHaveCount(0);
+
+    await page.reload();
+    await expect(overlay).toHaveCount(0);
   });
 
   test("login keep-account decision skips server writes and clears anonymous local state", async ({

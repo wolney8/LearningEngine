@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CompletionScreen } from "../components/CompletionScreen";
+import { GuestLimitNotice } from "../components/GuestLimitNotice";
 import { QuestionView } from "../components/QuestionView";
 import { StudyPageView } from "../components/StudyPageView";
 import { useAttempts } from "../hooks/useAttempts";
@@ -11,7 +12,12 @@ import { useStreak } from "../hooks/useStreak";
 import { useTestResults } from "../hooks/useTestResults";
 import { useXP } from "../hooks/useXP";
 import type { Package } from "../schemas/package";
-import { fetchPackage } from "../services/api";
+import {
+  ANONYMOUS_GUEST_PACKAGE_CAP,
+  fetchPackage,
+  getAnonymousGuestPackageCapStatus,
+  markAnonymousGuestPackageEngaged,
+} from "../services/api";
 import "./LessonPage.css";
 
 // ---------------------------------------------------------------------------
@@ -21,6 +27,7 @@ import "./LessonPage.css";
 type LessonPhase =
   | { kind: "loading" }
   | { kind: "error"; message: string }
+  | { kind: "guest-limit"; message: string }
   | {
       kind: "studying";
       pageIndex: number;
@@ -68,11 +75,31 @@ export function LessonPage() {
   const [pkg, setPkg] = useState<Package | null>(null);
   const [phase, setPhase] = useState<LessonPhase>({ kind: "loading" });
 
+  const showGuestLimit = useCallback((message: string): void => {
+    setPhase({ kind: "guest-limit", message });
+  }, []);
+
   const loadPackage = useCallback(async () => {
     if (!id) {
       setPhase({ kind: "error", message: "No package ID in URL." });
       return;
     }
+
+    if (!isAuthenticated) {
+      const capState = getAnonymousGuestPackageCapStatus(id);
+      if (
+        !capState.hasPackageEngagement &&
+        capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+      ) {
+        showGuestLimit(
+          `Guest mode allows only ${ANONYMOUS_GUEST_PACKAGE_CAP} packages. Create an account to start additional packages and save progress.`,
+        );
+        return;
+      }
+
+      markAnonymousGuestPackageEngaged(id);
+    }
+
     setPhase({ kind: "loading" });
     try {
       const loaded = await fetchPackage(id);
@@ -88,7 +115,7 @@ export function LessonPage() {
         message: err instanceof Error ? err.message : "Failed to load package.",
       });
     }
-  }, [id]);
+  }, [id, isAuthenticated, showGuestLimit]);
 
   useEffect(() => {
     void loadPackage();
@@ -136,6 +163,29 @@ export function LessonPage() {
   }
 
   function startQuestions(): void {
+    if (!id || isAuthenticated) {
+      setPhase({
+        kind: "questions",
+        questionIndex: 0,
+        correctCount: 0,
+        streak: 0,
+        xpEarned: 0,
+      });
+      return;
+    }
+
+    const capState = getAnonymousGuestPackageCapStatus(id);
+    if (
+      !activeIsFirstCompletion &&
+      capState.hasPackageEngagement &&
+      capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+    ) {
+      showGuestLimit(
+        "You reached the guest package cap. Create an account to continue re-attempts and keep your progress.",
+      );
+      return;
+    }
+
     setPhase({
       kind: "questions",
       questionIndex: 0,
@@ -212,6 +262,20 @@ export function LessonPage() {
 
   function handleRetry(): void {
     if (!pkg) return;
+
+    if (!isAuthenticated && id) {
+      const capState = getAnonymousGuestPackageCapStatus(id);
+      if (
+        capState.hasPackageEngagement &&
+        capState.engagedCount >= ANONYMOUS_GUEST_PACKAGE_CAP
+      ) {
+        showGuestLimit(
+          "You reached the guest package cap. Create an account to continue re-attempting packages.",
+        );
+        return;
+      }
+    }
+
     setPhase({
       kind: "studying",
       pageIndex: 0,
@@ -249,6 +313,15 @@ export function LessonPage() {
         {phase.kind === "error" && (
           <div className="lesson-page__error">
             <p>{phase.message}</p>
+            <Link to="/" className="lesson-page__back-link">
+              Back to packages
+            </Link>
+          </div>
+        )}
+
+        {phase.kind === "guest-limit" && (
+          <div className="lesson-page__guest-limit">
+            <GuestLimitNotice message={phase.message} />
             <Link to="/" className="lesson-page__back-link">
               Back to packages
             </Link>
