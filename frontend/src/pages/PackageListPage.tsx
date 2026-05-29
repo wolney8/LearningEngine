@@ -1,3 +1,4 @@
+import { Flame } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -394,18 +395,33 @@ export function PackageListPage() {
           ? "Your selected courses"
           : "Pick a package to start learning"}
       </p>
-      {authStatus === "authenticated" && user && (
-        <p className="package-list-page__auth-status" aria-live="polite">
-          Signed in as {user.username}
-        </p>
-      )}
-      {dailyStreak > 0 && (
-        <p
-          className="package-list-page__streak"
-          aria-label={`${dailyStreak} day streak`}
-        >
-          🔥 {dailyStreak} {dailyStreak === 1 ? "day" : "days"} streak
-        </p>
+      {(authStatus === "authenticated" || dailyStreak > 0) && (
+        <div className="package-list-page__status-strip">
+          {authStatus === "authenticated" && user && (
+            <p className="package-list-page__auth-status" aria-live="polite">
+              <span className="package-list-page__status-label">Signed in as</span>
+              <span className="package-list-page__auth-user">{user.username}</span>
+            </p>
+          )}
+
+          {dailyStreak > 0 && (
+            <p
+              className="package-list-page__streak"
+              aria-label={`${dailyStreak} day streak`}
+            >
+              <Flame
+                className="package-list-page__streak-icon"
+                aria-hidden="true"
+                focusable="false"
+                size={16}
+              />
+              <span className="package-list-page__status-label">Current streak</span>
+              <span className="package-list-page__streak-value">
+                {dailyStreak} {dailyStreak === 1 ? "day" : "days"} streak
+              </span>
+            </p>
+          )}
+        </div>
       )}
 
       {isAuthenticated && (
