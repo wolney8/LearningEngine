@@ -124,7 +124,9 @@ async function completeLessonRun(page: Page): Promise<void> {
   await page.getByRole("button", { name: /Start Questions/i }).click();
   await page.getByRole("button", { name: "Correct" }).click();
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Lesson complete!" }),
+  ).toBeVisible();
 }
 
 test.describe("XP persistence", () => {
@@ -137,7 +139,9 @@ test.describe("XP persistence", () => {
     const topBar = page.getByTestId("app-top-bar");
     await expect(topBar).toBeVisible();
     await expect(topBar.getByTestId("xp-widget")).toBeVisible();
-    await expect(topBar.getByRole("link", { name: "Create account" })).toBeVisible();
+    await expect(
+      topBar.getByRole("link", { name: "Create account" }),
+    ).toBeVisible();
     await expect(topBar.getByRole("link", { name: "Sign in" })).toBeVisible();
 
     await page.goto("/login");
@@ -221,7 +225,9 @@ test.describe("XP persistence", () => {
     const packageFourCard = page
       .locator("article.package-card")
       .filter({ hasText: "Package Four" });
-    await packageFourCard.getByRole("button", { name: "Start Learning" }).click();
+    await packageFourCard
+      .getByRole("button", { name: "Start Learning" })
+      .click();
 
     await expect(page.getByText("Guest limit reached")).toBeVisible();
     await expect(
@@ -232,7 +238,9 @@ test.describe("XP persistence", () => {
     await page.getByRole("button", { name: /Start Questions/i }).click();
     await page.getByRole("button", { name: "Correct" }).click();
     await page.getByRole("button", { name: "Next" }).click();
-    await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Lesson complete!" }),
+    ).toBeVisible();
 
     const continueLearningButton = page.getByRole("button", {
       name: "Continue learning",
@@ -334,7 +342,9 @@ test.describe("XP persistence", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(serverProgress.attempt_count > 0 ? [serverProgress] : []),
+        body: JSON.stringify(
+          serverProgress.attempt_count > 0 ? [serverProgress] : [],
+        ),
       });
     });
 
@@ -406,7 +416,9 @@ test.describe("XP persistence", () => {
 
     await completeLessonRun(page);
 
-    const localXPAfterRun = await page.evaluate(() => localStorage.getItem("lle_xp"));
+    const localXPAfterRun = await page.evaluate(() =>
+      localStorage.getItem("lle_xp"),
+    );
     expect(localXPAfterRun).toBe("30");
     expect(serverXPCalls).toBe(0);
 
@@ -419,7 +431,9 @@ test.describe("XP persistence", () => {
     expect(serverXPCalls).toBe(0);
   });
 
-  test("xp widget stays visible in app shell for anonymous users", async ({ page }) => {
+  test("xp widget stays visible in app shell for anonymous users", async ({
+    page,
+  }) => {
     await page.addInitScript(() => {
       localStorage.setItem("lle_xp", "35");
     });
@@ -546,16 +560,19 @@ test.describe("XP persistence", () => {
       });
     });
 
-    await page.route(`${API_BASE_URL}/users/me/progress/${PACKAGE_ID}`, (route) => {
-      if (route.request().method() === "PUT") {
-        progressPutCalls += 1;
-      }
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(serverProgressRow),
-      });
-    });
+    await page.route(
+      `${API_BASE_URL}/users/me/progress/${PACKAGE_ID}`,
+      (route) => {
+        if (route.request().method() === "PUT") {
+          progressPutCalls += 1;
+        }
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(serverProgressRow),
+        });
+      },
+    );
 
     await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
       if (route.request().method() === "PUT") {
