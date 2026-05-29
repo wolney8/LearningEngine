@@ -29,6 +29,9 @@ export function AppTopBar({ xp, levelProgress }: AppTopBarProps) {
             <>
               <div className="app-top-bar__auth app-top-bar__auth--desktop">
                 <span className="app-top-bar__profile">{user.username}</span>
+                <Link to="/profile" className="app-top-bar__profile-link">
+                  Profile
+                </Link>
                 <button
                   type="button"
                   className="app-top-bar__sign-out"
@@ -51,10 +54,20 @@ export function AppTopBar({ xp, levelProgress }: AppTopBarProps) {
                 {isMobileMenuOpen && (
                   <div id="app-top-bar-mobile-menu" className="app-top-bar__menu">
                     <p className="app-top-bar__menu-profile">{user.username}</p>
+                    <Link
+                      to="/profile"
+                      className="app-top-bar__menu-link"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Profile
+                    </Link>
                     <button
                       type="button"
                       className="app-top-bar__menu-link"
-                      onClick={logout}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        logout();
+                      }}
                     >
                       Sign out
                     </button>

@@ -72,6 +72,11 @@ const UserStreakUpdateSchema = z.object({
   streak_count: z.number().int().nonnegative(),
   last_practised_date: z.string().regex(ISO_LOCAL_DATE_RE).nullable(),
 });
+const UserProfileUpdateRequestSchema = z
+  .object({
+    username: z.string().trim().min(3).max(50).optional(),
+  })
+  .strict();
 const AdminAIConfigSchema = z
   .object({
     provider: z.literal("gemini"),
@@ -623,6 +628,29 @@ export async function fetchCurrentUser(token: string): Promise<User> {
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`Could not fetch current user (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return UserSchema.parse(data);
+}
+
+export async function updateMyProfile(
+  token: string,
+  payload: { username?: string },
+): Promise<User> {
+  const parsed = UserProfileUpdateRequestSchema.parse(payload);
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/profile`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify(parsed),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Could not update profile (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();

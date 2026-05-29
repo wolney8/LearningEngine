@@ -1,0 +1,156 @@
+.profile-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+}
+
+.profile-page__panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgb(30 41 59 / 0.08);
+  padding: 1.5rem;
+}
+
+.profile-page__title {
+  margin: 0 0 1rem;
+  color: #1e1b4b;
+  font-family: "Nunito", "Segoe UI", sans-serif;
+  font-size: 1.9rem;
+}
+
+.profile-page__stats {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.profile-page__stat {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 0.8rem;
+}
+
+.profile-page__stat h2 {
+  margin: 0;
+  color: #334155;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+
+.profile-page__stat p {
+  margin: 0.35rem 0 0;
+  color: #0f172a;
+  font-family: "Nunito", "Segoe UI", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.profile-page__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile-page__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.profile-page__form input {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+}
+
+.profile-page__form input:focus-visible,
+.profile-page__form button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.profile-page__form button {
+  width: fit-content;
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 9999px;
+  background: #4f46e5;
+  color: #ffffff;
+  font-family: "Nunito", "Segoe UI", sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-page__form button:disabled {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+.profile-page__scores h2 {
+  margin: 0 0 0.6rem;
+  color: #1e1b4b;
+  font-family: "Nunito", "Segoe UI", sans-serif;
+}
+
+.profile-page__scores table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.profile-page__scores th,
+.profile-page__scores td {
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  padding: 0.55rem;
+}
+
+.profile-page__scores th {
+  color: #334155;
+  font-size: 0.9rem;
+}
+
+.profile-page__message {
+  margin: 0;
+  font-weight: 600;
+}
+
+.profile-page__message--success {
+  color: #166534;
+}
+
+.profile-page__message--error {
+  color: #b91c1c;
+}
+
+.profile-page__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .profile-page {
+    padding: 1rem;
+  }
+
+  .profile-page__panel {
+    padding: 1rem;
+  }
+}

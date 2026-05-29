@@ -73,6 +73,12 @@ class UserStreakResponse(BaseModel):
     last_practised_date: date | None
 
 
+class UserProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str | None = None
+
+
 class UserCatalogueItemResponse(PackageSummary):
     selected: bool
 
@@ -155,6 +161,53 @@ def get_current_user(
 
 @router.get("/me", response_model=UserResponse)
 async def read_me(current_user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse(
+        id=current_user.id or 0,
+        username=current_user.username,
+        email=current_user.email,
+        role=current_user.role,
+        xp=current_user.xp,
+        streak_count=current_user.streak_count,
+        last_practised_date=current_user.last_practised_date,
+        created_at=current_user.created_at,
+    )
+
+
+@router.patch("/me/profile", response_model=UserResponse)
+async def update_my_profile(
+    body: UserProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> UserResponse:
+    if body.username is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one field must be provided",
+        )
+
+    user_id = _require_current_user_id(current_user)
+    next_username = body.username.strip()
+    if len(next_username) < 3 or len(next_username) > 50:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Username must be between 3 and 50 characters",
+        )
+
+    if next_username != current_user.username:
+        duplicate_user = session.exec(
+            select(User).where(User.username == next_username, User.id != user_id)
+        ).first()
+        if duplicate_user is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already exists",
+            )
+
+        current_user.username = next_username
+        session.add(current_user)
+        session.commit()
+        session.refresh(current_user)
+
     return UserResponse(
         id=current_user.id or 0,
         username=current_user.username,

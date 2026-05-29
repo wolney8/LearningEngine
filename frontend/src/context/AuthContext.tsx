@@ -41,6 +41,7 @@ export type AuthContextValue = {
   register: (payload: RegisterRequest) => Promise<void>;
   logout: () => void;
   resetAnonymousLocalProgress: () => void;
+  setCurrentUser: (nextUser: User) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -285,6 +286,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError("");
   }, []);
 
+  const setCurrentUser = useCallback((nextUser: User) => {
+    setUser(nextUser);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -295,8 +300,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       resetAnonymousLocalProgress,
+      setCurrentUser,
     }),
-    [error, login, logout, register, status, token, user],
+    [error, login, logout, register, setCurrentUser, status, token, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

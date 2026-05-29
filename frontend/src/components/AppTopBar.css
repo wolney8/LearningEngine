@@ -30,6 +30,7 @@
 .app-top-bar__brand:focus-visible,
 .app-top-bar__create-account:focus-visible,
 .app-top-bar__sign-in-text:focus-visible,
+.app-top-bar__profile-link:focus-visible,
 .app-top-bar__menu-toggle:focus-visible,
 .app-top-bar__menu-link:focus-visible,
 .app-top-bar__sign-out:focus-visible {
@@ -71,6 +72,7 @@
 }
 
 .app-top-bar__sign-in-text,
+.app-top-bar__profile-link,
 .app-top-bar__sign-out,
 .app-top-bar__menu-link {
   min-height: 2.5rem;

@@ -160,6 +160,69 @@ async def test_users_me_rejects_invalid_token(users_client: AsyncClient) -> None
     assert response.json() == {"detail": "Invalid or expired token"}
 
 
+async def test_users_profile_patch_updates_username(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="profile-update-source",
+        email="profile-update-source@example.com",
+    )
+
+    response = await users_client.patch(
+        "/users/me/profile",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"username": "updated-profile-name"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["username"] == "updated-profile-name"
+
+
+async def test_users_profile_patch_rejects_duplicate_username(
+    users_client: AsyncClient,
+) -> None:
+    existing_username = "profile-duplicate-existing"
+    await _register_user_and_get_token(
+        users_client,
+        username=existing_username,
+        email="profile-duplicate-existing@example.com",
+    )
+
+    token = await _register_user_and_get_token(
+        users_client,
+        username="profile-duplicate-source",
+        email="profile-duplicate-source@example.com",
+    )
+
+    response = await users_client.patch(
+        "/users/me/profile",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"username": existing_username},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Username already exists"}
+
+
+async def test_users_profile_patch_rejects_empty_payload(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="profile-empty-payload",
+        email="profile-empty-payload@example.com",
+    )
+
+    response = await users_client.patch(
+        "/users/me/profile",
+        headers={"Authorization": f"Bearer {token}"},
+        json={},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "At least one field must be provided"}
+
+
 async def _register_user_and_get_token(
     users_client: AsyncClient,
     *,

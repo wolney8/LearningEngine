@@ -12,6 +12,7 @@ import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { LessonPage } from "./pages/LessonPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PackageListPage } from "./pages/PackageListPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { TestModePage } from "./pages/TestModePage";
 import "./App.css";
@@ -62,6 +63,7 @@ function AppRoutes() {
       <main className="app-shell__content">
         <Routes>
           <Route path="/" element={<PackageListPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/admin" element={<AdminGuard />} />
