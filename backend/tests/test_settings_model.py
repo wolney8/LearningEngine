@@ -119,3 +119,18 @@ def test_game_settings_content_refresh_rejects_zero() -> None:
 
     with pytest.raises(ValidationError):
         GameSettings.model_validate(payload)
+
+
+def test_game_settings_ai_defaults() -> None:
+    settings = GameSettings.model_validate(_valid_settings_dict())
+
+    assert settings.ai.provider == "gemini"
+    assert settings.ai.model == "gemini-2.0-flash-exp"
+
+
+def test_game_settings_ai_rejects_empty_model() -> None:
+    payload = _valid_settings_dict()
+    payload["ai"] = {"provider": "gemini", "model": ""}
+
+    with pytest.raises(ValidationError):
+        GameSettings.model_validate(payload)

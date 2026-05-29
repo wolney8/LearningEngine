@@ -3,9 +3,13 @@ import { Link, Navigate } from "react-router-dom";
 
 import type { Settings } from "../schemas/settings";
 import {
+  type AdminAIConfig,
   clearAdminToken,
+  fetchAdminAIConfig,
   fetchAdminSettings,
   getAdminToken,
+  testAdminAIConnection,
+  updateAdminAIConfig,
   updateAdminSettings,
 } from "../services/api";
 import "./AdminSettingsPage.css";
@@ -108,10 +112,17 @@ function setNumberValue(settings: Settings, path: NumberPath, value: number): Se
 export function AdminSettingsPage() {
   const token = useMemo(() => getAdminToken(), []);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [aiConfig, setAIConfig] = useState<AdminAIConfig | null>(null);
   const [status, setStatus] = useState<"loading" | "saving" | "ready" | "error">(
     "loading",
   );
   const [message, setMessage] = useState<string>("");
+  const [aiProvider, setAIProvider] = useState<"gemini">("gemini");
+  const [aiModel, setAIModel] = useState<string>("");
+  const [aiApiKey, setAIApiKey] = useState<string>("");
+  const [aiSaving, setAISaving] = useState<boolean>(false);
+  const [aiTesting, setAITesting] = useState<boolean>(false);
+  const [aiMessage, setAIMessage] = useState<string>("");
 
   useEffect(() => {
     if (!token) {
@@ -120,8 +131,16 @@ export function AdminSettingsPage() {
 
     const load = async () => {
       try {
-        const data = await fetchAdminSettings(token);
-        setSettings(data);
+        const [settingsData, aiData] = await Promise.all([
+          fetchAdminSettings(token),
+          fetchAdminAIConfig(token),
+        ]);
+        setSettings(settingsData);
+        setAIConfig(aiData);
+        setAIProvider(aiData.provider);
+        setAIModel(aiData.model);
+        setAIApiKey("");
+        setAIMessage("");
         setStatus("ready");
       } catch {
         setStatus("error");
@@ -151,6 +170,53 @@ export function AdminSettingsPage() {
     } catch {
       setStatus("error");
       setMessage("Could not save settings.");
+    }
+  }
+
+  async function handleSaveAIConfig() {
+    if (!aiModel.trim()) {
+      setAIMessage("Model is required.");
+      return;
+    }
+
+    setAISaving(true);
+    setAIMessage("");
+    try {
+      const updated = await updateAdminAIConfig(adminToken, {
+        provider: aiProvider,
+        model: aiModel.trim(),
+      });
+      setAIConfig(updated);
+      setAIProvider(updated.provider);
+      setAIModel(updated.model);
+      setAIMessage("AI config saved.");
+    } catch {
+      setAIMessage("Could not save AI config.");
+    } finally {
+      setAISaving(false);
+    }
+  }
+
+  async function handleTestAIConnection() {
+    if (!aiApiKey.trim()) {
+      setAIMessage("API key is required for connection test.");
+      return;
+    }
+
+    setAITesting(true);
+    setAIMessage("");
+    try {
+      const result = await testAdminAIConnection(adminToken, {
+        api_key: aiApiKey,
+        provider: aiProvider,
+        model: aiModel.trim() || undefined,
+      });
+      setAIMessage(result.message);
+    } catch {
+      setAIMessage("Could not run AI connection test.");
+    } finally {
+      setAIApiKey("");
+      setAITesting(false);
     }
   }
 
@@ -299,36 +365,96 @@ export function AdminSettingsPage() {
       {status === "error" && <p role="alert">Could not load admin settings.</p>}
 
       {settings && (
-        <section className="admin-page__panel" aria-label="Editable settings">
-          <div className="admin-page__grid">
-            {fields.map((field) => (
-              <label key={field.key} className="admin-page__field">
-                <span>{field.label}</span>
+        <>
+          <section className="admin-page__panel" aria-label="Editable settings">
+            <div className="admin-page__grid">
+              {fields.map((field) => (
+                <label key={field.key} className="admin-page__field">
+                  <span>{field.label}</span>
+                  <input
+                    type="number"
+                    step={field.step ?? "1"}
+                    value={readValue(settings, field.key)}
+                    onChange={(event) =>
+                      setSettings(
+                        setNumberValue(settings, field.key, Number(event.target.value)),
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="admin-page__actions">
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={status === "saving"}
+              >
+                {status === "saving" ? "Saving…" : "Save Settings"}
+              </button>
+              {message && <p aria-live="polite">{message}</p>}
+            </div>
+          </section>
+
+          <section className="admin-page__panel" aria-label="AI configuration">
+            <h2>AI configuration</h2>
+            <div className="admin-page__grid admin-page__grid--ai">
+              <label className="admin-page__field">
+                <span>Provider</span>
+                <select
+                  value={aiProvider}
+                  onChange={(event) => setAIProvider(event.target.value as "gemini")}
+                >
+                  <option value="gemini">gemini</option>
+                </select>
+              </label>
+
+              <label className="admin-page__field">
+                <span>Model</span>
                 <input
-                  type="number"
-                  step={field.step ?? "1"}
-                  value={readValue(settings, field.key)}
-                  onChange={(event) =>
-                    setSettings(
-                      setNumberValue(settings, field.key, Number(event.target.value)),
-                    )
-                  }
+                  type="text"
+                  value={aiModel}
+                  onChange={(event) => setAIModel(event.target.value)}
+                  placeholder="gemini-2.0-flash-exp"
                 />
               </label>
-            ))}
-          </div>
 
-          <div className="admin-page__actions">
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={status === "saving"}
-            >
-              {status === "saving" ? "Saving…" : "Save Settings"}
-            </button>
-            {message && <p aria-live="polite">{message}</p>}
-          </div>
-        </section>
+              <label className="admin-page__field">
+                <span>Connection test API key (write-only)</span>
+                <input
+                  type="password"
+                  value={aiApiKey}
+                  onChange={(event) => setAIApiKey(event.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
+
+            <div className="admin-page__actions">
+              <button
+                type="button"
+                onClick={() => void handleSaveAIConfig()}
+                disabled={aiSaving}
+              >
+                {aiSaving ? "Saving…" : "Save AI Config"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleTestAIConnection()}
+                disabled={aiTesting}
+              >
+                {aiTesting ? "Testing…" : "Test AI Connection"}
+              </button>
+              {aiConfig && (
+                <p aria-live="polite">
+                  Key present in runtime env: {aiConfig.key_present ? "Yes" : "No"}
+                </p>
+              )}
+              {aiMessage && <p aria-live="polite">{aiMessage}</p>}
+            </div>
+          </section>
+        </>
       )}
     </main>
   );

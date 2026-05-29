@@ -447,3 +447,152 @@ async def test_admin_publish_package_success_updates_cache_and_writes_file(
     assert "published-demo" in app.state.packages
     assert (tmp_path / "published-demo.yaml").exists()
     # end of file
+
+
+async def test_admin_ai_config_rejects_invalid_token() -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get(
+            "/admin/ai-config", headers={"X-Admin-Token": "bad"}
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid admin token"
+
+
+async def test_admin_ai_config_get_and_update_roundtrip(tmp_path: Path) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+    os.environ["GEMINI_API_KEY"] = "secret-test-key"
+
+    settings_cache = _sample_settings()
+    app.dependency_overrides[get_settings_cache] = lambda: settings_cache
+
+    from app.routers import admin as admin_router
+
+    original_settings_file = admin_router.SETTINGS_FILE
+    admin_router.SETTINGS_FILE = tmp_path / "settings.yaml"
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        get_response = await client.get(
+            "/admin/ai-config", headers={"X-Admin-Token": "secret-token"}
+        )
+        assert get_response.status_code == 200
+        assert get_response.json() == {
+            "provider": "gemini",
+            "model": "gemini-2.0-flash-exp",
+            "key_present": True,
+        }
+
+        put_response = await client.put(
+            "/admin/ai-config",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"provider": "gemini", "model": "gemini-2.5-flash"},
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.SETTINGS_FILE = original_settings_file
+
+    assert put_response.status_code == 200
+    assert put_response.json() == {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "key_present": True,
+    }
+
+    saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
+    assert saved["ai"] == {"provider": "gemini", "model": "gemini-2.5-flash"}
+    assert "api_key" not in saved.get("ai", {})
+
+
+async def test_admin_ai_connection_test_uses_write_only_key(
+    monkeypatch,
+) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    settings_cache = _sample_settings()
+    app.dependency_overrides[get_settings_cache] = lambda: settings_cache
+
+    from app.routers import admin as admin_router
+
+    observed: dict[str, object] = {}
+
+    async def fake_test_connection(
+        *,
+        settings: GameSettings,
+        api_key: str,
+        provider_override: str | None,
+        model_override: str | None,
+    ) -> None:
+        observed["provider"] = provider_override
+        observed["model"] = model_override
+        observed["api_key"] = api_key
+        observed["settings_model"] = settings.ai.model
+
+    monkeypatch.setattr(admin_router, "test_connection", fake_test_connection)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/ai-config/test",
+            headers={"X-Admin-Token": "secret-token"},
+            json={
+                "api_key": "super-secret",
+                "provider": "gemini",
+                "model": "gemini-2.5-flash",
+            },
+        )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": True,
+        "message": "Connection test succeeded.",
+    }
+    assert observed == {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "api_key": "super-secret",
+        "settings_model": "gemini-2.0-flash-exp",
+    }
+    assert "api_key" not in response.text
+
+
+async def test_admin_ai_connection_test_failure_redacts_details(
+    monkeypatch,
+) -> None:
+    os.environ["ADMIN_TOKEN"] = "secret-token"
+
+    settings_cache = _sample_settings()
+    app.dependency_overrides[get_settings_cache] = lambda: settings_cache
+
+    from app.routers import admin as admin_router
+
+    async def fake_test_connection(**kwargs) -> None:
+        raise admin_router.AIGenerationError("raw provider error with token")
+
+    monkeypatch.setattr(admin_router, "test_connection", fake_test_connection)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/ai-config/test",
+            headers={"X-Admin-Token": "secret-token"},
+            json={"api_key": "super-secret"},
+        )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": False,
+        "message": "Connection test failed. Check provider, model, and API key.",
+    }
+    assert "super-secret" not in response.text

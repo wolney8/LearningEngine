@@ -27,3 +27,6 @@ difficulty:
     expert: 2.0
 content_refresh:
   stale_after_days: 1
+ai:
+  provider: gemini
+  model: gemini-2.0-flash-exp

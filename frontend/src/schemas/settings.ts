@@ -48,11 +48,31 @@ const DifficultySettingsSchema = z
   })
   .strict();
 
+const ContentRefreshSettingsSchema = z
+  .object({
+    stale_after_days: z.number().int().positive().default(90),
+  })
+  .strict();
+
+const AISettingsSchema = z
+  .object({
+    provider: z.literal("gemini").default("gemini"),
+    model: z.string().min(1).default("gemini-2.0-flash-exp"),
+  })
+  .strict();
+
 export const SettingsSchema = z
   .object({
     version: z.number().int().nonnegative(),
     xp: XPSettingsSchema,
     difficulty: DifficultySettingsSchema,
+    content_refresh: ContentRefreshSettingsSchema.default({
+      stale_after_days: 90,
+    }),
+    ai: AISettingsSchema.default({
+      provider: "gemini",
+      model: "gemini-2.0-flash-exp",
+    }),
   })
   .strict();
 

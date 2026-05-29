@@ -72,6 +72,22 @@ const UserStreakUpdateSchema = z.object({
   streak_count: z.number().int().nonnegative(),
   last_practised_date: z.string().regex(ISO_LOCAL_DATE_RE).nullable(),
 });
+const AdminAIConfigSchema = z
+  .object({
+    provider: z.literal("gemini"),
+    model: z.string().min(1),
+    key_present: z.boolean(),
+  })
+  .strict();
+const AdminAIConnectionTestSchema = z
+  .object({
+    success: z.boolean(),
+    message: z.string(),
+  })
+  .strict();
+
+export type AdminAIConfig = z.infer<typeof AdminAIConfigSchema>;
+export type AdminAIConnectionTestResult = z.infer<typeof AdminAIConnectionTestSchema>;
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
@@ -791,6 +807,53 @@ export async function updateAdminSettings(
 
   const data: unknown = await response.json();
   return SettingsSchema.parse(data);
+}
+
+export async function fetchAdminAIConfig(token: string): Promise<AdminAIConfig> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/ai-config`, {
+    headers: getAdminHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch admin AI config: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return AdminAIConfigSchema.parse(data);
+}
+
+export async function updateAdminAIConfig(
+  token: string,
+  config: { provider: "gemini"; model: string },
+): Promise<AdminAIConfig> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/ai-config`, {
+    method: "PATCH",
+    headers: getAdminHeaders(token),
+    body: JSON.stringify(config),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to update admin AI config: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return AdminAIConfigSchema.parse(data);
+}
+
+export async function testAdminAIConnection(
+  token: string,
+  payload: {
+    api_key: string;
+    provider?: "gemini";
+    model?: string;
+  },
+): Promise<AdminAIConnectionTestResult> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/ai-config/test`, {
+    method: "POST",
+    headers: getAdminHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to test admin AI connection: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return AdminAIConnectionTestSchema.parse(data);
 }
 
 export async function fetchAdminPackages(token: string): Promise<PackageSummary[]> {

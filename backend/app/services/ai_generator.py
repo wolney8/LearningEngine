@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Literal
 
 import yaml
 from pydantic_ai import Agent
@@ -10,6 +11,7 @@ from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.providers.google_gla import GoogleGLAProvider
 
 from app.models.package import Package
+from app.models.settings import GameSettings
 
 _SYSTEM_PROMPT = """\
 You are an expert instructional designer creating training packages for a
@@ -52,9 +54,47 @@ class AIGenerationError(Exception):
     """Raised when the AI generator fails to produce a valid package."""
 
 
-def _get_agent() -> Agent[None, Package]:
-    api_key = os.getenv("GEMINI_API_KEY")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+DEFAULT_AI_PROVIDER: Literal["gemini"] = "gemini"
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
+
+
+def _resolve_provider_and_model(
+    settings: GameSettings | None,
+    provider_override: Literal["gemini"] | None,
+    model_override: str | None,
+) -> tuple[Literal["gemini"], str]:
+    configured_provider = (
+        settings.ai.provider if settings is not None else DEFAULT_AI_PROVIDER
+    )
+    configured_model = (
+        settings.ai.model if settings is not None else None
+    )
+
+    provider = provider_override or configured_provider
+    model_name = model_override or configured_model or os.getenv(
+        "GEMINI_MODEL", DEFAULT_GEMINI_MODEL
+    )
+
+    if provider != "gemini":
+        raise AIGenerationError("Unsupported AI provider")
+
+    return provider, model_name
+
+
+def _get_agent(
+    *,
+    settings: GameSettings | None = None,
+    provider_override: Literal["gemini"] | None = None,
+    model_override: str | None = None,
+    api_key_override: str | None = None,
+) -> Agent[None, Package]:
+    _, model_name = _resolve_provider_and_model(
+        settings=settings,
+        provider_override=provider_override,
+        model_override=model_override,
+    )
+
+    api_key = api_key_override or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise AIGenerationError("GEMINI_API_KEY is not set. Add it to backend/.env")
 
@@ -68,6 +108,7 @@ async def generate_package(
     audience: str,
     num_pages: int,
     num_questions: int,
+    settings: GameSettings | None = None,
 ) -> str:
     """Generate a Package from a topic description and return it as a YAML string.
 
@@ -78,7 +119,7 @@ async def generate_package(
         AIGenerationError: if the API key is missing, the API call fails,
             or the response fails Pydantic validation.
     """
-    agent = _get_agent()
+    agent = _get_agent(settings=settings)
     prompt = (
         f"Create a training package about: {topic}\n"
         f"Target audience: {audience}\n"
@@ -104,9 +145,12 @@ async def generate_package(
     )
 
 
-async def refresh_package(existing: Package) -> str:
+async def refresh_package(
+    existing: Package,
+    settings: GameSettings | None = None,
+) -> str:
     """Re-generate content for an existing package, preserving its id and identity."""
-    agent = _get_agent()
+    agent = _get_agent(settings=settings)
     prompt = (
         f"Refresh the training package titled: {existing.title}\n"
         f"Original description: {existing.description}\n"
@@ -131,3 +175,24 @@ async def refresh_package(existing: Package) -> str:
         sort_keys=False,
         default_flow_style=False,
     )
+
+
+async def test_connection(
+    *,
+    settings: GameSettings,
+    api_key: str,
+    provider_override: Literal["gemini"] | None = None,
+    model_override: str | None = None,
+) -> None:
+    agent = _get_agent(
+        settings=settings,
+        provider_override=provider_override,
+        model_override=model_override,
+        api_key_override=api_key,
+    )
+    try:
+        await agent.run("Reply with exactly: ok")
+    except Exception as exc:
+        raise AIGenerationError(
+            "Connection test failed. Check provider, model, and API key."
+        ) from exc

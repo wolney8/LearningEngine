@@ -12,7 +12,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from app.models.package import Package, PackageSummary
 from app.models.refresh import PackageRefreshRecord, RefreshResult, StalePackageInfo
 from app.models.settings import GameSettings
-from app.services.ai_generator import AIGenerationError, refresh_package
+from app.services.ai_generator import (
+    AIGenerationError,
+    refresh_package,
+    test_connection,
+)
 from app.services.overrides_loader import (
     OVERRIDES_FILE,
     PackageOverride,
@@ -28,7 +32,7 @@ from app.services.refresh_service import (
     detect_stale_packages,
     write_refreshed_package,
 )
-from app.services.settings_loader import SETTINGS_FILE, save_settings
+from app.services.settings_loader import SETTINGS_FILE, load_settings, save_settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -53,6 +57,36 @@ class PublishPackageRequest(BaseModel):
     yaml_content: str = Field(min_length=1)
 
 
+class AdminAIConfigResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["gemini"]
+    model: str
+    key_present: bool
+
+
+class AdminAIConfigUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["gemini"]
+    model: str = Field(min_length=1)
+
+
+class AdminAIConnectionTestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    api_key: str = Field(min_length=1)
+    provider: Literal["gemini"] | None = None
+    model: str | None = Field(default=None, min_length=1)
+
+
+class AdminAIConnectionTestResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    success: bool
+    message: str
+
+
 def require_admin_token(
     x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
 ) -> None:
@@ -68,7 +102,11 @@ def require_admin_token(
 
 
 def get_settings_cache(request: Request) -> GameSettings:
-    return request.app.state.settings
+    settings = getattr(request.app.state, "settings", None)
+    if settings is None:
+        settings = load_settings()
+        request.app.state.settings = settings
+    return settings
 
 
 def get_packages_cache(request: Request) -> dict[str, Package]:
@@ -103,6 +141,14 @@ def build_package_summary(
     )
 
 
+def build_ai_config_response(settings: GameSettings) -> AdminAIConfigResponse:
+    return AdminAIConfigResponse(
+        provider=settings.ai.provider,
+        model=settings.ai.model,
+        key_present=bool(os.getenv("GEMINI_API_KEY")),
+    )
+
+
 @router.get(
     "/settings",
     response_model=GameSettings,
@@ -126,6 +172,85 @@ async def update_admin_settings(
     save_settings(body, SETTINGS_FILE)
     request.app.state.settings = body
     return body
+
+
+@router.get(
+    "/ai-config",
+    response_model=AdminAIConfigResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+async def read_admin_ai_config(
+    settings: GameSettings = Depends(get_settings_cache),
+) -> AdminAIConfigResponse:
+    return build_ai_config_response(settings)
+
+
+async def _update_admin_ai_config(
+    body: AdminAIConfigUpdateRequest,
+    request: Request,
+    settings: GameSettings,
+) -> AdminAIConfigResponse:
+    updated_ai = settings.ai.model_copy(
+        update={"provider": body.provider, "model": body.model}
+    )
+    updated_settings = settings.model_copy(update={"ai": updated_ai})
+    save_settings(updated_settings, SETTINGS_FILE)
+    request.app.state.settings = updated_settings
+    return build_ai_config_response(updated_settings)
+
+
+@router.put(
+    "/ai-config",
+    response_model=AdminAIConfigResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+async def update_admin_ai_config_put(
+    body: AdminAIConfigUpdateRequest,
+    request: Request,
+    settings: GameSettings = Depends(get_settings_cache),
+) -> AdminAIConfigResponse:
+    return await _update_admin_ai_config(body, request, settings)
+
+
+@router.patch(
+    "/ai-config",
+    response_model=AdminAIConfigResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+async def update_admin_ai_config_patch(
+    body: AdminAIConfigUpdateRequest,
+    request: Request,
+    settings: GameSettings = Depends(get_settings_cache),
+) -> AdminAIConfigResponse:
+    return await _update_admin_ai_config(body, request, settings)
+
+
+@router.post(
+    "/ai-config/test",
+    response_model=AdminAIConnectionTestResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+async def test_admin_ai_connection(
+    body: AdminAIConnectionTestRequest,
+    settings: GameSettings = Depends(get_settings_cache),
+) -> AdminAIConnectionTestResponse:
+    try:
+        await test_connection(
+            settings=settings,
+            api_key=body.api_key,
+            provider_override=body.provider,
+            model_override=body.model,
+        )
+    except AIGenerationError:
+        return AdminAIConnectionTestResponse(
+            success=False,
+            message="Connection test failed. Check provider, model, and API key.",
+        )
+
+    return AdminAIConnectionTestResponse(
+        success=True,
+        message="Connection test succeeded.",
+    )
 
 
 @router.get(
@@ -264,13 +389,14 @@ async def refresh_admin_package(
     refresh_metadata: dict[str, PackageRefreshRecord] = Depends(
         get_refresh_metadata_cache
     ),
+    settings: GameSettings = Depends(get_settings_cache),
 ) -> RefreshResult:
     pkg = packages.get(package_id)
     if pkg is None:
         raise HTTPException(status_code=404, detail="Package not found")
 
     try:
-        new_yaml = await refresh_package(pkg)
+        new_yaml = await refresh_package(pkg, settings=settings)
     except AIGenerationError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

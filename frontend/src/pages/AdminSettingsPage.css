@@ -52,6 +52,11 @@
   padding: 1rem;
 }
 
+.admin-page__panel h2 {
+  margin: 0 0 0.75rem;
+  color: #1e293b;
+}
+
 .admin-page__grid {
   display: grid;
   gap: 0.8rem;
@@ -70,6 +75,18 @@
   border: 1px solid #94a3b8;
   border-radius: 0.7rem;
   padding: 0.45rem 0.65rem;
+}
+
+.admin-page__field select {
+  min-height: 44px;
+  border: 1px solid #94a3b8;
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.65rem;
+  background: #ffffff;
+}
+
+.admin-page__grid--ai {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .admin-page__actions {

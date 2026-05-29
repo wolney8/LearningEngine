@@ -306,9 +306,7 @@ test.describe("Test Mode", () => {
   }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
-    await expect(
-      page.getByRole("heading", { name: "Python Basics" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
     await expect(
       page.getByText("Choose your difficulty to begin the timed exam."),
     ).toBeVisible();
@@ -323,15 +321,11 @@ test.describe("Test Mode", () => {
     await expect(page.getByRole("button", { name: /Expert/i })).toBeVisible();
   });
 
-  test("selecting Normal difficulty shows exam view with timer", async ({
-    page,
-  }) => {
+  test("selecting Normal difficulty shows exam view with timer", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
-    await expect(
-      page.getByLabel(/minutes .* seconds remaining/i),
-    ).toBeVisible();
+    await expect(page.getByLabel(/minutes .* seconds remaining/i)).toBeVisible();
     await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
   });
 
@@ -449,16 +443,13 @@ test.describe("Test Mode", () => {
 
   test.describe("Phase B behaviour", () => {
     test("score percentage never exceeds 100%", async ({ page }) => {
-      await page.route(
-        `${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`,
-        (route) => {
-          route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify(MOCK_TWO_QUESTION_PACKAGE),
-          });
-        },
-      );
+      await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_TWO_QUESTION_PACKAGE),
+        });
+      });
 
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
       await checkA11y(page);
@@ -468,12 +459,8 @@ test.describe("Test Mode", () => {
       await page.getByRole("button", { name: "Next" }).click();
       await page.getByRole("button", { name: "Finish" }).click();
 
-      await expect(
-        page.getByRole("heading", { name: "Test Complete" }),
-      ).toBeVisible();
-      const scoreText = await page
-        .locator(".test-results__score")
-        .textContent();
+      await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
+      const scoreText = await page.locator(".test-results__score").textContent();
       expect(scoreText).toMatch(/^\d{1,3}%$/);
 
       const scoreValue = Number(scoreText?.replace("%", ""));
@@ -528,9 +515,7 @@ test.describe("Test Mode", () => {
       await checkA11y(page);
       await page.getByRole("button", { name: /Hard/i }).click();
 
-      await expect(
-        page.locator(".test-mode-page__warning-callout"),
-      ).toBeVisible();
+      await expect(page.locator(".test-mode-page__warning-callout")).toBeVisible();
       await expect(page.getByText(/If you leave or cancel/i)).toBeVisible();
       await expect(
         page.getByRole("button", { name: "Confirm — Start Exam" }),
@@ -539,16 +524,12 @@ test.describe("Test Mode", () => {
         page.getByRole("button", { name: "Choose a different difficulty" }),
       ).toBeVisible();
 
-      await page
-        .getByRole("button", { name: "Choose a different difficulty" })
-        .click();
+      await page.getByRole("button", { name: "Choose a different difficulty" }).click();
 
       await expect(
         page.getByText("Choose your difficulty to begin the timed exam."),
       ).toBeVisible();
-      await expect(
-        page.locator(".test-mode-page__difficulty-card"),
-      ).toHaveCount(4);
+      await expect(page.locator(".test-mode-page__difficulty-card")).toHaveCount(4);
     });
 
     test("confirming Hard difficulty starts exam", async ({ page }) => {
@@ -558,14 +539,10 @@ test.describe("Test Mode", () => {
       await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
 
       await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
-      await expect(
-        page.getByLabel(/minutes .* seconds remaining/i),
-      ).toBeVisible();
+      await expect(page.getByLabel(/minutes .* seconds remaining/i)).toBeVisible();
     });
 
-    test("few-answer Hard warning mentions 50 XP deduction", async ({
-      page,
-    }) => {
+    test("few-answer Hard warning mentions 50 XP deduction", async ({ page }) => {
       await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
       await checkA11y(page);
       await page.getByRole("button", { name: /Hard/i }).click();
@@ -582,9 +559,7 @@ test.describe("Test Mode", () => {
     });
   });
 
-  test("clicking an answer marks the question dot as answered", async ({
-    page,
-  }) => {
+  test("clicking an answer marks the question dot as answered", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
@@ -602,9 +577,7 @@ test.describe("Test Mode", () => {
     await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
 
-    await page
-      .getByRole("button", { name: /Flag question for review/i })
-      .click();
+    await page.getByRole("button", { name: /Flag question for review/i }).click();
     await page.getByRole("button", { name: "Question 2, unanswered" }).click();
 
     await expect(
@@ -621,9 +594,7 @@ test.describe("Test Mode", () => {
     await expect(page.getByText("Question 2 of 4")).toBeVisible();
   });
 
-  test("previous answer is preserved when navigating back", async ({
-    page,
-  }) => {
+  test("previous answer is preserved when navigating back", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Normal/i }).click();
@@ -633,9 +604,7 @@ test.describe("Test Mode", () => {
     await firstAnswer.click();
 
     await page.getByRole("button", { name: "Question 2, unanswered" }).click();
-    await page
-      .getByRole("button", { name: /Question 1, (current|answered)/i })
-      .click();
+    await page.getByRole("button", { name: /Question 1, (current|answered)/i }).click();
 
     await expect(
       page.getByRole("button", {
@@ -664,9 +633,7 @@ test.describe("Test Mode", () => {
     }
 
     await page.getByRole("button", { name: "Finish" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Test Complete" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
   });
 
   test("results screen shows score percentage", async ({ page }) => {
@@ -689,9 +656,7 @@ test.describe("Test Mode", () => {
     await expect(page.locator(".test-results__score")).toContainText(/\d+%/);
   });
 
-  test("timer expiry auto-submits exam and shows results screen", async ({
-    page,
-  }) => {
+  test("timer expiry auto-submits exam and shows results screen", async ({ page }) => {
     const shortTimerPackage = {
       ...MOCK_FULL_PACKAGE,
       questions: [MOCK_FULL_PACKAGE.questions[0]],
@@ -711,14 +676,10 @@ test.describe("Test Mode", () => {
     await page.getByRole("button", { name: "Confirm — Start Exam" }).click();
     await expect(page.getByText("00:10")).toBeVisible();
 
-    await expect(page.getByRole("heading", { name: "Time's Up!" })).toBeVisible(
-      {
-        timeout: 15_000,
-      },
-    );
-    await expect(
-      page.getByText("Time's up - exam auto-submitted"),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Time's Up!" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText("Time's up - exam auto-submitted")).toBeVisible();
   });
 
   test("authenticated test mode uses server attempt metadata and skips localStorage metadata keys", async ({
@@ -777,20 +738,17 @@ test.describe("Test Mode", () => {
       });
     });
 
-    await page.route(
-      `${API_BASE_URL}/users/me/streak/mark-practised`,
-      (route) => {
-        streakMarkCalls += 1;
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            streak_count: 3,
-            last_practised_date: "2026-05-24",
-          }),
-        });
-      },
-    );
+    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
+      streakMarkCalls += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 3,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
 
     await page.route(
       `${API_BASE_URL}/users/me/progress/${MOCK_PACKAGE_ID}`,
@@ -832,9 +790,7 @@ test.describe("Test Mode", () => {
     }
 
     await page.getByRole("button", { name: "Finish" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Test Complete" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
 
     await expect.poll(() => capturedAttemptCount).toBe(3);
     await expect.poll(() => streakMarkCalls).toBe(1);
@@ -847,9 +803,7 @@ test.describe("Test Mode", () => {
     expect(localMetadata.firstCompletion).toBeNull();
   });
 
-  test("navigating to nonexistent package redirects to home", async ({
-    page,
-  }) => {
+  test("navigating to nonexistent package redirects to home", async ({ page }) => {
     await page.unrouteAll({ behavior: "wait" });
     await page.route(`${API_BASE_URL}/packages/nonexistent`, (route) => {
       route.fulfill({
