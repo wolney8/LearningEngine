@@ -183,6 +183,116 @@ test.describe("Optional auth shell", () => {
     await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
   });
 
+  test("profile route redirects unauthenticated users to login", async ({ page }) => {
+    await page.goto("/profile");
+
+    await expect(page).toHaveURL("/login");
+    await checkA11y(page);
+  });
+
+  test("profile page shows stats and allows username update", async ({ page }) => {
+    let authUser = {
+      id: 19,
+      username: "profile-viewer",
+      email: "profile-viewer@example.com",
+      role: "student",
+      xp: 88,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+    let receivedProfilePatchBody: { username?: string } | null = null;
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "token-profile-viewer");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 4,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/xp`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ xp: 88 }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            package_id: SAMPLE_PACKAGE_ID,
+            latest_weighted_score: 0.8,
+            completed: true,
+            attempt_count: 3,
+            first_completed_at: "2026-05-23T08:30:00Z",
+            updated_at: "2026-05-24T08:30:00Z",
+          },
+          {
+            package_id: "second-profile-pkg",
+            latest_weighted_score: 0.65,
+            completed: false,
+            attempt_count: 2,
+            first_completed_at: null,
+            updated_at: "2026-05-24T08:45:00Z",
+          },
+        ]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/profile`, (route) => {
+      receivedProfilePatchBody = route.request().postDataJSON() as {
+        username?: string;
+      };
+      authUser = {
+        ...authUser,
+        username: (receivedProfilePatchBody?.username ?? "").trim(),
+      };
+
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/profile");
+    await checkA11y(page);
+
+    await expect(page.getByRole("heading", { name: "Your Profile" })).toBeVisible();
+    await expect(page.getByText("Total XP").locator("..")).toContainText("88");
+    await expect(page.getByText("Current streak").locator("..")).toContainText("4");
+    await expect(page.getByText("Completed packages").locator("..")).toContainText("1");
+    await expect(page.getByRole("cell", { name: "80%" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "65%" })).toBeVisible();
+
+    await page.getByLabel("Change username").fill("updated-profile-user");
+    await page.getByRole("button", { name: "Save username" }).click();
+
+    await expect(page.getByRole("status")).toContainText(
+      "Username updated successfully.",
+    );
+    expect(receivedProfilePatchBody).toEqual({ username: "updated-profile-user" });
+    await expect(page.getByText("updated-profile-user")).toHaveCount(2);
+  });
+
   test("register accepts anonymous import and merges XP, progress, and streak", async ({
     page,
   }) => {

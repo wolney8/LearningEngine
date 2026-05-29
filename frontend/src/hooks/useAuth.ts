@@ -8,6 +8,7 @@ export function useAuth(): {
   login: ReturnType<typeof useAuthContext>["login"];
   register: ReturnType<typeof useAuthContext>["register"];
   logout: () => void;
+  setCurrentUser: ReturnType<typeof useAuthContext>["setCurrentUser"];
 } {
   return useAuthContext();
 }
