@@ -20,6 +20,30 @@
   gap: 0.45rem;
   background: #ffffff;
   box-shadow: 0 1px 3px rgb(30 41 59 / 0.08);
+  white-space: nowrap;
+}
+
+.xp-widget__compact-summary {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.xp-widget__divider {
+  color: #64748b;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.xp-widget--compact .xp-widget__level {
+  font-size: 0.8rem;
+}
+
+.xp-widget--compact .xp-widget__total {
+  font-size: 0.74rem;
 }
 
 .xp-widget__level {

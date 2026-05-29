@@ -389,7 +389,6 @@ export function PackageListPage() {
 
   return (
     <main className="package-list-page">
-      <h1>Local Learning Engine</h1>
       <p className="package-list-page__subtitle">
         {isAuthenticated && effectiveScope === "library"
           ? "Your selected courses"

@@ -825,7 +825,7 @@ test.describe("Test Mode", () => {
     await checkA11y(page);
     await expect(page).toHaveURL("/");
     await expect(
-      page.getByRole("heading", { name: "Local Learning Engine" }),
+      page.getByTestId("app-top-bar").getByRole("link", { name: "Go to home" }),
     ).toBeVisible();
   });
 });

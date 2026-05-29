@@ -252,7 +252,7 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await checkA11y(page);
     await expect(
-      page.getByRole("heading", { name: "Local Learning Engine" }),
+      page.getByTestId("app-top-bar").getByRole("link", { name: "Go to home" }),
     ).toBeVisible();
   });
 

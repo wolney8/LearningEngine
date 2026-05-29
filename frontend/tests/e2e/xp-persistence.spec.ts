@@ -431,7 +431,8 @@ test.describe("XP persistence", () => {
     await expect(widget).toBeVisible();
     await expect(widget).toContainText("Level 2");
     await expect(widget).toContainText("35 XP total");
-    await expect(widget).toContainText("5 XP to next level");
+    await expect(widget).toHaveText(/Level 2\s*•\s*35 XP total/);
+    await expect(widget).not.toContainText("XP to next level");
   });
 
   test("level-up overlay is single-fire and supports reduced motion", async ({

@@ -8,11 +8,29 @@ interface XPWidgetProps {
 }
 
 export function XPWidget({ xp, levelProgress, compact = false }: XPWidgetProps) {
+  if (compact) {
+    return (
+      <aside
+        className="xp-widget xp-widget--compact"
+        data-testid="xp-widget"
+        aria-label={`Level ${levelProgress.level}, ${xp} total XP`}
+      >
+        <p className="xp-widget__compact-summary">
+          <span className="xp-widget__level">Level {levelProgress.level}</span>
+          <span className="xp-widget__divider" aria-hidden="true">
+            •
+          </span>
+          <span className="xp-widget__total">{xp} XP total</span>
+        </p>
+      </aside>
+    );
+  }
+
   const progressPercent = Math.round(levelProgress.progressRatio * 100);
 
   return (
     <aside
-      className={`xp-widget ${compact ? "xp-widget--compact" : ""}`.trim()}
+      className="xp-widget"
       data-testid="xp-widget"
       aria-label={`Level ${levelProgress.level}, ${xp} total XP, ${levelProgress.remainingXP} XP to next level`}
     >
