@@ -1,0 +1,63 @@
+.guest-limit-notice {
+  border: 1px solid #f9a8d4;
+  border-radius: 0.85rem;
+  background: linear-gradient(135deg, #fff7ed 0%, #fff1f2 100%);
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.guest-limit-notice__title {
+  margin: 0;
+  color: #7f1d1d;
+  font-family: "Nunito", sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.guest-limit-notice__message {
+  margin: 0;
+  color: #7c2d12;
+  font-family: "Inter", sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.guest-limit-notice__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.guest-limit-notice__primary,
+.guest-limit-notice__secondary {
+  min-height: 2.5rem;
+  border-radius: 9999px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Inter", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0.42rem 0.9rem;
+}
+
+.guest-limit-notice__primary {
+  border: 1px solid #9f1239;
+  background: #9f1239;
+  color: #ffffff;
+}
+
+.guest-limit-notice__secondary {
+  border: 1px solid #fdba74;
+  background: #ffffff;
+  color: #9a3412;
+}
+
+.guest-limit-notice__primary:focus-visible,
+.guest-limit-notice__secondary:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}

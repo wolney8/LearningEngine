@@ -55,6 +55,11 @@
   font-family: "Inter", system-ui, sans-serif;
 }
 
+.lesson-page__guest-limit {
+  display: grid;
+  gap: 1rem;
+}
+
 .lesson-page__reduced-xp-notice {
   padding: 0.5rem 1rem;
   background: #f9fafb;

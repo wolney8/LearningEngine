@@ -141,9 +141,7 @@ test.describe("Admin panel", () => {
     await page.getByRole("button", { name: "Enter Admin" }).click();
 
     await expect(page).toHaveURL(/\/admin\/settings/);
-    await expect(
-      page.getByRole("heading", { name: "Admin Settings" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Admin Settings" })).toBeVisible();
   });
 
   test("settings page saves updated values", async ({ page }) => {
@@ -173,9 +171,7 @@ test.describe("Admin panel", () => {
     await page.goto("/admin/packages");
     await checkA11y(page);
 
-    await expect(
-      page.getByRole("heading", { name: "Admin Packages" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Admin Packages" })).toBeVisible();
     const availabilityControl = page.getByLabel("Availability");
     await availabilityControl.selectOption("hidden");
     await expect(availabilityControl).toHaveValue("hidden");

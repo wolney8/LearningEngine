@@ -4,14 +4,15 @@ import "./XPWidget.css";
 interface XPWidgetProps {
   xp: number;
   levelProgress: LevelProgress;
+  compact?: boolean;
 }
 
-export function XPWidget({ xp, levelProgress }: XPWidgetProps) {
+export function XPWidget({ xp, levelProgress, compact = false }: XPWidgetProps) {
   const progressPercent = Math.round(levelProgress.progressRatio * 100);
 
   return (
     <aside
-      className="xp-widget"
+      className={`xp-widget ${compact ? "xp-widget--compact" : ""}`.trim()}
       data-testid="xp-widget"
       aria-label={`Level ${levelProgress.level}, ${xp} total XP, ${levelProgress.remainingXP} XP to next level`}
     >

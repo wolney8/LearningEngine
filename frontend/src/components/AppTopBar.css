@@ -1,0 +1,140 @@
+.app-top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(90deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.app-top-bar__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 72px;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.app-top-bar__brand {
+  color: #1e1b4b;
+  text-decoration: none;
+  font-family: "Nunito", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.app-top-bar__brand:focus-visible,
+.app-top-bar__create-account:focus-visible,
+.app-top-bar__sign-in-text:focus-visible,
+.app-top-bar__menu-toggle:focus-visible,
+.app-top-bar__menu-link:focus-visible,
+.app-top-bar__sign-out:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+.app-top-bar__right-cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.app-top-bar__auth {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.app-top-bar__auth--mobile {
+  display: none;
+  position: relative;
+}
+
+.app-top-bar__create-account {
+  min-height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid #312e81;
+  background: #312e81;
+  color: #ffffff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Inter", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.45rem 0.95rem;
+}
+
+.app-top-bar__sign-in-text,
+.app-top-bar__sign-out,
+.app-top-bar__menu-link {
+  min-height: 2.5rem;
+  border: none;
+  background: transparent;
+  color: #312e81;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  font-family: "Inter", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.4rem 0.55rem;
+}
+
+.app-top-bar__profile,
+.app-top-bar__menu-profile {
+  color: #334155;
+  font-family: "Inter", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.app-top-bar__menu-toggle {
+  min-height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1f2937;
+  font-family: "Inter", sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+}
+
+.app-top-bar__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  min-width: 9.5rem;
+  border: 1px solid #dbeafe;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgb(30 41 59 / 0.18);
+  padding: 0.35rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+@media (max-width: 860px) {
+  .app-top-bar__auth--desktop {
+    display: none;
+  }
+
+  .app-top-bar__auth--mobile {
+    display: flex;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-top-bar__inner {
+    padding: 0.65rem 0.85rem;
+  }
+
+  .app-top-bar__brand {
+    font-size: 0.95rem;
+  }
+}

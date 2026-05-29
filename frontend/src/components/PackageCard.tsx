@@ -12,6 +12,8 @@ interface PackageCardProps {
   variant?: "learning" | "catalogue";
   onAdd?: () => Promise<void>;
   onRemove?: () => Promise<void>;
+  onStartLearning?: () => void;
+  onTakeTest?: () => void;
 }
 
 export function PackageCard({
@@ -19,6 +21,8 @@ export function PackageCard({
   variant = "learning",
   onAdd,
   onRemove,
+  onStartLearning,
+  onTakeTest,
 }: PackageCardProps) {
   const navigate = useNavigate();
   const { results } = useTestResults(pkg.id);
@@ -140,7 +144,9 @@ export function PackageCard({
               <button
                 type="button"
                 className="package-card__btn package-card__btn--primary"
-                onClick={() => navigate(`/packages/${pkg.id}`)}
+                onClick={() =>
+                  onStartLearning ? onStartLearning() : navigate(`/packages/${pkg.id}`)
+                }
                 disabled={!isActionEnabled}
                 aria-disabled={!isActionEnabled}
               >
@@ -149,7 +155,9 @@ export function PackageCard({
               <button
                 type="button"
                 className="package-card__btn package-card__btn--secondary"
-                onClick={() => navigate(`/test/exam/${pkg.id}`)}
+                onClick={() =>
+                  onTakeTest ? onTakeTest() : navigate(`/test/exam/${pkg.id}`)
+                }
                 disabled={!isActionEnabled}
                 aria-disabled={!isActionEnabled}
               >
