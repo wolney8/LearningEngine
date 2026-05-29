@@ -537,7 +537,8 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(page.getByText("🔥 3 days streak")).toBeVisible();
+    await expect(page.getByText("Current streak")).toBeVisible();
+    await expect(page.getByText("3 days streak")).toBeVisible();
     await expect(page.getByLabel("3 day streak")).toBeVisible();
   });
 
@@ -589,8 +590,9 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(page.getByText("🔥 6 days streak")).toBeVisible();
-    await expect(page.getByText("🔥 1 day streak")).toHaveCount(0);
+    await expect(page.getByText("Current streak")).toBeVisible();
+    await expect(page.getByText("6 days streak")).toBeVisible();
+    await expect(page.getByText("1 day streak")).toHaveCount(0);
   });
 
   test("authenticated users default to My Library and can switch to Full catalogue", async ({
