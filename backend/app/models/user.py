@@ -53,3 +53,26 @@ class UserLibraryItem(SQLModel, table=True):
     status: str = Field(default="selected", min_length=1, max_length=30)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserXPSpendHistory(SQLModel, table=True):
+    __tablename__ = "user_xp_spend_history"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="uq_user_xp_spend_history_user_key",
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    action: str = Field(index=True, min_length=1, max_length=100)
+    cost: int = Field(ge=0)
+    status: str = Field(default="pending", min_length=1, max_length=20)
+    success: bool = Field(default=False)
+    refunded: bool = Field(default=False)
+    idempotency_key: str | None = Field(default=None, max_length=128)
+    failure_reason: str | None = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

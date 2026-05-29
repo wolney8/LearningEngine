@@ -4,10 +4,12 @@ from datetime import date
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.main import app
 from app.models.package import Package
+from app.models.settings import GameSettings
+from app.models.user import UserXPSpendHistory
 from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
 from app.services.overrides_loader import PackageOverride
@@ -90,6 +92,50 @@ _PACKAGE_HIDDEN = Package.model_validate(
     }
 )
 
+_SPEND_ENABLED_SETTINGS = GameSettings.model_validate(
+    {
+        "version": 1,
+        "xp": {
+            "lesson_base_xp_per_correct": 10,
+            "base_xp_per_level": 500,
+            "first_completion_bonus": 20,
+            "attempt_multipliers": {"1": 1.0, "2": 0.5, "3": 0.25},
+            "hard_expert_exit_penalty": 50,
+            "hard_expert_low_answer_penalty": 50,
+            "min_correct_for_xp": {
+                "easy": 2,
+                "normal": 2,
+                "hard": 0,
+                "expert": 0,
+            },
+        },
+        "difficulty": {
+            "seconds_per_question": {
+                "easy": 90,
+                "normal": 45,
+                "hard": 20,
+                "expert": 10,
+            },
+            "xp_multiplier": {
+                "easy": 0.5,
+                "normal": 1.0,
+                "hard": 1.5,
+                "expert": 2.0,
+            },
+        },
+        "spend_economy": {
+            "enabled": True,
+            "allow_non_admin_ai_generation_spend": True,
+            "costs": {
+                "generate_ai_course": 500,
+                "refresh_stale_course": 300,
+                "increase_difficulty_cap": 200,
+                "unlock_hidden_package": 250,
+            },
+        },
+    }
+)
+
 
 @pytest.fixture
 async def users_client(tmp_path):
@@ -117,6 +163,8 @@ async def users_client(tmp_path):
     app.dependency_overrides[get_session] = session_override
     app.dependency_overrides[get_packages_cache] = lambda: package_cache
     app.dependency_overrides[get_package_overrides] = lambda: package_overrides
+    app.state.settings = _SPEND_ENABLED_SETTINGS
+    app.state._test_users_engine = engine
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -1030,3 +1078,189 @@ async def test_users_streak_is_isolated_per_user(
         "streak_count": 1,
         "last_practised_date": "2026-05-25",
     }
+
+
+async def test_users_xp_spend_requires_authentication(
+    users_client: AsyncClient,
+) -> None:
+    response = await users_client.post(
+        "/users/me/xp/spend",
+        json={
+            "action": "refresh_stale_course",
+            "idempotency_key": "no-auth-guard-001",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+async def test_users_xp_spend_success_deducts_balance_and_writes_history(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="xp-spend-success",
+        email="xp-spend-success@example.com",
+    )
+
+    set_xp = await users_client.put(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"xp": 1200},
+    )
+    assert set_xp.status_code == 200
+
+    spend_response = await users_client.post(
+        "/users/me/xp/spend",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "action": "refresh_stale_course",
+            "idempotency_key": "spend-success-001",
+        },
+    )
+
+    assert spend_response.status_code == 200
+    payload = spend_response.json()
+    assert payload["action"] == "refresh_stale_course"
+    assert payload["cost"] == 300
+    assert payload["status"] == "succeeded"
+    assert payload["success"] is True
+    assert payload["refunded"] is False
+    assert payload["xp"] == 900
+
+    with Session(app.state._test_users_engine) as session:
+        history_rows = session.exec(select(UserXPSpendHistory)).all()
+    assert len(history_rows) == 1
+    assert history_rows[0].status == "succeeded"
+
+
+async def test_users_xp_spend_rejects_insufficient_balance(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="xp-spend-insufficient",
+        email="xp-spend-insufficient@example.com",
+    )
+
+    set_xp = await users_client.put(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"xp": 100},
+    )
+    assert set_xp.status_code == 200
+
+    spend_response = await users_client.post(
+        "/users/me/xp/spend",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "action": "refresh_stale_course",
+            "idempotency_key": "spend-insufficient-001",
+        },
+    )
+
+    assert spend_response.status_code == 409
+    assert spend_response.json() == {"detail": "Insufficient XP balance"}
+
+
+async def test_users_xp_spend_failure_path_refunds_xp(
+    users_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="xp-spend-refund",
+        email="xp-spend-refund@example.com",
+    )
+
+    set_xp = await users_client.put(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"xp": 700},
+    )
+    assert set_xp.status_code == 200
+
+    async def failing_spend_action(*, action: str, user) -> None:
+        _ = action
+        _ = user
+        raise RuntimeError("simulated downstream failure")
+
+    monkeypatch.setattr("app.routers.users._execute_spend_action", failing_spend_action)
+
+    spend_response = await users_client.post(
+        "/users/me/xp/spend",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "action": "refresh_stale_course",
+            "idempotency_key": "spend-refund-001",
+        },
+    )
+
+    assert spend_response.status_code == 502
+    assert spend_response.json() == {
+        "detail": "Spend action failed and XP was refunded"
+    }
+
+    xp_after_failure = await users_client.get(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert xp_after_failure.status_code == 200
+    assert xp_after_failure.json() == {"xp": 700}
+
+    with Session(app.state._test_users_engine) as session:
+        history_row = session.exec(select(UserXPSpendHistory)).one()
+    assert history_row.status == "failed"
+    assert history_row.success is False
+    assert history_row.refunded is True
+
+
+async def test_users_xp_spend_idempotency_prevents_double_charge(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="xp-spend-idempotent",
+        email="xp-spend-idempotent@example.com",
+    )
+
+    set_xp = await users_client.put(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"xp": 1000},
+    )
+    assert set_xp.status_code == 200
+
+    first_response = await users_client.post(
+        "/users/me/xp/spend",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "action": "refresh_stale_course",
+            "idempotency_key": "spend-idempotent-001",
+        },
+    )
+    assert first_response.status_code == 200
+    assert first_response.json()["xp"] == 700
+
+    second_response = await users_client.post(
+        "/users/me/xp/spend",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "action": "refresh_stale_course",
+            "idempotency_key": "spend-idempotent-001",
+        },
+    )
+    assert second_response.status_code == 200
+    assert second_response.json()["id"] == first_response.json()["id"]
+    assert second_response.json()["xp"] == 700
+
+    xp_after_retry = await users_client.get(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert xp_after_retry.status_code == 200
+    assert xp_after_retry.json() == {"xp": 700}
+
+    with Session(app.state._test_users_engine) as session:
+        history_rows = session.exec(select(UserXPSpendHistory)).all()
+    assert len(history_rows) == 1

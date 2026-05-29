@@ -134,3 +134,47 @@ def test_game_settings_ai_rejects_empty_model() -> None:
 
     with pytest.raises(ValidationError):
         GameSettings.model_validate(payload)
+
+
+def test_game_settings_spend_economy_defaults() -> None:
+    settings = GameSettings.model_validate(_valid_settings_dict())
+
+    assert settings.spend_economy.enabled is False
+    assert settings.spend_economy.allow_non_admin_ai_generation_spend is False
+    assert settings.spend_economy.costs.generate_ai_course == 500
+
+
+def test_game_settings_spend_economy_custom_values() -> None:
+    payload = _valid_settings_dict()
+    payload["spend_economy"] = {
+        "enabled": True,
+        "allow_non_admin_ai_generation_spend": True,
+        "costs": {
+            "generate_ai_course": 900,
+            "refresh_stale_course": 450,
+            "increase_difficulty_cap": 150,
+            "unlock_hidden_package": 275,
+        },
+    }
+
+    settings = GameSettings.model_validate(payload)
+    assert settings.spend_economy.enabled is True
+    assert settings.spend_economy.allow_non_admin_ai_generation_spend is True
+    assert settings.spend_economy.costs.refresh_stale_course == 450
+
+
+def test_game_settings_spend_economy_rejects_negative_cost() -> None:
+    payload = _valid_settings_dict()
+    payload["spend_economy"] = {
+        "enabled": True,
+        "allow_non_admin_ai_generation_spend": False,
+        "costs": {
+            "generate_ai_course": -1,
+            "refresh_stale_course": 300,
+            "increase_difficulty_cap": 200,
+            "unlock_hidden_package": 250,
+        },
+    }
+
+    with pytest.raises(ValidationError):
+        GameSettings.model_validate(payload)

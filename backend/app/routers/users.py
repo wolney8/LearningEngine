@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,13 +9,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Session, select
 
 from app.models.package import Package, PackageSummary
-from app.models.user import User, UserLibraryItem, UserTestResult
+from app.models.settings import GameSettings
+from app.models.user import User, UserLibraryItem, UserTestResult, UserXPSpendHistory
 from app.routers.packages import (
     build_package_summary,
     get_package_overrides,
     get_packages_cache,
     list_visible_package_summaries,
 )
+from app.routers.settings import get_settings
 from app.services.db import get_session
 from app.services.library_selection import (
     normalise_package_id,
@@ -83,6 +86,35 @@ class UserCatalogueItemResponse(PackageSummary):
     selected: bool
 
 
+SpendAction = Literal[
+    "generate_ai_course",
+    "refresh_stale_course",
+    "increase_difficulty_cap",
+    "unlock_hidden_package",
+]
+
+
+class UserXPSpendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: SpendAction
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
+
+
+class UserXPSpendResponse(BaseModel):
+    id: int
+    action: SpendAction
+    cost: int = Field(ge=0)
+    status: Literal["pending", "succeeded", "failed"]
+    success: bool
+    refunded: bool
+    xp: int = Field(ge=0)
+    idempotency_key: str | None
+    failure_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 def _to_test_result_response(result: UserTestResult) -> UserTestResultResponse:
     return UserTestResultResponse(
         package_id=result.package_id,
@@ -96,6 +128,51 @@ def _to_test_result_response(result: UserTestResult) -> UserTestResultResponse:
 
 def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def _normalise_idempotency_key(key: str | None) -> str | None:
+    if key is None:
+        return None
+    return key.strip().lower()
+
+
+def _spend_cost_for_action(settings: GameSettings, action: SpendAction) -> int:
+    costs = settings.spend_economy.costs
+    return {
+        "generate_ai_course": costs.generate_ai_course,
+        "refresh_stale_course": costs.refresh_stale_course,
+        "increase_difficulty_cap": costs.increase_difficulty_cap,
+        "unlock_hidden_package": costs.unlock_hidden_package,
+    }[action]
+
+
+def _to_spend_response(
+    history: UserXPSpendHistory,
+    xp: int,
+) -> UserXPSpendResponse:
+    return UserXPSpendResponse(
+        id=history.id or 0,
+        action=history.action,
+        cost=history.cost,
+        status=history.status,
+        success=history.success,
+        refunded=history.refunded,
+        xp=xp,
+        idempotency_key=history.idempotency_key,
+        failure_reason=history.failure_reason,
+        created_at=history.created_at,
+        updated_at=history.updated_at,
+    )
+
+
+async def _execute_spend_action(
+    *,
+    action: SpendAction,
+    user: User,
+) -> None:
+    # Backend-first MVP: this validates and charges; action integrations land later.
+    _ = action
+    _ = user
 
 
 def _read_selected_package_ids_for_user(
@@ -236,6 +313,103 @@ async def update_my_xp(
     session.commit()
     session.refresh(current_user)
     return UserXPResponse(xp=current_user.xp)
+
+
+@router.post("/me/xp/spend", response_model=UserXPSpendResponse)
+async def spend_my_xp(
+    body: UserXPSpendRequest,
+    current_user: User = Depends(get_current_user),
+    settings: GameSettings = Depends(get_settings),
+    session: Session = Depends(get_session),
+) -> UserXPSpendResponse:
+    user_id = _require_current_user_id(current_user)
+
+    if not settings.spend_economy.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="XP spend economy is disabled",
+        )
+
+    if (
+        body.action == "generate_ai_course"
+        and current_user.role != "admin"
+        and not settings.spend_economy.allow_non_admin_ai_generation_spend
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Non-admin AI generation spend is disabled",
+        )
+
+    idempotency_key = _normalise_idempotency_key(body.idempotency_key)
+    if idempotency_key is not None:
+        existing = session.exec(
+            select(UserXPSpendHistory).where(
+                UserXPSpendHistory.user_id == user_id,
+                UserXPSpendHistory.idempotency_key == idempotency_key,
+            )
+        ).first()
+        if existing is not None:
+            if existing.status == "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Spend request is already in progress",
+                )
+            session.refresh(current_user)
+            return _to_spend_response(existing, current_user.xp)
+
+    cost = _spend_cost_for_action(settings, body.action)
+    if current_user.xp < cost:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Insufficient XP balance",
+        )
+
+    current_user.xp -= cost
+    now = datetime.now(timezone.utc)
+    history = UserXPSpendHistory(
+        user_id=user_id,
+        action=body.action,
+        cost=cost,
+        status="pending",
+        success=False,
+        refunded=False,
+        idempotency_key=idempotency_key,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(current_user)
+    session.add(history)
+    session.commit()
+    session.refresh(current_user)
+    session.refresh(history)
+
+    try:
+        await _execute_spend_action(action=body.action, user=current_user)
+    except Exception:
+        current_user.xp += cost
+        history.status = "failed"
+        history.success = False
+        history.refunded = True
+        history.failure_reason = "Spend action execution failed"
+        history.updated_at = datetime.now(timezone.utc)
+        session.add(current_user)
+        session.add(history)
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Spend action failed and XP was refunded",
+        ) from None
+
+    history.status = "succeeded"
+    history.success = True
+    history.refunded = False
+    history.failure_reason = None
+    history.updated_at = datetime.now(timezone.utc)
+    session.add(history)
+    session.commit()
+    session.refresh(current_user)
+    session.refresh(history)
+    return _to_spend_response(history, current_user.xp)
 
 
 @router.get("/me/streak", response_model=UserStreakResponse)

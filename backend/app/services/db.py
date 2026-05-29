@@ -100,7 +100,12 @@ def _ensure_sqlite_user_test_result_schema_compatibility() -> None:
 
 def init_db() -> None:
     # Ensure metadata includes the User table before creating schema.
-    from app.models.user import User, UserLibraryItem, UserTestResult  # noqa: F401
+    from app.models.user import (  # noqa: F401
+        User,
+        UserLibraryItem,
+        UserTestResult,
+        UserXPSpendHistory,
+    )
 
     if DATABASE_URL.startswith("sqlite"):
         sqlite_path = DATABASE_URL.replace("sqlite:///", "", 1)

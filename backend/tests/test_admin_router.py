@@ -49,6 +49,16 @@ def _sample_settings(first_completion_bonus: int = 20) -> GameSettings:
                     "expert": 2.0,
                 },
             },
+            "spend_economy": {
+                "enabled": False,
+                "allow_non_admin_ai_generation_spend": False,
+                "costs": {
+                    "generate_ai_course": 500,
+                    "refresh_stale_course": 300,
+                    "increase_difficulty_cap": 200,
+                    "unlock_hidden_package": 250,
+                },
+            },
         }
     )
 
@@ -143,8 +153,18 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
         assert get_response.status_code == 200
         assert get_response.json()["xp"]["first_completion_bonus"] == 20
         assert get_response.json()["xp"]["base_xp_per_level"] == 500
+        assert get_response.json()["spend_economy"]["enabled"] is False
+        assert (
+            get_response.json()["spend_economy"][
+                "allow_non_admin_ai_generation_spend"
+            ]
+            is False
+        )
 
         payload = _sample_settings(first_completion_bonus=77).model_dump(mode="json")
+        payload["spend_economy"]["enabled"] = True
+        payload["spend_economy"]["allow_non_admin_ai_generation_spend"] = True
+        payload["spend_economy"]["costs"]["generate_ai_course"] = 777
         put_response = await client.put(
             "/admin/settings",
             headers={"X-Admin-Token": "secret-token"},
@@ -157,10 +177,19 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
     assert put_response.status_code == 200
     assert put_response.json()["xp"]["first_completion_bonus"] == 77
     assert put_response.json()["xp"]["base_xp_per_level"] == 500
+    assert put_response.json()["spend_economy"]["enabled"] is True
+    assert (
+        put_response.json()["spend_economy"]["allow_non_admin_ai_generation_spend"]
+        is True
+    )
+    assert put_response.json()["spend_economy"]["costs"]["generate_ai_course"] == 777
 
     saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
     assert saved["xp"]["first_completion_bonus"] == 77
     assert saved["xp"]["base_xp_per_level"] == 500
+    assert saved["spend_economy"]["enabled"] is True
+    assert saved["spend_economy"]["allow_non_admin_ai_generation_spend"] is True
+    assert saved["spend_economy"]["costs"]["generate_ai_course"] == 777
 
 
 async def test_admin_package_patch_persists_override_and_merges_public_list(
