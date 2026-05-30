@@ -16,4 +16,6 @@ export const UserProgressUpsertRequestSchema = z.object({
 });
 
 export type UserProgressRecord = z.infer<typeof UserProgressRecordSchema>;
-export type UserProgressUpsertRequest = z.infer<typeof UserProgressUpsertRequestSchema>;
+export type UserProgressUpsertRequest = z.infer<
+  typeof UserProgressUpsertRequestSchema
+>;

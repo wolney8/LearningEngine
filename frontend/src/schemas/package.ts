@@ -15,7 +15,10 @@ export const QuestionSchema = z
   .object({
     id: z.string().min(1),
     text: z.string().min(1),
-    difficulty: z.enum(["easy", "normal", "hard", "expert"]).nullable().optional(),
+    difficulty: z
+      .enum(["easy", "normal", "hard", "expert"])
+      .nullable()
+      .optional(),
     answers: z.array(AnswerSchema).min(2).max(6),
     correct_answer: z.string().min(1),
     weight: z.number().positive(),
@@ -58,7 +61,11 @@ export type Page = z.infer<typeof PageSchema>;
 export type Question = z.infer<typeof QuestionSchema>;
 export type Package = z.infer<typeof PackageSchema>;
 
-export const PackageAvailabilitySchema = z.enum(["available", "unavailable", "hidden"]);
+export const PackageAvailabilitySchema = z.enum([
+  "available",
+  "unavailable",
+  "hidden",
+]);
 
 const PackageSummaryBaseSchema = z
   .object({
@@ -77,10 +84,12 @@ const PackageSummaryBaseSchema = z
   })
   .strict();
 
-export const PackageSummarySchema = PackageSummaryBaseSchema.transform((summary) => ({
-  ...summary,
-  enabled: summary.availability === "available",
-}));
+export const PackageSummarySchema = PackageSummaryBaseSchema.transform(
+  (summary) => ({
+    ...summary,
+    enabled: summary.availability === "available",
+  }),
+);
 
 export const AdminPackageSummarySchema = PackageSummaryBaseSchema.extend({
   added_at: z.string().datetime().nullable().optional(),

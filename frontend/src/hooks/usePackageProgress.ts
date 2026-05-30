@@ -5,7 +5,9 @@ import { PROGRESS_UPDATED_EVENT, readResults } from "./useTestResults";
 
 export type PackageStatus = "incomplete" | "failed" | "completed";
 
-export function usePackageProgress(packageIds: string[]): Map<string, PackageStatus> {
+export function usePackageProgress(
+  packageIds: string[],
+): Map<string, PackageStatus> {
   const { status, token } = useAuth();
   const [serverProgress, setServerProgress] = useState<Map<
     string,

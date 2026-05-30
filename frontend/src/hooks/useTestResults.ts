@@ -13,7 +13,8 @@ import { useAuth } from "./useAuth";
 
 let cachedProgressToken: string | null = null;
 let cachedProgressByPackage: Map<string, UserProgressRecord> | null = null;
-let cachedProgressRequest: Promise<Map<string, UserProgressRecord>> | null = null;
+let cachedProgressRequest: Promise<Map<string, UserProgressRecord>> | null =
+  null;
 let cachedProgressGeneration = 0;
 export const PROGRESS_UPDATED_EVENT = "lle-progress-updated";
 
@@ -51,7 +52,9 @@ interface SaveResultOptions {
   attemptCount?: number;
 }
 
-function toPackageResultsFromServerRow(row: UserProgressRecord): PackageTestResults {
+function toPackageResultsFromServerRow(
+  row: UserProgressRecord,
+): PackageTestResults {
   return {
     normal: {
       passed: row.completed,
@@ -128,9 +131,15 @@ export function readResults(packageId: string): PackageTestResults {
   }
 }
 
-export function writeResults(packageId: string, data: PackageTestResults): void {
+export function writeResults(
+  packageId: string,
+  data: PackageTestResults,
+): void {
   try {
-    localStorage.setItem(getAnonymousTestResultsKey(packageId), JSON.stringify(data));
+    localStorage.setItem(
+      getAnonymousTestResultsKey(packageId),
+      JSON.stringify(data),
+    );
   } catch {
     // Private browsing or storage quota exceeded - silently no-op
   }
@@ -149,9 +158,8 @@ export function useTestResults(packageId: string): {
   const [results, setResults] = useState<PackageTestResults>(() =>
     readResults(packageId),
   );
-  const [progressMetadata, setProgressMetadata] = useState<ProgressMetadata | null>(
-    null,
-  );
+  const [progressMetadata, setProgressMetadata] =
+    useState<ProgressMetadata | null>(null);
   const resultsRef = useRef(results);
 
   useEffect(() => {
@@ -197,7 +205,10 @@ export function useTestResults(packageId: string): {
     const merged: DifficultyResult = {
       passed: (existing?.passed ?? false) || incoming.passed,
       bestScore: Math.max(existing?.bestScore ?? 0, incoming.bestScore),
-      bestXpEarned: Math.max(existing?.bestXpEarned ?? 0, incoming.bestXpEarned),
+      bestXpEarned: Math.max(
+        existing?.bestXpEarned ?? 0,
+        incoming.bestXpEarned,
+      ),
       lastAttemptedAt: incoming.lastAttemptedAt,
     };
 
@@ -212,13 +223,17 @@ export function useTestResults(packageId: string): {
     if (status === "authenticated" && token) {
       const previousRow = cachedProgressByPackage?.get(packageId) ?? null;
       const completed = Object.values(next).some((result) => result.passed);
-      const latestWeightedScore = Math.min(1, Math.max(0, incoming.bestScore / 100));
+      const latestWeightedScore = Math.min(
+        1,
+        Math.max(0, incoming.bestScore / 100),
+      );
 
       void upsertMyProgressForPackage(token, packageId, {
         latest_weighted_score: latestWeightedScore,
         completed,
         attempt_count:
-          options?.attemptCount ?? (previousRow ? previousRow.attempt_count + 1 : 1),
+          options?.attemptCount ??
+          (previousRow ? previousRow.attempt_count + 1 : 1),
       })
         .then((saved) => {
           if (!cachedProgressByPackage) {
@@ -235,7 +250,8 @@ export function useTestResults(packageId: string): {
               Math.round(saved.latest_weighted_score * 100),
             ),
             bestXpEarned: localDifficulty?.bestXpEarned ?? 0,
-            lastAttemptedAt: localDifficulty?.lastAttemptedAt ?? saved.updated_at,
+            lastAttemptedAt:
+              localDifficulty?.lastAttemptedAt ?? saved.updated_at,
           };
 
           const mergedResults: PackageTestResults = {
