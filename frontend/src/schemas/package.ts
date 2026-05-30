@@ -60,7 +60,7 @@ export type Package = z.infer<typeof PackageSchema>;
 
 export const PackageAvailabilitySchema = z.enum(["available", "unavailable", "hidden"]);
 
-export const PackageSummarySchema = z
+const PackageSummaryBaseSchema = z
   .object({
     id: z.string().min(1),
     title: z.string().min(1),
@@ -75,9 +75,20 @@ export const PackageSummarySchema = z
     xp_threshold: z.number().int().nonnegative().nullable().default(null),
     selected: z.boolean().optional(),
   })
-  .transform((summary) => ({
-    ...summary,
-    enabled: summary.availability === "available",
-  }));
+  .strict();
+
+export const PackageSummarySchema = PackageSummaryBaseSchema.transform((summary) => ({
+  ...summary,
+  enabled: summary.availability === "available",
+}));
+
+export const AdminPackageSummarySchema = PackageSummaryBaseSchema.extend({
+  added_at: z.string().datetime().nullable().optional(),
+  last_refreshed_at: z.string().datetime().nullable().optional(),
+}).transform((summary) => ({
+  ...summary,
+  enabled: summary.availability === "available",
+}));
 
 export type PackageSummary = z.infer<typeof PackageSummarySchema>;
+export type AdminPackageSummary = z.infer<typeof AdminPackageSummarySchema>;

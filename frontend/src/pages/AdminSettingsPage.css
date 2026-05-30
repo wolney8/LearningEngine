@@ -1,11 +1,13 @@
 .admin-page {
   min-height: 100vh;
   padding: 1.25rem;
-  background: radial-gradient(
-      circle at 10% 0%,
-      rgba(99, 102, 241, 0.1),
-      transparent 36%
-    ), radial-gradient(circle at 90% 100%, rgba(14, 165, 233, 0.12), transparent 28%),
+  background:
+    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.1), transparent 36%),
+    radial-gradient(
+      circle at 90% 100%,
+      rgba(14, 165, 233, 0.12),
+      transparent 28%
+    ),
     #f8fafc;
 }
 
@@ -75,6 +77,14 @@
   border: 1px solid #94a3b8;
   border-radius: 0.7rem;
   padding: 0.45rem 0.65rem;
+}
+
+.admin-page__field textarea {
+  border: 1px solid #94a3b8;
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  resize: vertical;
 }
 
 .admin-page__field select {

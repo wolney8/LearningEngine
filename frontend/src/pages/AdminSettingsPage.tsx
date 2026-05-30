@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 
+import { useAuth } from "../hooks/useAuth";
 import type { Settings } from "../schemas/settings";
 import {
   type AdminAIConfig,
-  clearAdminToken,
   fetchAdminAIConfig,
   fetchAdminSettings,
-  getAdminToken,
   testAdminAIConnection,
   updateAdminAIConfig,
   updateAdminSettings,
@@ -110,7 +109,8 @@ function setNumberValue(settings: Settings, path: NumberPath, value: number): Se
 }
 
 export function AdminSettingsPage() {
-  const token = useMemo(() => getAdminToken(), []);
+  const { status: authStatus, token, user, logout } = useAuth();
+  const canAccess = authStatus === "authenticated" && user?.role === "admin";
   const [settings, setSettings] = useState<Settings | null>(null);
   const [aiConfig, setAIConfig] = useState<AdminAIConfig | null>(null);
   const [status, setStatus] = useState<"loading" | "saving" | "ready" | "error">(
@@ -125,7 +125,7 @@ export function AdminSettingsPage() {
   const [aiMessage, setAIMessage] = useState<string>("");
 
   useEffect(() => {
-    if (!token) {
+    if (!canAccess || !token) {
       return;
     }
 
@@ -148,11 +148,28 @@ export function AdminSettingsPage() {
     };
 
     void load();
-  }, [token]);
+  }, [canAccess, token]);
 
-  if (!token) {
+  if (authStatus === "loading") {
+    return (
+      <main className="admin-page">
+        <p aria-busy="true">Loading…</p>
+      </main>
+    );
+  }
+
+  if (authStatus !== "authenticated") {
     return <Navigate to="/admin" replace />;
   }
+
+  if (!canAccess || !token) {
+    return (
+      <main className="admin-page">
+        <p role="alert">This account does not have admin access.</p>
+      </main>
+    );
+  }
+
   const adminToken = token;
 
   async function handleSave() {
@@ -349,11 +366,11 @@ export function AdminSettingsPage() {
         <nav aria-label="Admin navigation">
           <Link to="/admin/settings">Settings</Link>
           <Link to="/admin/packages">Packages</Link>
+          <Link to="/admin/users">Users</Link>
           <button
             type="button"
             onClick={() => {
-              clearAdminToken();
-              location.assign("/admin");
+              logout();
             }}
           >
             Sign out

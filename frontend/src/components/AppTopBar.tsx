@@ -29,6 +29,11 @@ export function AppTopBar({ xp, levelProgress }: AppTopBarProps) {
             <>
               <div className="app-top-bar__auth app-top-bar__auth--desktop">
                 <span className="app-top-bar__profile">{user.username}</span>
+                {user.role === "admin" && (
+                  <Link to="/admin/users" className="app-top-bar__profile-link">
+                    Admin
+                  </Link>
+                )}
                 <Link to="/profile" className="app-top-bar__profile-link">
                   Profile
                 </Link>
@@ -54,6 +59,15 @@ export function AppTopBar({ xp, levelProgress }: AppTopBarProps) {
                 {isMobileMenuOpen && (
                   <div id="app-top-bar-mobile-menu" className="app-top-bar__menu">
                     <p className="app-top-bar__menu-profile">{user.username}</p>
+                    {user.role === "admin" && (
+                      <Link
+                        to="/admin/users"
+                        className="app-top-bar__menu-link"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Admin
+                      </Link>
+                    )}
                     <Link
                       to="/profile"
                       className="app-top-bar__menu-link"

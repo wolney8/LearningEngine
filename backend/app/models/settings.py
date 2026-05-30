@@ -108,6 +108,23 @@ class AISettings(BaseModel):
     model: str = Field(default="gemini-2.0-flash-exp", min_length=1)
 
 
+class SpendActionCostSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generate_ai_course: int = Field(default=500, ge=0)
+    refresh_stale_course: int = Field(default=300, ge=0)
+    increase_difficulty_cap: int = Field(default=200, ge=0)
+    unlock_hidden_package: int = Field(default=250, ge=0)
+
+
+class SpendEconomySettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    allow_non_admin_ai_generation_spend: bool = False
+    costs: SpendActionCostSettings = Field(default_factory=SpendActionCostSettings)
+
+
 class GameSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -118,3 +135,4 @@ class GameSettings(BaseModel):
         default_factory=ContentRefreshSettings
     )
     ai: AISettings = Field(default_factory=AISettings)
+    spend_economy: SpendEconomySettings = Field(default_factory=SpendEconomySettings)
