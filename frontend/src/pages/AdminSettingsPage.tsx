@@ -36,7 +36,11 @@ type NumberPath =
   | "difficulty.xp_multiplier.hard"
   | "difficulty.xp_multiplier.expert";
 
-function setNumberValue(settings: Settings, path: NumberPath, value: number): Settings {
+function setNumberValue(
+  settings: Settings,
+  path: NumberPath,
+  value: number,
+): Settings {
   const next = structuredClone(settings);
   switch (path) {
     case "version":
@@ -113,9 +117,9 @@ export function AdminSettingsPage() {
   const canAccess = authStatus === "authenticated" && user?.role === "admin";
   const [settings, setSettings] = useState<Settings | null>(null);
   const [aiConfig, setAIConfig] = useState<AdminAIConfig | null>(null);
-  const [status, setStatus] = useState<"loading" | "saving" | "ready" | "error">(
-    "loading",
-  );
+  const [status, setStatus] = useState<
+    "loading" | "saving" | "ready" | "error"
+  >("loading");
   const [message, setMessage] = useState<string>("");
   const [aiProvider, setAIProvider] = useState<"gemini">("gemini");
   const [aiModel, setAIModel] = useState<string>("");
@@ -229,8 +233,12 @@ export function AdminSettingsPage() {
         model: aiModel.trim() || undefined,
       });
       setAIMessage(result.message);
-    } catch {
-      setAIMessage("Could not run AI connection test.");
+    } catch (error) {
+      setAIMessage(
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "Could not run AI connection test.",
+      );
     } finally {
       setAIApiKey("");
       setAITesting(false);
@@ -394,7 +402,11 @@ export function AdminSettingsPage() {
                     value={readValue(settings, field.key)}
                     onChange={(event) =>
                       setSettings(
-                        setNumberValue(settings, field.key, Number(event.target.value)),
+                        setNumberValue(
+                          settings,
+                          field.key,
+                          Number(event.target.value),
+                        ),
                       )
                     }
                   />
@@ -421,7 +433,9 @@ export function AdminSettingsPage() {
                 <span>Provider</span>
                 <select
                   value={aiProvider}
-                  onChange={(event) => setAIProvider(event.target.value as "gemini")}
+                  onChange={(event) =>
+                    setAIProvider(event.target.value as "gemini")
+                  }
                 >
                   <option value="gemini">gemini</option>
                 </select>
@@ -465,7 +479,8 @@ export function AdminSettingsPage() {
               </button>
               {aiConfig && (
                 <p aria-live="polite">
-                  Key present in runtime env: {aiConfig.key_present ? "Yes" : "No"}
+                  Key present in runtime env:{" "}
+                  {aiConfig.key_present ? "Yes" : "No"}
                 </p>
               )}
               {aiMessage && <p aria-live="polite">{aiMessage}</p>}
