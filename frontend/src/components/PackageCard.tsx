@@ -145,9 +145,7 @@ export function PackageCard({
                 type="button"
                 className="package-card__btn package-card__btn--primary"
                 onClick={() =>
-                  onStartLearning
-                    ? onStartLearning()
-                    : navigate(`/packages/${pkg.id}`)
+                  onStartLearning ? onStartLearning() : navigate(`/packages/${pkg.id}`)
                 }
                 disabled={!isActionEnabled}
                 aria-disabled={!isActionEnabled}

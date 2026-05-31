@@ -10,15 +10,21 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from sqlmodel import Session, select
 
 from app.models.package import AdminPackageSummary, Package, PackageSummary
-from app.models.refresh import PackageAdminMetadataRecord, RefreshResult, StalePackageInfo
+from app.models.refresh import (
+    PackageAdminMetadataRecord,
+    RefreshResult,
+    StalePackageInfo,
+)
 from app.models.settings import GameSettings
 from app.models.user import User
+from app.routers.users import require_admin_user
 from app.services.ai_generator import (
     AIGenerationError,
     generate_package,
     refresh_package,
     test_connection,
 )
+from app.services.db import get_session
 from app.services.overrides_loader import (
     OVERRIDES_FILE,
     PackageOverride,
@@ -27,7 +33,10 @@ from app.services.overrides_loader import (
     save_package_overrides,
 )
 from app.services.package_loader import PACKAGES_DIR
-from app.services.refresh_metadata_loader import REFRESH_METADATA_FILE, save_refresh_metadata
+from app.services.refresh_metadata_loader import (
+    REFRESH_METADATA_FILE,
+    save_refresh_metadata,
+)
 from app.services.refresh_service import (
     _bump_patch_version,
     compute_diff_summary,
@@ -35,8 +44,6 @@ from app.services.refresh_service import (
     write_refreshed_package,
 )
 from app.services.settings_loader import SETTINGS_FILE, load_settings, save_settings
-from app.routers.users import require_admin_user
-from app.services.db import get_session
 
 router = APIRouter(
     prefix="/admin",
@@ -152,7 +159,9 @@ def get_package_overrides(request: Request) -> dict[str, PackageOverride]:
     return request.app.state.package_overrides
 
 
-def get_refresh_metadata_cache(request: Request) -> dict[str, PackageAdminMetadataRecord]:
+def get_refresh_metadata_cache(
+    request: Request,
+) -> dict[str, PackageAdminMetadataRecord]:
     return request.app.state.refresh_metadata
 
 

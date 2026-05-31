@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 
 from httpx import ASGITransport, AsyncClient
@@ -8,8 +7,8 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 from app.models.package import Package
 from app.models.refresh import PackageAdminMetadataRecord
-from app.models.user import User
 from app.models.settings import GameSettings
+from app.models.user import User
 from app.routers.admin import (
     get_packages_cache,
     get_refresh_metadata_cache,

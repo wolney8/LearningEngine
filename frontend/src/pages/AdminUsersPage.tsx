@@ -41,16 +41,12 @@ export function AdminUsersPage() {
   const [pendingRoles, setPendingRoles] = useState<
     Record<number, AdminManagedUserRole>
   >({});
-  const [loadingState, setLoadingState] = useState<
-    "loading" | "ready" | "error"
-  >("loading");
-  const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
-  const [messageByUserId, setMessageByUserId] = useState<
-    Record<number, string>
-  >({});
-  const [errorByUserId, setErrorByUserId] = useState<Record<number, string>>(
-    {},
+  const [loadingState, setLoadingState] = useState<"loading" | "ready" | "error">(
+    "loading",
   );
+  const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
+  const [messageByUserId, setMessageByUserId] = useState<Record<number, string>>({});
+  const [errorByUserId, setErrorByUserId] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (!canAccess || !token) {
@@ -119,11 +115,7 @@ export function AdminUsersPage() {
     setErrorByUserId((current) => ({ ...current, [targetUser.id]: "" }));
 
     try {
-      const updated = await updateAdminUserRole(
-        adminToken,
-        targetUser.id,
-        nextRole,
-      );
+      const updated = await updateAdminUserRole(adminToken, targetUser.id, nextRole);
       setUsers((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       );
@@ -170,10 +162,7 @@ export function AdminUsersPage() {
       )}
 
       {loadingState === "ready" && (
-        <section
-          className="admin-page__panel"
-          aria-label="User role management"
-        >
+        <section className="admin-page__panel" aria-label="User role management">
           <ul className="admin-page__list">
             {sortedUsers.map((row) => (
               <li key={row.id} className="admin-page__list-item">
@@ -219,9 +208,7 @@ export function AdminUsersPage() {
                 {messageByUserId[row.id] && (
                   <p aria-live="polite">{messageByUserId[row.id]}</p>
                 )}
-                {errorByUserId[row.id] && (
-                  <p role="alert">{errorByUserId[row.id]}</p>
-                )}
+                {errorByUserId[row.id] && <p role="alert">{errorByUserId[row.id]}</p>}
               </li>
             ))}
           </ul>

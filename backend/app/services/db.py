@@ -4,8 +4,7 @@ import os
 from pathlib import Path
 from typing import Generator
 
-from sqlmodel import Session, SQLModel, create_engine
-from sqlmodel import select
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.models.user import User
 from app.services.security import hash_password

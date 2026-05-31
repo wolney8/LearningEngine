@@ -138,10 +138,7 @@ export function TestResultsScreen({
             const selected = answers[question.id] ?? null;
             const isCorrect = selected === question.correct_answer;
             const selectedText = getAnswerText(question, selected);
-            const correctText = getAnswerText(
-              question,
-              question.correct_answer,
-            );
+            const correctText = getAnswerText(question, question.correct_answer);
 
             return (
               <li key={question.id} className="test-results__review-item">

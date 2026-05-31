@@ -3,13 +3,8 @@
   display: grid;
   place-items: center;
   padding: 1.5rem;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(79, 70, 229, 0.16), transparent 45%),
-    radial-gradient(
-      circle at 100% 100%,
-      rgba(139, 92, 246, 0.22),
-      transparent 40%
-    ),
+  background: radial-gradient(circle at 0% 0%, rgba(79, 70, 229, 0.16), transparent 45%),
+    radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.22), transparent 40%),
     #f8fafc;
 }
 

@@ -18,9 +18,7 @@ export function AdminPackagesPage() {
   const { status: authStatus, token, user, logout } = useAuth();
   const canAccess = authStatus === "authenticated" && user?.role === "admin";
   const [packages, setPackages] = useState<AdminPackageSummary[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    "loading",
-  );
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [publishYAML, setPublishYAML] = useState("");
   const [publishStatus, setPublishStatus] = useState<
     "idle" | "publishing" | "success" | "error"
@@ -33,9 +31,7 @@ export function AdminPackagesPage() {
     "idle" | "generating" | "success" | "error"
   >("idle");
   const [generateMessage, setGenerateMessage] = useState("");
-  const [refreshingPackageId, setRefreshingPackageId] = useState<string | null>(
-    null,
-  );
+  const [refreshingPackageId, setRefreshingPackageId] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string>("");
 
   useEffect(() => {
@@ -56,7 +52,7 @@ export function AdminPackagesPage() {
     void load();
   }, [canAccess, token]);
 
-  if (authStatus === "loading") {
+  if (authStatus === "loading" || authStatus === "idle") {
     return (
       <main className="admin-page">
         <p aria-busy="true">Loading…</p>
@@ -78,10 +74,7 @@ export function AdminPackagesPage() {
 
   const adminToken = token;
 
-  async function setAvailability(
-    pkg: AdminPackageSummary,
-    availability: Availability,
-  ) {
+  async function setAvailability(pkg: AdminPackageSummary, availability: Availability) {
     try {
       const updated = await updateAdminPackage(adminToken, pkg.id, {
         availability,
@@ -275,9 +268,7 @@ export function AdminPackagesPage() {
             onClick={() => void handleGeneratePackage()}
             disabled={generateStatus === "generating"}
           >
-            {generateStatus === "generating"
-              ? "Generating…"
-              : "Generate with AI"}
+            {generateStatus === "generating" ? "Generating…" : "Generate with AI"}
           </button>
           {generateStatus === "success" && generateMessage && (
             <p aria-live="polite">{generateMessage}</p>
@@ -303,28 +294,19 @@ export function AdminPackagesPage() {
           >
             {publishStatus === "publishing" ? "Publishing…" : "Publish package"}
           </button>
-          {publishStatus === "success" && (
-            <p aria-live="polite">Package published.</p>
-          )}
+          {publishStatus === "success" && <p aria-live="polite">Package published.</p>}
           {publishStatus === "error" && (
-            <p role="alert">
-              Could not publish package. Validate YAML and try again.
-            </p>
+            <p role="alert">Could not publish package. Validate YAML and try again.</p>
           )}
         </div>
       </section>
 
       {status === "loading" && <p aria-busy="true">Loading packages…</p>}
-      {status === "error" && (
-        <p role="alert">Could not load or update packages.</p>
-      )}
+      {status === "error" && <p role="alert">Could not load or update packages.</p>}
       {refreshMessage && <p aria-live="polite">{refreshMessage}</p>}
 
       {status === "ready" && (
-        <section
-          className="admin-page__panel"
-          aria-label="Package admin controls"
-        >
+        <section className="admin-page__panel" aria-label="Package admin controls">
           <ul className="admin-page__list">
             {packages.map((pkg) => (
               <li key={pkg.id} className="admin-page__list-item">
@@ -341,10 +323,7 @@ export function AdminPackagesPage() {
                     <select
                       value={pkg.availability}
                       onChange={(event) =>
-                        void setAvailability(
-                          pkg,
-                          event.target.value as Availability,
-                        )
+                        void setAvailability(pkg, event.target.value as Availability)
                       }
                     >
                       <option value="available">Available</option>
@@ -358,9 +337,7 @@ export function AdminPackagesPage() {
                       type="number"
                       min="0"
                       defaultValue={pkg.xp_threshold ?? ""}
-                      onBlur={(event) =>
-                        void setThreshold(pkg, event.target.value)
-                      }
+                      onBlur={(event) => void setThreshold(pkg, event.target.value)}
                     />
                   </label>
                   <button

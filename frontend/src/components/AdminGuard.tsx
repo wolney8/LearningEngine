@@ -23,14 +23,10 @@ export function AdminGuard() {
   if (status !== "authenticated") {
     return (
       <main className="admin-guard">
-        <section
-          className="admin-guard__panel"
-          aria-labelledby="admin-guard-title"
-        >
+        <section className="admin-guard__panel" aria-labelledby="admin-guard-title">
           <h1 id="admin-guard-title">Admin Access</h1>
           <p className="admin-guard__lead">
-            Sign in with an admin account to access admin settings and package
-            controls.
+            Sign in with an admin account to access admin settings and package controls.
           </p>
           <div className="admin-guard__actions">
             <Link to="/login">Go to login</Link>
@@ -43,10 +39,7 @@ export function AdminGuard() {
 
   return (
     <main className="admin-guard">
-      <section
-        className="admin-guard__panel"
-        aria-labelledby="admin-guard-title"
-      >
+      <section className="admin-guard__panel" aria-labelledby="admin-guard-title">
         <h1 id="admin-guard-title">Admin Access</h1>
         <p className="admin-guard__lead">
           This account is signed in but does not have admin permissions.

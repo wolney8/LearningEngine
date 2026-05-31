@@ -78,7 +78,9 @@ def ensure_package_metadata_records(
             except OSError:
                 inferred_added_at = now
 
-            metadata[package_id] = PackageAdminMetadataRecord(added_at=inferred_added_at)
+            metadata[package_id] = PackageAdminMetadataRecord(
+                added_at=inferred_added_at,
+            )
             changed = True
             continue
 

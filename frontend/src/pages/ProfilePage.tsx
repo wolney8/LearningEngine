@@ -25,9 +25,9 @@ export function ProfilePage() {
   const [streakCount, setStreakCount] = useState(0);
   const [scoreRows, setScoreRows] = useState<ProfileScoreRow[]>([]);
   const [usernameInput, setUsernameInput] = useState("");
-  const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "success" | "error"
-  >("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">(
+    "idle",
+  );
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
@@ -47,11 +47,7 @@ export function ProfilePage() {
     setLoadingStats(true);
     setStatsError("");
 
-    void Promise.all([
-      fetchMyStreak(token),
-      fetchMyProgress(token),
-      fetchPackages(),
-    ])
+    void Promise.all([fetchMyStreak(token), fetchMyProgress(token), fetchPackages()])
       .then(([streak, progressRows, packages]) => {
         if (cancelled) {
           return;
@@ -125,8 +121,7 @@ export function ProfilePage() {
       setSaveStatus("success");
       setSaveMessage("Username updated successfully.");
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Could not update profile";
+      const message = err instanceof Error ? err.message : "Could not update profile";
       const statusMatch = message.match(/\((\d+)\)/);
       const statusCode = statusMatch ? Number(statusMatch[1]) : null;
 
@@ -144,10 +139,7 @@ export function ProfilePage() {
 
   return (
     <main className="profile-page">
-      <section
-        className="profile-page__panel"
-        aria-labelledby="profile-page-title"
-      >
+      <section className="profile-page__panel" aria-labelledby="profile-page-title">
         <h1 id="profile-page-title" className="profile-page__title">
           Your Profile
         </h1>
