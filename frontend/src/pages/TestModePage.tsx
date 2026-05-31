@@ -740,6 +740,22 @@ export function TestModePage() {
           setPhase({ kind: "difficulty-select", pkg: phase.pkg });
         }}
         onBack={() => navigate("/")}
+        onRevise={(revisionPageIds) => {
+          const cleanedRevisionPageIds = revisionPageIds
+            .map((pageId) => pageId.trim())
+            .filter((pageId) => pageId.length > 0);
+
+          if (cleanedRevisionPageIds.length === 0) {
+            navigate(`/packages/${id}`);
+            return;
+          }
+
+          const reviseParams = new URLSearchParams();
+          for (const pageId of cleanedRevisionPageIds) {
+            reviseParams.append("revise", pageId);
+          }
+          navigate(`/packages/${id}?${reviseParams.toString()}`);
+        }}
       />
     </main>
   );

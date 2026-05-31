@@ -11,8 +11,12 @@ import type {
   RegisterRequest,
   User,
 } from "../schemas/auth";
-import { PackageSchema, PackageSummarySchema } from "../schemas/package";
-import type { Package, PackageSummary } from "../schemas/package";
+import {
+  AdminPackageSummarySchema,
+  PackageSchema,
+  PackageSummarySchema,
+} from "../schemas/package";
+import type { AdminPackageSummary, Package, PackageSummary } from "../schemas/package";
 import {
   UserProgressRecordSchema,
   UserProgressUpsertRequestSchema,
@@ -26,7 +30,7 @@ import type { Settings } from "../schemas/settings";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const TIMEOUT_MS = 10_000;
-const ADMIN_TOKEN_KEY = "lle_admin_token";
+const ADMIN_AI_TIMEOUT_MS = 90_000;
 const AUTH_TOKEN_KEY = "lle_auth_token";
 const ANONYMOUS_XP_KEY = "lle_xp";
 const ANONYMOUS_DAILY_STREAK_KEY = "lle_daily_streak";
@@ -35,9 +39,10 @@ const ANONYMOUS_ATTEMPT_KEY_PREFIX = "lle_attempt_";
 const ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX = "lle_completed_";
 const ANONYMOUS_TEST_RESULTS_KEY_PREFIX = "lle_test_results_";
 const ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY = "lle_guest_engaged_packages";
+const ANONYMOUS_GUEST_TEST_ENGAGED_PACKAGES_KEY = "lle_guest_test_engaged_packages";
 const XP_RECONCILIATION_DECISION_KEY_PREFIX = "lle_xp_reconciled_user_";
 const ISO_LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-export const ANONYMOUS_GUEST_PACKAGE_CAP = 3;
+export const ANONYMOUS_GUEST_PACKAGE_CAP = 2;
 export const ANONYMOUS_LOCAL_STORAGE_KEYS = {
   xp: ANONYMOUS_XP_KEY,
   dailyStreak: ANONYMOUS_DAILY_STREAK_KEY,
@@ -46,6 +51,7 @@ export const ANONYMOUS_LOCAL_STORAGE_KEYS = {
   firstCompletionPrefix: ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX,
   testResultsPrefix: ANONYMOUS_TEST_RESULTS_KEY_PREFIX,
   guestEngagedPackages: ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY,
+  guestTestEngagedPackages: ANONYMOUS_GUEST_TEST_ENGAGED_PACKAGES_KEY,
 } as const;
 
 export interface AnonymousProgressSeed {
@@ -90,18 +96,47 @@ const AdminAIConnectionTestSchema = z
     message: z.string(),
   })
   .strict();
+const AdminPackageGenerateResponseSchema = z
+  .object({
+    yaml_content: z.string().min(1),
+  })
+  .strict();
+const AdminManagedUserRoleSchema = z.enum(["student", "admin"]);
+const AdminManagedUserSchema = z
+  .object({
+    id: z.number().int().positive(),
+    username: z.string().min(1),
+    email: z.string().email(),
+    role: AdminManagedUserRoleSchema,
+    created_at: z.string().min(1),
+  })
+  .strict();
 
 export type AdminAIConfig = z.infer<typeof AdminAIConfigSchema>;
 export type AdminAIConnectionTestResult = z.infer<typeof AdminAIConnectionTestSchema>;
+export type AdminPackageGenerateResponse = z.infer<
+  typeof AdminPackageGenerateResponseSchema
+>;
+export type AdminManagedUserRole = z.infer<typeof AdminManagedUserRoleSchema>;
+export type AdminManagedUser = z.infer<typeof AdminManagedUserSchema>;
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
   init?: RequestInit,
+  timeoutMs?: number,
 ): Promise<Response> {
+  const effectiveTimeoutMs = timeoutMs ?? TIMEOUT_MS;
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const id = setTimeout(() => controller.abort(), effectiveTimeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(
+        `Request timed out after ${Math.ceil(effectiveTimeoutMs / 1000)}s`,
+      );
+    }
+    throw error;
   } finally {
     clearTimeout(id);
   }
@@ -195,7 +230,7 @@ export async function fetchSettings(): Promise<Settings> {
 function getAdminHeaders(token: string): HeadersInit {
   return {
     "Content-Type": "application/json",
-    "X-Admin-Token": token,
+    ...getAuthHeaders(token),
   };
 }
 
@@ -203,18 +238,6 @@ function getAuthHeaders(token: string): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,
   };
-}
-
-export function getAdminToken(): string | null {
-  return sessionStorage.getItem(ADMIN_TOKEN_KEY);
-}
-
-export function setAdminToken(token: string): void {
-  sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
-}
-
-export function clearAdminToken(): void {
-  sessionStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
 export function getAuthToken(): string | null {
@@ -494,6 +517,44 @@ export function readAnonymousGuestEngagedPackages(): string[] {
   } catch {
     return [];
   }
+}
+
+export function readAnonymousGuestTestEngagedPackages(): string[] {
+  try {
+    const raw = localStorage.getItem(ANONYMOUS_GUEST_TEST_ENGAGED_PACKAGES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? (parsed as string[]).filter((id) => typeof id === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function markAnonymousGuestTestPackageEngaged(packageId: string): void {
+  try {
+    const current = readAnonymousGuestTestEngagedPackages();
+    if (!current.includes(packageId)) {
+      localStorage.setItem(
+        ANONYMOUS_GUEST_TEST_ENGAGED_PACKAGES_KEY,
+        JSON.stringify([...current, packageId]),
+      );
+    }
+  } catch {
+    // Private browsing or storage quota exceeded - silently no-op
+  }
+}
+
+export function getAnonymousGuestTestCapStatus(packageId: string): {
+  hasTestEngagement: boolean;
+  engagedCount: number;
+} {
+  const testEngaged = readAnonymousGuestTestEngagedPackages();
+  return {
+    hasTestEngagement: testEngaged.includes(packageId),
+    engagedCount: testEngaged.length,
+  };
 }
 
 export function markAnonymousGuestPackageEngaged(packageId: string): void {
@@ -800,14 +861,6 @@ export async function upsertMyProgressForPackage(
   return UserProgressRecordSchema.parse(data);
 }
 
-export async function validateAdminToken(token: string): Promise<boolean> {
-  const response = await fetchWithTimeout(`${BASE_URL}/admin/settings`, {
-    headers: getAdminHeaders(token),
-  });
-
-  return response.ok;
-}
-
 export async function fetchAdminSettings(token: string): Promise<Settings> {
   const response = await fetchWithTimeout(`${BASE_URL}/admin/settings`, {
     headers: getAdminHeaders(token),
@@ -872,11 +925,15 @@ export async function testAdminAIConnection(
     model?: string;
   },
 ): Promise<AdminAIConnectionTestResult> {
-  const response = await fetchWithTimeout(`${BASE_URL}/admin/ai-config/test`, {
-    method: "POST",
-    headers: getAdminHeaders(token),
-    body: JSON.stringify(payload),
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/ai-config/test`,
+    {
+      method: "POST",
+      headers: getAdminHeaders(token),
+      body: JSON.stringify(payload),
+    },
+    ADMIN_AI_TIMEOUT_MS,
+  );
   if (!response.ok) {
     throw new Error(`Failed to test admin AI connection: ${response.status}`);
   }
@@ -884,7 +941,9 @@ export async function testAdminAIConnection(
   return AdminAIConnectionTestSchema.parse(data);
 }
 
-export async function fetchAdminPackages(token: string): Promise<PackageSummary[]> {
+export async function fetchAdminPackages(
+  token: string,
+): Promise<AdminPackageSummary[]> {
   const response = await fetchWithTimeout(`${BASE_URL}/admin/packages`, {
     headers: getAdminHeaders(token),
   });
@@ -894,7 +953,7 @@ export async function fetchAdminPackages(token: string): Promise<PackageSummary[
   }
 
   const data: unknown = await response.json();
-  return z.array(PackageSummarySchema).parse(data);
+  return z.array(AdminPackageSummarySchema).parse(data);
 }
 
 export async function updateAdminPackage(
@@ -919,4 +978,123 @@ export async function updateAdminPackage(
 
   const data: unknown = await response.json();
   return PackageSummarySchema.parse(data);
+}
+
+export async function publishAdminPackage(
+  token: string,
+  yamlContent: string,
+): Promise<AdminPackageSummary> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/packages`, {
+    method: "POST",
+    headers: getAdminHeaders(token),
+    body: JSON.stringify({ yaml_content: yamlContent }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to publish package (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminPackageSummarySchema.parse(data);
+}
+
+export async function generateAdminPackage(
+  token: string,
+  payload: {
+    topic: string;
+    audience: string;
+    num_pages: number;
+    num_questions: number;
+  },
+): Promise<AdminPackageGenerateResponse> {
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/packages/generate`,
+    {
+      method: "POST",
+      headers: getAdminHeaders(token),
+      body: JSON.stringify(payload),
+    },
+    ADMIN_AI_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to generate package (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminPackageGenerateResponseSchema.parse(data);
+}
+
+const RefreshResultSchema = z
+  .object({
+    package_id: z.string().min(1),
+    previous_version: z.string().min(1),
+    new_version: z.string().min(1),
+    diff_summary: z.string(),
+    dry_run: z.boolean(),
+    refreshed_at: z.string().datetime().nullable().optional(),
+  })
+  .strict();
+
+export type AdminRefreshResult = z.infer<typeof RefreshResultSchema>;
+
+export async function refreshAdminPackage(
+  token: string,
+  packageId: string,
+): Promise<AdminRefreshResult> {
+  const encodedId = encodeURIComponent(packageId);
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/packages/${encodedId}/refresh`,
+    {
+      method: "POST",
+      headers: getAdminHeaders(token),
+    },
+    ADMIN_AI_TIMEOUT_MS,
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(
+      `Failed to refresh package '${packageId}' (${response.status}): ${detail}`,
+    );
+  }
+
+  const data: unknown = await response.json();
+  return RefreshResultSchema.parse(data);
+}
+
+export async function fetchAdminUsers(token: string): Promise<AdminManagedUser[]> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/users`, {
+    headers: getAdminHeaders(token),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to fetch admin users (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return z.array(AdminManagedUserSchema).parse(data);
+}
+
+export async function updateAdminUserRole(
+  token: string,
+  userId: number,
+  role: AdminManagedUserRole,
+): Promise<AdminManagedUser> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/users/${userId}/role`, {
+    method: "PATCH",
+    headers: getAdminHeaders(token),
+    body: JSON.stringify({ role: AdminManagedUserRoleSchema.parse(role) }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to update user role (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminManagedUserSchema.parse(data);
 }

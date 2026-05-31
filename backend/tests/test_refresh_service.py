@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import yaml
 
 from app.models.package import Package
-from app.models.refresh import PackageRefreshRecord
+from app.models.refresh import PackageAdminMetadataRecord
 from app.services.refresh_service import (
     _bump_patch_version,
     compute_diff_summary,
@@ -107,7 +107,7 @@ def test_detect_stale_uses_refresh_metadata_over_mtime(tmp_path) -> None:
     os.utime(package_file, (old_time.timestamp(), old_time.timestamp()))
 
     refresh_metadata = {
-        pkg.id: PackageRefreshRecord(
+        pkg.id: PackageAdminMetadataRecord(
             refreshed_at=datetime.now(tz=timezone.utc) - timedelta(days=5),
             previous_version="1.0.0",
             new_version="1.0.1",
@@ -131,7 +131,7 @@ def test_detect_stale_uses_refresh_metadata_if_stale(tmp_path) -> None:
     os.utime(package_file, (recent_mtime.timestamp(), recent_mtime.timestamp()))
 
     refresh_metadata = {
-        pkg.id: PackageRefreshRecord(
+        pkg.id: PackageAdminMetadataRecord(
             refreshed_at=datetime.now(tz=timezone.utc) - timedelta(days=100),
             previous_version="1.0.0",
             new_version="1.0.1",
@@ -154,7 +154,7 @@ def test_write_refreshed_creates_bak(tmp_path) -> None:
     package_file.write_text(original_yaml, encoding="utf-8")
 
     refreshed_pkg = _sample_package(version="2.0.0", page_content="new")
-    metadata: dict[str, PackageRefreshRecord] = {}
+    metadata: dict[str, PackageAdminMetadataRecord] = {}
     metadata_file = tmp_path / "package-refresh-metadata.yaml"
 
     write_refreshed_package(
@@ -178,7 +178,7 @@ def test_write_refreshed_atomic_new_file_written(tmp_path) -> None:
     package_file.write_text(_package_yaml(old_pkg), encoding="utf-8")
 
     refreshed_pkg = _sample_package(version="9.9.9", page_content="new")
-    metadata: dict[str, PackageRefreshRecord] = {}
+    metadata: dict[str, PackageAdminMetadataRecord] = {}
     metadata_file = tmp_path / "package-refresh-metadata.yaml"
 
     _, record = write_refreshed_package(
@@ -201,7 +201,7 @@ def test_write_refreshed_id_preserved(tmp_path) -> None:
     package_file.write_text(_package_yaml(old_pkg), encoding="utf-8")
 
     generated_pkg = _sample_package(package_id="different-id", version="1.0.0")
-    metadata: dict[str, PackageRefreshRecord] = {}
+    metadata: dict[str, PackageAdminMetadataRecord] = {}
     metadata_file = tmp_path / "package-refresh-metadata.yaml"
 
     new_pkg, _ = write_refreshed_package(
@@ -223,7 +223,7 @@ def test_write_refreshed_version_bumped(tmp_path) -> None:
     package_file.write_text(_package_yaml(old_pkg), encoding="utf-8")
 
     generated_pkg = _sample_package(version="3.7.9")
-    metadata: dict[str, PackageRefreshRecord] = {}
+    metadata: dict[str, PackageAdminMetadataRecord] = {}
     metadata_file = tmp_path / "package-refresh-metadata.yaml"
 
     new_pkg, _ = write_refreshed_package(
@@ -253,7 +253,7 @@ def test_compute_diff_summary_counts_changes() -> None:
 def test_get_last_updated_at_returns_metadata_value(tmp_path) -> None:
     refreshed_at = datetime.now(tz=timezone.utc) - timedelta(days=3)
     refresh_metadata = {
-        "sample-demo": PackageRefreshRecord(
+        "sample-demo": PackageAdminMetadataRecord(
             refreshed_at=refreshed_at,
             previous_version="1.0.0",
             new_version="1.0.1",

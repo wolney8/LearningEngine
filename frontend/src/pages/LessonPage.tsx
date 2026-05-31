@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CompletionScreen } from "../components/CompletionScreen";
 import { GuestLimitNotice } from "../components/GuestLimitNotice";
 import { QuestionView } from "../components/QuestionView";
@@ -55,6 +55,7 @@ type LessonPhase =
 
 export function LessonPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addXP } = useXP();
   const { markPractised } = useStreak();
@@ -103,11 +104,31 @@ export function LessonPage() {
     setPhase({ kind: "loading" });
     try {
       const loaded = await fetchPackage(id);
+      const reviseQueryValues = searchParams
+        .getAll("revise")
+        .map((pageId) => pageId.trim())
+        .filter((pageId) => pageId.length > 0);
+
+      const revisePageIds =
+        reviseQueryValues.length === 1 &&
+        !loaded.pages.some((page) => page.id === reviseQueryValues[0])
+          ? reviseQueryValues[0]
+              .split(",")
+              .map((pageId) => pageId.trim())
+              .filter((pageId) => pageId.length > 0)
+          : reviseQueryValues;
+
+      const revisePageIdSet = new Set(revisePageIds);
+      const reviseStartIndex = loaded.pages.findIndex((page) =>
+        revisePageIdSet.has(page.id),
+      );
+      const startPageIndex = reviseStartIndex >= 0 ? reviseStartIndex : 0;
+
       setPkg(loaded);
       setPhase({
         kind: "studying",
-        pageIndex: 0,
-        visitedPageIds: new Set([loaded.pages[0].id]),
+        pageIndex: startPageIndex,
+        visitedPageIds: new Set([loaded.pages[startPageIndex].id]),
       });
     } catch (err) {
       setPhase({
@@ -115,7 +136,7 @@ export function LessonPage() {
         message: err instanceof Error ? err.message : "Failed to load package.",
       });
     }
-  }, [id, isAuthenticated, showGuestLimit]);
+  }, [id, isAuthenticated, searchParams, showGuestLimit]);
 
   useEffect(() => {
     void loadPackage();

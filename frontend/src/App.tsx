@@ -9,6 +9,7 @@ import { useAuth } from "./hooks/useAuth";
 import { useXP } from "./hooks/useXP";
 import { AdminPackagesPage } from "./pages/AdminPackagesPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { LessonPage } from "./pages/LessonPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PackageListPage } from "./pages/PackageListPage";
@@ -69,9 +70,10 @@ function AppRoutes() {
           <Route path="/admin" element={<AdminGuard />} />
           <Route path="/admin/settings" element={<AdminSettingsPage />} />
           <Route path="/admin/packages" element={<AdminPackagesPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/packages/:id" element={<LessonPage />} />
           <Route path="/test/exam/:id" element={<TestModePage />} />
-          {/* TODO Phase 6+: /test/practice/:id - Practice Mode */}
+          <Route path="/test/practice/:id" element={<TestModePage />} />
           <Route
             path="*"
             element={

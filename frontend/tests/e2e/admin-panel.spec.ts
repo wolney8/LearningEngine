@@ -2,7 +2,15 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 const API_BASE_URL = "http://localhost:8000";
-const ADMIN_TOKEN = "admin-secret";
+const AUTH_TOKEN = "admin-auth-token";
+const ADMIN_USER = {
+  id: 999,
+  username: "admin-user",
+  email: "admin@example.com",
+  role: "admin",
+  xp: 0,
+  created_at: "2026-05-30T00:00:00Z",
+} as const;
 
 const SETTINGS_PAYLOAD = {
   version: 1,
@@ -71,13 +79,15 @@ async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
 
 test.describe("Admin panel", () => {
   test.beforeEach(async ({ page }) => {
-    await page.route(`${API_BASE_URL}/admin/settings`, (route) => {
-      const token = route.request().headers()["x-admin-token"];
-      if (token !== ADMIN_TOKEN) {
-        route.fulfill({ status: 401, body: "unauthorised" });
-        return;
-      }
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(ADMIN_USER),
+      });
+    });
 
+    await page.route(`${API_BASE_URL}/admin/settings`, (route) => {
       if (route.request().method() === "PUT") {
         route.fulfill({
           status: 200,
@@ -169,18 +179,17 @@ test.describe("Admin panel", () => {
     });
   });
 
-  test("admin token gate rejects invalid value then accepts valid token", async ({
-    page,
-  }) => {
+  test("admin guard prompts sign-in then allows admin session", async ({ page }) => {
     await page.goto("/admin");
     await checkA11y(page);
 
-    await page.getByLabel("Admin token").fill("bad-token");
-    await page.getByRole("button", { name: "Enter Admin" }).click();
-    await expect(page.getByText(/Token rejected/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Admin Access" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to login" })).toBeVisible();
 
-    await page.getByLabel("Admin token").fill(ADMIN_TOKEN);
-    await page.getByRole("button", { name: "Enter Admin" }).click();
+    await page.evaluate((token) => {
+      sessionStorage.setItem("lle_auth_token", token);
+    }, AUTH_TOKEN);
+    await page.goto("/admin");
 
     await expect(page).toHaveURL(/\/admin\/settings/);
     await expect(page.getByRole("heading", { name: "Admin Settings" })).toBeVisible();
@@ -188,8 +197,8 @@ test.describe("Admin panel", () => {
 
   test("settings page saves updated values", async ({ page }) => {
     await page.addInitScript((token) => {
-      sessionStorage.setItem("lle_admin_token", token);
-    }, ADMIN_TOKEN);
+      sessionStorage.setItem("lle_auth_token", token);
+    }, AUTH_TOKEN);
 
     await page.goto("/admin/settings");
     await checkA11y(page);
@@ -216,8 +225,8 @@ test.describe("Admin panel", () => {
 
   test("packages page can set hidden then available", async ({ page }) => {
     await page.addInitScript((token) => {
-      sessionStorage.setItem("lle_admin_token", token);
-    }, ADMIN_TOKEN);
+      sessionStorage.setItem("lle_auth_token", token);
+    }, AUTH_TOKEN);
 
     await page.goto("/admin/packages");
     await checkA11y(page);
@@ -233,8 +242,8 @@ test.describe("Admin panel", () => {
 
   test("packages page can set unavailable", async ({ page }) => {
     await page.addInitScript((token) => {
-      sessionStorage.setItem("lle_admin_token", token);
-    }, ADMIN_TOKEN);
+      sessionStorage.setItem("lle_auth_token", token);
+    }, AUTH_TOKEN);
 
     await page.goto("/admin/packages");
     await checkA11y(page);

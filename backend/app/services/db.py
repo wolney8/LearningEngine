@@ -4,7 +4,10 @@ import os
 from pathlib import Path
 from typing import Generator
 
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
+
+from app.models.user import User
+from app.services.security import hash_password
 
 _DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "lle.db"
 _DEFAULT_DATABASE_URL = f"sqlite:///{_DEFAULT_DB_PATH}"
@@ -99,8 +102,8 @@ def _ensure_sqlite_user_test_result_schema_compatibility() -> None:
 
 
 def init_db() -> None:
-    # Ensure metadata includes the User table before creating schema.
-    from app.models.user import User, UserLibraryItem, UserTestResult  # noqa: F401
+    # Ensure metadata includes user tables before creating schema.
+    from app.models.user import UserLibraryItem, UserTestResult  # noqa: F401
 
     if DATABASE_URL.startswith("sqlite"):
         sqlite_path = DATABASE_URL.replace("sqlite:///", "", 1)
@@ -109,6 +112,50 @@ def init_db() -> None:
         _ensure_sqlite_user_library_schema_compatibility()
         _ensure_sqlite_user_test_result_schema_compatibility()
     SQLModel.metadata.create_all(engine)
+    bootstrap_initial_admin_user()
+
+
+def bootstrap_initial_admin_user() -> None:
+    """Create or elevate an admin user from env vars if no admin exists.
+
+    Expected env vars:
+    - LLE_BOOTSTRAP_ADMIN_USERNAME
+    - LLE_BOOTSTRAP_ADMIN_EMAIL
+    - LLE_BOOTSTRAP_ADMIN_PASSWORD
+    """
+
+    with Session(engine) as session:
+        existing_admin = session.exec(select(User).where(User.role == "admin")).first()
+        if existing_admin is not None:
+            return
+
+        username = os.getenv("LLE_BOOTSTRAP_ADMIN_USERNAME", "").strip().lower()
+        email = os.getenv("LLE_BOOTSTRAP_ADMIN_EMAIL", "").strip().lower()
+        password = os.getenv("LLE_BOOTSTRAP_ADMIN_PASSWORD", "")
+
+        if not username or not email or not password:
+            return
+
+        existing_user = session.exec(
+            select(User).where((User.username == username) | (User.email == email))
+        ).first()
+
+        if existing_user is None:
+            session.add(
+                User(
+                    username=username,
+                    email=email,
+                    hashed_password=hash_password(password),
+                    role="admin",
+                )
+            )
+            session.commit()
+            return
+
+        existing_user.role = "admin"
+        existing_user.hashed_password = hash_password(password)
+        session.add(existing_user)
+        session.commit()
 
 
 def get_session() -> Generator[Session, None, None]:

@@ -9,7 +9,6 @@ import {
 } from "react";
 import type { LoginRequest, RegisterRequest, User } from "../schemas/auth";
 import {
-  clearAdminToken,
   clearAuthToken,
   fetchCurrentUser,
   fetchMyProgress,
@@ -277,7 +276,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
-    clearAdminToken();
     clearAuthToken();
     resetAnonymousLocalProgress();
     setToken(null);

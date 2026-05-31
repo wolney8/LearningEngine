@@ -12,7 +12,7 @@ import yaml
 from pydantic import ValidationError
 
 from app.models.package import Package
-from app.models.refresh import PackageRefreshRecord, StalePackageInfo
+from app.models.refresh import PackageAdminMetadataRecord, StalePackageInfo
 from app.services.refresh_metadata_loader import save_refresh_metadata
 
 log = logging.getLogger(__name__)
@@ -34,12 +34,14 @@ def _bump_patch_version(version: str) -> str:
 
 def get_last_updated_at(
     package_id: str,
-    refresh_metadata: dict[str, PackageRefreshRecord],
+    refresh_metadata: dict[str, PackageAdminMetadataRecord],
     packages_dir: Path,
 ) -> datetime:
     """Return the most recent known update time for a package."""
     if package_id in refresh_metadata:
-        return refresh_metadata[package_id].refreshed_at
+        record = refresh_metadata[package_id]
+        if record.last_refreshed_at is not None:
+            return record.last_refreshed_at
     yaml_file = packages_dir / f"{package_id}.yaml"
     try:
         mtime = os.stat(yaml_file).st_mtime
@@ -53,7 +55,7 @@ def get_last_updated_at(
 
 def detect_stale_packages(
     packages: dict[str, Package],
-    refresh_metadata: dict[str, PackageRefreshRecord],
+    refresh_metadata: dict[str, PackageAdminMetadataRecord],
     stale_after_days: int,
     packages_dir: Path,
 ) -> list[StalePackageInfo]:
@@ -117,10 +119,10 @@ def write_refreshed_package(
     new_yaml_str: str,
     packages_dir: Path,
     old_pkg: Package,
-    refresh_metadata: dict[str, PackageRefreshRecord],
+    refresh_metadata: dict[str, PackageAdminMetadataRecord],
     refresh_metadata_file: Path,
     now: datetime,
-) -> tuple[Package, PackageRefreshRecord]:
+) -> tuple[Package, PackageAdminMetadataRecord]:
     """
     Validate, patch, back up, and atomically write the refreshed YAML package.
 
@@ -165,7 +167,10 @@ def write_refreshed_package(
     tmp_path.replace(target)
 
     diff = compute_diff_summary(old_pkg, new_pkg)
-    record = PackageRefreshRecord(
+    existing_record = refresh_metadata.get(package_id)
+    record = PackageAdminMetadataRecord(
+        added_at=existing_record.added_at if existing_record else None,
+        last_refreshed_at=now,
         refreshed_at=now,
         previous_version=old_pkg.version,
         new_version=new_pkg.version,

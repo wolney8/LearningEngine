@@ -77,6 +77,14 @@
   padding: 0.45rem 0.65rem;
 }
 
+.admin-page__field textarea {
+  border: 1px solid #94a3b8;
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  resize: vertical;
+}
+
 .admin-page__field select {
   min-height: 44px;
   border: 1px solid #94a3b8;

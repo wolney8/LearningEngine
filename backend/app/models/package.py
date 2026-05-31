@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -104,3 +105,8 @@ class PackageSummary(BaseModel):
     def derive_enabled_from_availability(self) -> "PackageSummary":
         self.enabled = self.availability == "available"
         return self
+
+
+class AdminPackageSummary(PackageSummary):
+    added_at: datetime | None = None
+    last_refreshed_at: datetime | None = None

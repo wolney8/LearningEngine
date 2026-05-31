@@ -1,22 +1,30 @@
 from __future__ import annotations
 
-import hmac
 import os
 from datetime import datetime, timezone
 from typing import Any, Literal
 
 import yaml
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from sqlmodel import Session, select
 
-from app.models.package import Package, PackageSummary
-from app.models.refresh import PackageRefreshRecord, RefreshResult, StalePackageInfo
+from app.models.package import AdminPackageSummary, Package, PackageSummary
+from app.models.refresh import (
+    PackageAdminMetadataRecord,
+    RefreshResult,
+    StalePackageInfo,
+)
 from app.models.settings import GameSettings
+from app.models.user import User
+from app.routers.users import require_admin_user
 from app.services.ai_generator import (
     AIGenerationError,
+    generate_package,
     refresh_package,
     test_connection,
 )
+from app.services.db import get_session
 from app.services.overrides_loader import (
     OVERRIDES_FILE,
     PackageOverride,
@@ -25,7 +33,10 @@ from app.services.overrides_loader import (
     save_package_overrides,
 )
 from app.services.package_loader import PACKAGES_DIR
-from app.services.refresh_metadata_loader import REFRESH_METADATA_FILE
+from app.services.refresh_metadata_loader import (
+    REFRESH_METADATA_FILE,
+    save_refresh_metadata,
+)
 from app.services.refresh_service import (
     _bump_patch_version,
     compute_diff_summary,
@@ -34,7 +45,11 @@ from app.services.refresh_service import (
 )
 from app.services.settings_loader import SETTINGS_FILE, load_settings, save_settings
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 class PackageOverridePatchRequest(BaseModel):
@@ -55,6 +70,21 @@ class PublishPackageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     yaml_content: str = Field(min_length=1)
+
+
+class GenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    topic: str = Field(min_length=3, max_length=500)
+    audience: str = Field(default="general learners", max_length=200)
+    num_pages: int = Field(default=3, ge=1, le=10)
+    num_questions: int = Field(default=4, ge=2, le=20)
+
+
+class GenerateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    yaml_content: str
 
 
 class AdminAIConfigResponse(BaseModel):
@@ -87,18 +117,30 @@ class AdminAIConnectionTestResponse(BaseModel):
     message: str
 
 
-def require_admin_token(
-    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
-) -> None:
-    expected_token = os.getenv("ADMIN_TOKEN")
-    if not expected_token:
-        raise HTTPException(
-            status_code=503,
-            detail="Admin API not configured. Set ADMIN_TOKEN in the environment.",
-        )
+class AdminUserSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    if not x_admin_token or not hmac.compare_digest(x_admin_token, expected_token):
-        raise HTTPException(status_code=401, detail="Invalid admin token")
+    id: int
+    username: str
+    email: str
+    role: Literal["student", "admin"]
+    created_at: datetime
+
+
+class AdminUserRoleUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["student", "admin"]
+
+
+def to_admin_user_summary(user: User) -> AdminUserSummary:
+    return AdminUserSummary(
+        id=user.id or 0,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        created_at=user.created_at,
+    )
 
 
 def get_settings_cache(request: Request) -> GameSettings:
@@ -117,7 +159,9 @@ def get_package_overrides(request: Request) -> dict[str, PackageOverride]:
     return request.app.state.package_overrides
 
 
-def get_refresh_metadata_cache(request: Request) -> dict[str, PackageRefreshRecord]:
+def get_refresh_metadata_cache(
+    request: Request,
+) -> dict[str, PackageAdminMetadataRecord]:
     return request.app.state.refresh_metadata
 
 
@@ -141,6 +185,19 @@ def build_package_summary(
     )
 
 
+def build_admin_package_summary(
+    pkg: Package,
+    override: PackageOverride | None,
+    metadata: PackageAdminMetadataRecord | None,
+) -> AdminPackageSummary:
+    base_summary = build_package_summary(pkg, override)
+    return AdminPackageSummary(
+        **base_summary.model_dump(),
+        added_at=metadata.added_at if metadata else None,
+        last_refreshed_at=metadata.last_refreshed_at if metadata else None,
+    )
+
+
 def build_ai_config_response(settings: GameSettings) -> AdminAIConfigResponse:
     return AdminAIConfigResponse(
         provider=settings.ai.provider,
@@ -152,7 +209,6 @@ def build_ai_config_response(settings: GameSettings) -> AdminAIConfigResponse:
 @router.get(
     "/settings",
     response_model=GameSettings,
-    dependencies=[Depends(require_admin_token)],
 )
 async def read_admin_settings(
     settings: GameSettings = Depends(get_settings_cache),
@@ -163,7 +219,6 @@ async def read_admin_settings(
 @router.put(
     "/settings",
     response_model=GameSettings,
-    dependencies=[Depends(require_admin_token)],
 )
 async def update_admin_settings(
     body: GameSettings,
@@ -177,7 +232,6 @@ async def update_admin_settings(
 @router.get(
     "/ai-config",
     response_model=AdminAIConfigResponse,
-    dependencies=[Depends(require_admin_token)],
 )
 async def read_admin_ai_config(
     settings: GameSettings = Depends(get_settings_cache),
@@ -202,7 +256,6 @@ async def _update_admin_ai_config(
 @router.put(
     "/ai-config",
     response_model=AdminAIConfigResponse,
-    dependencies=[Depends(require_admin_token)],
 )
 async def update_admin_ai_config_put(
     body: AdminAIConfigUpdateRequest,
@@ -215,7 +268,6 @@ async def update_admin_ai_config_put(
 @router.patch(
     "/ai-config",
     response_model=AdminAIConfigResponse,
-    dependencies=[Depends(require_admin_token)],
 )
 async def update_admin_ai_config_patch(
     body: AdminAIConfigUpdateRequest,
@@ -228,7 +280,6 @@ async def update_admin_ai_config_patch(
 @router.post(
     "/ai-config/test",
     response_model=AdminAIConnectionTestResponse,
-    dependencies=[Depends(require_admin_token)],
 )
 async def test_admin_ai_connection(
     body: AdminAIConnectionTestRequest,
@@ -255,23 +306,72 @@ async def test_admin_ai_connection(
 
 @router.get(
     "/packages",
-    response_model=list[PackageSummary],
-    dependencies=[Depends(require_admin_token)],
+    response_model=list[AdminPackageSummary],
 )
 async def list_admin_packages(
     packages: dict[str, Package] = Depends(get_packages_cache),
     overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
-) -> list[PackageSummary]:
+    refresh_metadata: dict[str, PackageAdminMetadataRecord] = Depends(
+        get_refresh_metadata_cache
+    ),
+) -> list[AdminPackageSummary]:
     return [
-        build_package_summary(pkg, overrides.get(pkg.id))
+        build_admin_package_summary(
+            pkg,
+            overrides.get(pkg.id),
+            refresh_metadata.get(pkg.id),
+        )
         for pkg in packages.values()
     ]
+
+
+@router.get(
+    "/users",
+    response_model=list[AdminUserSummary],
+)
+async def list_admin_users(
+    session: Session = Depends(get_session),
+) -> list[AdminUserSummary]:
+    users = session.exec(select(User).order_by(User.created_at, User.id)).all()
+    return [to_admin_user_summary(user) for user in users]
+
+
+@router.patch(
+    "/users/{user_id}/role",
+    response_model=AdminUserSummary,
+)
+async def patch_admin_user_role(
+    user_id: int,
+    body: AdminUserRoleUpdateRequest,
+    session: Session = Depends(get_session),
+) -> AdminUserSummary:
+    user = session.exec(select(User).where(User.id == user_id)).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.role == body.role:
+        return to_admin_user_summary(user)
+
+    if user.role == "admin" and body.role != "admin":
+        admin_count = len(session.exec(select(User).where(User.role == "admin")).all())
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Cannot remove admin role from the last remaining admin user"
+                ),
+            )
+
+    user.role = body.role
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return to_admin_user_summary(user)
 
 
 @router.patch(
     "/packages/{package_id}",
     response_model=PackageSummary,
-    dependencies=[Depends(require_admin_token)],
 )
 async def patch_admin_package(
     package_id: str,
@@ -307,11 +407,10 @@ async def patch_admin_package(
 @router.get(
     "/packages/stale",
     response_model=list[StalePackageInfo],
-    dependencies=[Depends(require_admin_token)],
 )
 async def list_stale_packages(
     packages: dict[str, Package] = Depends(get_packages_cache),
-    refresh_metadata: dict[str, PackageRefreshRecord] = Depends(
+    refresh_metadata: dict[str, PackageAdminMetadataRecord] = Depends(
         get_refresh_metadata_cache
     ),
     settings: GameSettings = Depends(get_settings_cache),
@@ -327,16 +426,18 @@ async def list_stale_packages(
 
 @router.post(
     "/packages",
-    response_model=PackageSummary,
+    response_model=AdminPackageSummary,
     status_code=201,
-    dependencies=[Depends(require_admin_token)],
 )
 async def publish_admin_package(
     body: PublishPackageRequest,
     request: Request,
     packages: dict[str, Package] = Depends(get_packages_cache),
     overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
-) -> PackageSummary:
+    refresh_metadata: dict[str, PackageAdminMetadataRecord] = Depends(
+        get_refresh_metadata_cache
+    ),
+) -> AdminPackageSummary:
     try:
         raw = yaml.safe_load(body.yaml_content)
     except yaml.YAMLError as exc:
@@ -373,20 +474,69 @@ async def publish_admin_package(
     packages[pkg.id] = pkg
     request.app.state.packages = packages
 
-    return build_package_summary(pkg, overrides.get(pkg.id))
+    now = datetime.now(tz=timezone.utc)
+    existing_record = refresh_metadata.get(pkg.id)
+    if existing_record is None or existing_record.added_at is None:
+        refresh_metadata[pkg.id] = PackageAdminMetadataRecord(
+            added_at=(existing_record.added_at or now) if existing_record else now,
+            last_refreshed_at=(
+                existing_record.last_refreshed_at if existing_record else None
+            ),
+            refreshed_at=(existing_record.refreshed_at if existing_record else None),
+            previous_version=(
+                existing_record.previous_version if existing_record else None
+            ),
+            new_version=existing_record.new_version if existing_record else None,
+            diff_summary=existing_record.diff_summary if existing_record else None,
+            content_hash=existing_record.content_hash if existing_record else None,
+        )
+        save_refresh_metadata(refresh_metadata, REFRESH_METADATA_FILE)
+        request.app.state.refresh_metadata = refresh_metadata
+
+    return build_admin_package_summary(
+        pkg,
+        overrides.get(pkg.id),
+        refresh_metadata.get(pkg.id),
+    )
+
+
+@router.post("/packages/generate", response_model=GenerateResponse)
+async def generate_admin_package(
+    body: GenerateRequest,
+    settings: GameSettings = Depends(get_settings_cache),
+) -> GenerateResponse:
+    try:
+        yaml_content = await generate_package(
+            topic=body.topic,
+            audience=body.audience,
+            num_pages=body.num_pages,
+            num_questions=body.num_questions,
+            settings=settings,
+        )
+    except AIGenerationError as exc:
+        if "GEMINI_API_KEY is not set" in str(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="AI service not configured. Set GEMINI_API_KEY in backend/.env",
+            ) from exc
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI generation failed: {exc}",
+        ) from exc
+
+    return GenerateResponse(yaml_content=yaml_content)
 
 
 @router.post(
     "/packages/{package_id}/refresh",
     response_model=RefreshResult,
-    dependencies=[Depends(require_admin_token)],
 )
 async def refresh_admin_package(
     package_id: str,
     request: Request,
     dry_run: bool = False,
     packages: dict[str, Package] = Depends(get_packages_cache),
-    refresh_metadata: dict[str, PackageRefreshRecord] = Depends(
+    refresh_metadata: dict[str, PackageAdminMetadataRecord] = Depends(
         get_refresh_metadata_cache
     ),
     settings: GameSettings = Depends(get_settings_cache),

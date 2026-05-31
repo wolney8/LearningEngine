@@ -1,6 +1,3 @@
-from pathlib import Path
-from unittest.mock import AsyncMock
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -183,16 +180,13 @@ async def test_get_package_unavailable_returns_403(
 
 
 # ---------------------------------------------------------------------------
-# POST /packages/generate
+# POST /packages/generate (removed from public router)
 # ---------------------------------------------------------------------------
 
 
-async def test_generate_package_returns_503_when_api_key_missing(
+async def test_generate_package_is_not_exposed_on_public_packages_router(
     client_empty: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
     response = await client_empty.post(
         "/packages/generate",
         json={
@@ -203,56 +197,4 @@ async def test_generate_package_returns_503_when_api_key_missing(
         },
     )
 
-    assert response.status_code == 503
-    assert response.json()["detail"] == (
-        "AI service not configured. Set GEMINI_API_KEY in backend/.env"
-    )
-
-
-async def test_generate_package_returns_yaml_on_success(
-    client_empty: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sample_yaml = (
-        Path(__file__).resolve().parents[2] / "packages" / "sample-demo.yaml"
-    ).read_text(encoding="utf-8")
-    mock_generate = AsyncMock(return_value=sample_yaml)
-    monkeypatch.setattr("app.routers.packages.generate_package", mock_generate)
-
-    response = await client_empty.post(
-        "/packages/generate",
-        json={
-            "topic": "Fraud prevention",
-            "audience": "frontline staff",
-            "num_pages": 2,
-            "num_questions": 3,
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.json()["yaml_content"] == sample_yaml
-
-
-async def test_generate_package_passes_request_values_to_service(
-    client_empty: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    mock_generate = AsyncMock(return_value="id: demo\n")
-    monkeypatch.setattr("app.routers.packages.generate_package", mock_generate)
-
-    payload = {
-        "topic": "Data protection essentials",
-        "audience": "general learners",
-        "num_pages": 5,
-        "num_questions": 8,
-    }
-    response = await client_empty.post("/packages/generate", json=payload)
-
-    assert response.status_code == 200
-    mock_generate.assert_awaited_once()
-    called_kwargs = mock_generate.await_args.kwargs
-    assert called_kwargs["topic"] == payload["topic"]
-    assert called_kwargs["audience"] == payload["audience"]
-    assert called_kwargs["num_pages"] == payload["num_pages"]
-    assert called_kwargs["num_questions"] == payload["num_questions"]
-    assert called_kwargs["settings"] is not None
+    assert response.status_code == 405

@@ -289,7 +289,9 @@ test.describe("Optional auth shell", () => {
     await expect(page.getByRole("status")).toContainText(
       "Username updated successfully.",
     );
-    expect(receivedProfilePatchBody).toEqual({ username: "updated-profile-user" });
+    expect(receivedProfilePatchBody).toEqual({
+      username: "updated-profile-user",
+    });
     await expect(page.getByText("updated-profile-user")).toHaveCount(2);
   });
 
@@ -563,7 +565,7 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByText("Signed in as logout-user")).toBeVisible();
+    await expect(page.getByText(/Signed in as\s*logout-user/)).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
 
@@ -687,7 +689,7 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByText("Signed in as alice")).toBeVisible();
+    await expect(page.getByText(/Signed in as\s*alice/)).toBeVisible();
     await expect(page.getByText("Last test: Normal — 90%")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
@@ -700,7 +702,7 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByText("Signed in as bob")).toBeVisible();
+    await expect(page.getByText(/Signed in as\s*bob/)).toBeVisible();
     await expect(page.getByText("Signed in as alice")).toHaveCount(0);
     await expect(page.getByText("Last test: Normal — 90%")).toHaveCount(0);
     await expect(page.getByLabel("Normal: Not attempted")).toBeVisible();

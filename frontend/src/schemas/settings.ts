@@ -61,6 +61,23 @@ const AISettingsSchema = z
   })
   .strict();
 
+const SpendActionCostSettingsSchema = z
+  .object({
+    generate_ai_course: z.number().int().nonnegative().default(500),
+    refresh_stale_course: z.number().int().nonnegative().default(300),
+    increase_difficulty_cap: z.number().int().nonnegative().default(200),
+    unlock_hidden_package: z.number().int().nonnegative().default(250),
+  })
+  .strict();
+
+const SpendEconomySettingsSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    allow_non_admin_ai_generation_spend: z.boolean().default(false),
+    costs: SpendActionCostSettingsSchema.default({}),
+  })
+  .strict();
+
 export const SettingsSchema = z
   .object({
     version: z.number().int().nonnegative(),
@@ -73,6 +90,7 @@ export const SettingsSchema = z
       provider: "gemini",
       model: "gemini-2.0-flash-exp",
     }),
+    spend_economy: SpendEconomySettingsSchema.default({}),
   })
   .strict();
 

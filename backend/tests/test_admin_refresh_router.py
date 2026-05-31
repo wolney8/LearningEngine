@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.models.package import Package
-from app.models.refresh import PackageRefreshRecord
+from app.models.refresh import PackageAdminMetadataRecord
 from app.models.settings import GameSettings
+from app.models.user import User
 from app.routers.admin import (
     get_packages_cache,
     get_refresh_metadata_cache,
     get_settings_cache,
 )
+from app.routers.users import require_admin_user
 from app.services.ai_generator import AIGenerationError
 
 
@@ -110,19 +111,39 @@ questions:
 """.strip()
 
 
-async def test_stale_list_rejects_invalid_token() -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+def _admin_user() -> User:
+    return User(
+        id=1,
+        username="admin",
+        email="admin@example.com",
+        hashed_password="x",
+        role="admin",
+    )
+
+
+def _install_admin_override() -> None:
+    app.dependency_overrides[require_admin_user] = _admin_user
+
+
+def _clear_admin_override() -> None:
+    app.dependency_overrides.pop(require_admin_user, None)
+
+
+async def test_stale_list_requires_authentication() -> None:
+    _clear_admin_override()
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         response = await client.get("/admin/packages/stale")
 
+    _install_admin_override()
+
     assert response.status_code == 401
 
 
 async def test_stale_list_returns_empty_when_no_stale_packages(tmp_path) -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+    _install_admin_override()
 
     pkg = _sample_package()
     package_file = tmp_path / f"{pkg.id}.yaml"
@@ -141,7 +162,7 @@ async def test_stale_list_returns_empty_when_no_stale_packages(tmp_path) -> None
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         response = await client.get(
-            "/admin/packages/stale", headers={"X-Admin-Token": "secret-token"}
+            "/admin/packages/stale"
         )
 
     app.dependency_overrides.clear()
@@ -152,12 +173,12 @@ async def test_stale_list_returns_empty_when_no_stale_packages(tmp_path) -> None
 
 
 async def test_stale_list_returns_stale_packages() -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+    _install_admin_override()
 
     pkg = _sample_package()
     stale_metadata = {
-        pkg.id: PackageRefreshRecord(
-            refreshed_at=datetime.now(tz=timezone.utc) - timedelta(days=100),
+        pkg.id: PackageAdminMetadataRecord(
+            last_refreshed_at=datetime.now(tz=timezone.utc) - timedelta(days=100),
             previous_version="1.0.0",
             new_version="1.0.1",
             diff_summary="updated",
@@ -173,7 +194,7 @@ async def test_stale_list_returns_stale_packages() -> None:
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         response = await client.get(
-            "/admin/packages/stale", headers={"X-Admin-Token": "secret-token"}
+            "/admin/packages/stale"
         )
 
     app.dependency_overrides.clear()
@@ -184,19 +205,21 @@ async def test_stale_list_returns_stale_packages() -> None:
     assert body[0]["id"] == pkg.id
 
 
-async def test_refresh_rejects_invalid_token() -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+async def test_refresh_requires_authentication() -> None:
+    _clear_admin_override()
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         response = await client.post("/admin/packages/sample-demo/refresh")
 
+    _install_admin_override()
+
     assert response.status_code == 401
 
 
 async def test_refresh_404_for_unknown_package() -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+    _install_admin_override()
 
     app.dependency_overrides[get_packages_cache] = lambda: {}
     app.dependency_overrides[get_refresh_metadata_cache] = lambda: {}
@@ -206,7 +229,6 @@ async def test_refresh_404_for_unknown_package() -> None:
     ) as client:
         response = await client.post(
             "/admin/packages/missing/refresh",
-            headers={"X-Admin-Token": "secret-token"},
         )
 
     app.dependency_overrides.clear()
@@ -215,7 +237,7 @@ async def test_refresh_404_for_unknown_package() -> None:
 
 
 async def test_refresh_dry_run_no_disk_write(monkeypatch) -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+    _install_admin_override()
 
     pkg = _sample_package()
 
@@ -242,7 +264,6 @@ async def test_refresh_dry_run_no_disk_write(monkeypatch) -> None:
     ) as client:
         response = await client.post(
             f"/admin/packages/{pkg.id}/refresh?dry_run=true",
-            headers={"X-Admin-Token": "secret-token"},
         )
 
     app.dependency_overrides.clear()
@@ -255,7 +276,7 @@ async def test_refresh_dry_run_no_disk_write(monkeypatch) -> None:
 
 
 async def test_refresh_validation_failure_returns_422(monkeypatch) -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+    _install_admin_override()
 
     pkg = _sample_package()
 
@@ -278,7 +299,6 @@ async def test_refresh_validation_failure_returns_422(monkeypatch) -> None:
     ) as client:
         response = await client.post(
             f"/admin/packages/{pkg.id}/refresh",
-            headers={"X-Admin-Token": "secret-token"},
         )
 
     app.dependency_overrides.clear()
@@ -287,7 +307,7 @@ async def test_refresh_validation_failure_returns_422(monkeypatch) -> None:
 
 
 async def test_refresh_ai_error_returns_502(monkeypatch) -> None:
-    os.environ["ADMIN_TOKEN"] = "secret-token"
+    _install_admin_override()
 
     pkg = _sample_package()
 
@@ -310,9 +330,53 @@ async def test_refresh_ai_error_returns_502(monkeypatch) -> None:
     ) as client:
         response = await client.post(
             f"/admin/packages/{pkg.id}/refresh",
-            headers={"X-Admin-Token": "secret-token"},
         )
 
     app.dependency_overrides.clear()
 
     assert response.status_code == 502
+
+
+async def test_refresh_updates_last_refreshed_metadata(monkeypatch, tmp_path) -> None:
+    _install_admin_override()
+
+    pkg = _sample_package()
+
+    async def fake_refresh_package(
+        existing: Package, settings: GameSettings | None = None
+    ) -> str:
+        assert existing.id == pkg.id
+        assert settings is not None
+        return _refreshed_yaml()
+
+    from app.routers import admin as admin_router
+
+    monkeypatch.setattr(admin_router, "refresh_package", fake_refresh_package)
+
+    original_packages_dir = admin_router.PACKAGES_DIR
+    original_metadata_file = admin_router.REFRESH_METADATA_FILE
+    admin_router.PACKAGES_DIR = tmp_path
+    admin_router.REFRESH_METADATA_FILE = tmp_path / "package-refresh-metadata.yaml"
+
+    (tmp_path / f"{pkg.id}.yaml").write_text(_refreshed_yaml(), encoding="utf-8")
+    refresh_metadata: dict[str, PackageAdminMetadataRecord] = {
+        pkg.id: PackageAdminMetadataRecord(
+            added_at=datetime.now(tz=timezone.utc) - timedelta(days=20)
+        )
+    }
+
+    app.dependency_overrides[get_packages_cache] = lambda: {pkg.id: pkg}
+    app.dependency_overrides[get_refresh_metadata_cache] = lambda: refresh_metadata
+    app.dependency_overrides[get_settings_cache] = lambda: _sample_settings(90)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(f"/admin/packages/{pkg.id}/refresh")
+
+    app.dependency_overrides.clear()
+    admin_router.PACKAGES_DIR = original_packages_dir
+    admin_router.REFRESH_METADATA_FILE = original_metadata_file
+
+    assert response.status_code == 200
+    assert refresh_metadata[pkg.id].last_refreshed_at is not None
