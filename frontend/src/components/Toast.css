@@ -1,0 +1,108 @@
+.toast-region {
+  position: fixed;
+  inset: auto 1rem 1rem auto;
+  z-index: 80;
+  width: min(24rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast-region__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid var(--colour-panel-border);
+  border-radius: 0.75rem;
+  background: var(--colour-panel-bg);
+  color: var(--colour-text-primary);
+  box-shadow: var(--colour-card-shadow);
+  padding: 0.7rem 0.8rem;
+  animation: toast-enter 220ms ease-out;
+}
+
+.toast--info {
+  border-color: var(--colour-panel-border-muted);
+  background: var(--colour-status-strip-bg);
+}
+
+.toast--success {
+  border-color: var(--colour-success-border);
+  background: var(--colour-success-bg);
+  color: var(--colour-success-text);
+}
+
+.toast--error {
+  border-color: var(--colour-danger-border-strong);
+  background: var(--colour-danger-bg);
+  color: var(--colour-danger-text);
+}
+
+.toast__content {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.toast__title {
+  margin: 0;
+  font-family: "Nunito", "Segoe UI", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.toast__message {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.toast__dismiss {
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  background: transparent;
+  color: inherit;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  min-height: 2rem;
+}
+
+.toast__dismiss:focus-visible {
+  outline: 3px solid var(--colour-focus);
+  outline-offset: 2px;
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .toast-region {
+    inset: auto 0.75rem 0.75rem 0.75rem;
+    width: auto;
+  }
+}

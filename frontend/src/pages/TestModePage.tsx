@@ -6,6 +6,7 @@ import { TestNavigator } from "../components/TestNavigator";
 import { TestResultsScreen } from "../components/TestResultsScreen";
 import { useAttempts } from "../hooks/useAttempts";
 import { useAuth } from "../hooks/useAuth";
+import { useCelebrationEffects } from "../hooks/useCelebrationEffects";
 import { useCountdown } from "../hooks/useCountdown";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
 import { useSettings } from "../hooks/useSettings";
@@ -77,6 +78,7 @@ export function TestModePage() {
   const { isFirstCompletion, markCompleted } = useFirstCompletion(`test_${id}`);
   const { addXP, subtractXP } = useXP();
   const { markPractised } = useStreak();
+  const { triggerConfetti } = useCelebrationEffects();
   const { status } = useAuth();
   const { saveResult, progressMetadata } = useTestResults(id);
   const { settings } = useSettings();
@@ -314,6 +316,10 @@ export function TestModePage() {
         timedOut,
       });
 
+      if (passed) {
+        triggerConfetti("pass");
+      }
+
       const scorePercent =
         totalPossibleWeight > 0
           ? Math.round((weightScore / totalPossibleWeight) * 100)
@@ -348,6 +354,7 @@ export function TestModePage() {
       settings.xp.hard_expert_low_answer_penalty,
       settings.xp.min_correct_for_xp,
       subtractXP,
+      triggerConfetti,
     ],
   );
 

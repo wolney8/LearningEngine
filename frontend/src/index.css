@@ -4,13 +4,131 @@
   box-sizing: border-box;
 }
 
+:root {
+  --colour-bg: #ffffff;
+  --colour-background: var(--colour-bg);
+  --colour-page-bg: #f8fafc;
+  --colour-bg-subtle: #f8fafc;
+  --colour-text: #374151;
+  --colour-text-strong: #1e293b;
+  --colour-text-primary: #0f172a;
+  --colour-text-secondary: #475569;
+  --colour-brand-strong: #1e1b4b;
+  --colour-brand: #312e81;
+  --colour-primary: #4f46e5;
+  --colour-border: #cbd5e1;
+  --colour-border-strong: #94a3b8;
+  --colour-surface: #ffffff;
+  --colour-panel-bg: #ffffff;
+  --colour-panel-border: #e2e8f0;
+  --colour-panel-bg-muted: #f8fafc;
+  --colour-panel-border-muted: #dbeafe;
+  --colour-surface-soft: #eef2ff;
+  --colour-menu-border: #dbeafe;
+  --colour-focus: #4f46e5;
+  --colour-card-bg: #ffffff;
+  --colour-card-bg-muted: #f1f5f9;
+  --colour-card-shadow: 0 4px 12px rgb(15 23 42 / 0.08);
+  --colour-pill-bg: #ffffff;
+  --colour-pill-bg-hover: #f1f5f9;
+  --colour-pill-text: #374151;
+  --colour-pill-border: #e2e8f0;
+  --colour-chip-active-bg: #4f46e5;
+  --colour-chip-active-text: #ffffff;
+  --colour-search-icon: #9ca3af;
+  --colour-search-icon-hover: #374151;
+  --colour-xp-widget-bg: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  --colour-xp-widget-compact-bg: #ffffff;
+  --colour-xp-level: #312e81;
+  --colour-xp-muted: #475569;
+  --colour-scope-bg: #eef2ff;
+  --colour-scope-border: #c7d2fe;
+  --colour-scope-text: #3730a3;
+  --colour-menu-surface: #ffffff;
+  --colour-menu-item-hover: #eef2ff;
+  --colour-warning-bg: #fff7ed;
+  --colour-warning-bg-hover: #ffedd5;
+  --colour-warning-border: #fdba74;
+  --colour-warning-border-strong: #fb923c;
+  --colour-warning-text: #c2410c;
+  --colour-danger-bg: #fef2f2;
+  --colour-danger-bg-hover: #fee2e2;
+  --colour-danger-border: #fca5a5;
+  --colour-danger-border-strong: #ef4444;
+  --colour-danger-text: #b91c1c;
+  --colour-success-bg: #f0fdf4;
+  --colour-success-border: #86efac;
+  --colour-success-text: #166534;
+  --colour-status-strip-border: #dbeafe;
+  --colour-status-strip-bg: linear-gradient(125deg, #eff6ff 0%, #f8fafc 70%);
+}
+
+:root[data-theme="dark"] {
+  --colour-bg: #0f172a;
+  --colour-background: var(--colour-bg);
+  --colour-page-bg: #0f172a;
+  --colour-bg-subtle: #111827;
+  --colour-text: #e5e7eb;
+  --colour-text-strong: #f8fafc;
+  --colour-text-primary: #f8fafc;
+  --colour-text-secondary: #cbd5e1;
+  --colour-brand-strong: #e0e7ff;
+  --colour-brand: #c7d2fe;
+  --colour-primary: #818cf8;
+  --colour-border: #334155;
+  --colour-border-strong: #475569;
+  --colour-surface: #111827;
+  --colour-panel-bg: #111827;
+  --colour-panel-border: #334155;
+  --colour-panel-bg-muted: #1f2937;
+  --colour-panel-border-muted: #334155;
+  --colour-surface-soft: #1f2937;
+  --colour-menu-border: #334155;
+  --colour-focus: #a5b4fc;
+  --colour-card-bg: #111827;
+  --colour-card-bg-muted: #1f2937;
+  --colour-card-shadow: 0 4px 12px rgb(0 0 0 / 0.32);
+  --colour-pill-bg: #0f172a;
+  --colour-pill-bg-hover: #1f2937;
+  --colour-pill-text: #e5e7eb;
+  --colour-pill-border: #334155;
+  --colour-chip-active-bg: #6366f1;
+  --colour-chip-active-text: #020617;
+  --colour-search-icon: #94a3b8;
+  --colour-search-icon-hover: #e5e7eb;
+  --colour-xp-widget-bg: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  --colour-xp-widget-compact-bg: #0f172a;
+  --colour-xp-level: #c7d2fe;
+  --colour-xp-muted: #cbd5e1;
+  --colour-scope-bg: #1e293b;
+  --colour-scope-border: #334155;
+  --colour-scope-text: #c7d2fe;
+  --colour-menu-surface: #0f172a;
+  --colour-menu-item-hover: #312e81;
+  --colour-warning-bg: #3a220f;
+  --colour-warning-bg-hover: #4a2c12;
+  --colour-warning-border: #9a3412;
+  --colour-warning-border-strong: #c2410c;
+  --colour-warning-text: #fdba74;
+  --colour-danger-bg: #3f1d1d;
+  --colour-danger-bg-hover: #4c1d1d;
+  --colour-danger-border: #991b1b;
+  --colour-danger-border-strong: #dc2626;
+  --colour-danger-text: #fca5a5;
+  --colour-success-bg: #052e1b;
+  --colour-success-border: #166534;
+  --colour-success-text: #86efac;
+  --colour-status-strip-border: #334155;
+  --colour-status-strip-bg: linear-gradient(125deg, #172554 0%, #111827 70%);
+}
+
 body {
   margin: 0;
   font-family: "Inter", system-ui, sans-serif;
   font-size: 1rem;
   line-height: 1.6;
-  color: #374151;
-  background: #ffffff;
+  color: var(--colour-text);
+  background: var(--colour-page-bg);
 }
 
 h1,

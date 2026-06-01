@@ -6,7 +6,9 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.main import app
 from app.models.package import Package
+from app.models.user import User
 from app.routers.packages import get_package_overrides, get_packages_cache
+from app.routers.users import require_admin_user
 from app.services.db import get_session
 from app.services.overrides_loader import PackageOverride
 
@@ -240,3 +242,58 @@ async def test_login_rejects_invalid_password(auth_client: AsyncClient) -> None:
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid username/email or password"}
+
+
+async def test_login_returns_bonus_xp_notice_once_after_admin_grant(
+    auth_client: AsyncClient,
+) -> None:
+    register_response = await auth_client.post(
+        "/auth/register",
+        json={
+            "username": "bonus-user",
+            "email": "bonus-user@example.com",
+            "password": "StrongPass123",
+        },
+    )
+    assert register_response.status_code == 200
+    user_id = register_response.json()["user"]["id"]
+
+    app.dependency_overrides[require_admin_user] = lambda: User(
+        id=999,
+        username="admin",
+        email="admin@example.com",
+        hashed_password="x",
+        role="admin",
+    )
+
+    bonus_response = await auth_client.post(
+        f"/admin/users/{user_id}/xp/bonus",
+        json={"xp": 35, "reason": "Excellent progression"},
+    )
+    assert bonus_response.status_code == 200
+    assert bonus_response.json()["xp"] == 35
+
+    app.dependency_overrides.pop(require_admin_user, None)
+
+    first_login = await auth_client.post(
+        "/auth/login",
+        json={
+            "username_or_email": "bonus-user",
+            "password": "StrongPass123",
+        },
+    )
+    assert first_login.status_code == 200
+    assert first_login.json()["user"]["bonus_xp_notice"] == {
+        "xp": 35,
+        "reason": "Excellent progression",
+    }
+
+    second_login = await auth_client.post(
+        "/auth/login",
+        json={
+            "username_or_email": "bonus-user",
+            "password": "StrongPass123",
+        },
+    )
+    assert second_login.status_code == 200
+    assert second_login.json()["user"]["bonus_xp_notice"] is None

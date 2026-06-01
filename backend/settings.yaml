@@ -29,7 +29,7 @@ content_refresh:
   stale_after_days: 1
 ai:
   provider: gemini
-  model: gemini-2.0-flash-exp
+  model: gemini-2.5-flash
 spend_economy:
   enabled: false
   allow_non_admin_ai_generation_spend: false
@@ -38,3 +38,9 @@ spend_economy:
     refresh_stale_course: 300
     increase_difficulty_cap: 200
     unlock_hidden_package: 250
+celebration_effects:
+  enabled: true
+  confetti_on_pass: true
+  confetti_on_bonus_xp_gain: true
+  lightning_on_streak_milestones: true
+  respect_reduced_motion: true

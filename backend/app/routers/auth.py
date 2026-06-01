@@ -36,11 +36,16 @@ class LoginRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
+    class BonusXPNotice(BaseModel):
+        xp: int
+        reason: str
+
     id: int
     username: str
     email: str
     role: str
     xp: int
+    bonus_xp_notice: BonusXPNotice | None = None
     created_at: datetime
 
 
@@ -59,12 +64,20 @@ def _normalise_email(value: str) -> str:
 
 
 def _to_user_response(user: User) -> UserResponse:
+    bonus_xp_notice: UserResponse.BonusXPNotice | None = None
+    if user.pending_bonus_xp > 0 and user.pending_bonus_reason is not None:
+        bonus_xp_notice = UserResponse.BonusXPNotice(
+            xp=user.pending_bonus_xp,
+            reason=user.pending_bonus_reason,
+        )
+
     return UserResponse(
         id=user.id or 0,
         username=user.username,
         email=user.email,
         role=user.role,
         xp=user.xp,
+        bonus_xp_notice=bonus_xp_notice,
         created_at=user.created_at,
     )
 
@@ -166,5 +179,13 @@ async def login(
             detail="Invalid username/email or password",
         )
 
+    user_response = _to_user_response(user)
+    if user.pending_bonus_xp > 0:
+        # Bonus notice is shown exactly once on the next successful login.
+        user.pending_bonus_xp = 0
+        user.pending_bonus_reason = None
+        session.add(user)
+        session.commit()
+
     token = create_access_token(subject=str(user.id), role=user.role)
-    return AuthResponse(access_token=token, user=_to_user_response(user))
+    return AuthResponse(access_token=token, user=user_response)

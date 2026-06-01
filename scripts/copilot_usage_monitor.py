@@ -28,8 +28,8 @@ class ModelBilling:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Summarise local Copilot activity and estimate premium burn-rate "
-            "for a multi-agent workflow."
+            "Summarise local Copilot activity and estimate premium/AI-credit "
+            "burn-rate for a multi-agent workflow."
         )
     )
     parser.add_argument(
@@ -67,6 +67,30 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=10.0,
         help="Monthly additional budget in USD (default: 10).",
+    )
+    parser.add_argument(
+        "--included-ai-credits",
+        type=float,
+        default=1500.0,
+        help="Monthly included AI credits (default: 1500 for Copilot Pro docs).",
+    )
+    parser.add_argument(
+        "--credits-per-premium-unit",
+        type=float,
+        default=1.0,
+        help=(
+            "Deprecated alias for --credits-per-activity-unit. "
+            "If --credits-per-activity-unit is provided, it takes precedence."
+        ),
+    )
+    parser.add_argument(
+        "--credits-per-activity-unit",
+        type=float,
+        default=None,
+        help=(
+            "Estimated AI credits consumed per calculated activity unit "
+            "(default: 1.0). Calibrate from dashboard data."
+        ),
     )
     return parser.parse_args()
 
@@ -148,6 +172,40 @@ def parse_session_starts(log_root: Path, days: int) -> tuple[int, int]:
             continue
 
     return total, recent
+
+
+def recent_daily_units(log_root: Path, cycle_units: float, days: int) -> float:
+    if days <= 0:
+        return 0.0
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    recent_sessions = 0
+    for main_file in log_root.glob("*/main.jsonl"):
+        try:
+            with main_file.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except Exception:
+                        continue
+
+                    if event.get("type") != "session_start":
+                        continue
+
+                    ts_ms = event.get("ts")
+                    if not isinstance(ts_ms, (int, float)):
+                        continue
+
+                    dt = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc)
+                    if dt >= cutoff:
+                        recent_sessions += 1
+        except Exception:
+            continue
+
+    return (recent_sessions * cycle_units) / float(days)
 
 
 def parse_agent_models(repo_root: Path) -> dict[str, str]:
@@ -245,6 +303,8 @@ def print_report(
     days: int,
     allowance: float,
     budget_usd: float,
+    included_ai_credits: float,
+    credits_per_activity_unit: float,
 ) -> None:
     print("Copilot local usage monitor")
     print("=" * 28)
@@ -268,7 +328,8 @@ def print_report(
 
     print("Agent model mapping")
     print("-" * 19)
-    cycle_units = 0.0
+    cycle_billing_units = 0.0
+    cycle_activity_units = 0.0
     mapped = 0
     for agent, model_name in sorted(agent_models.items()):
         resolved = resolve_model_id(model_name, models)
@@ -278,7 +339,8 @@ def print_report(
 
         info = models[resolved]
         mapped += 1
-        cycle_units += info.multiplier
+        cycle_billing_units += info.multiplier
+        cycle_activity_units += info.multiplier if info.multiplier > 0 else 1.0
         premium_text = "premium" if info.is_premium else "included"
         print(
             f"{agent}: {model_name or '(not set)'} -> {resolved} "
@@ -286,29 +348,65 @@ def print_report(
         )
 
     print()
+    additional_ai_credits = budget_usd * 100.0
+    total_credit_capacity = included_ai_credits + additional_ai_credits
+
     if mapped == 0:
         print("No agent model mappings resolved from local model catalogue.")
     else:
         print("Legacy premium-request estimate")
         print("-" * 31)
-        print(f"Estimated premium units per full multi-agent cycle: {cycle_units:g}")
-        if cycle_units > 0:
-            cycles = allowance / cycle_units
+        print(
+            f"Estimated premium billing units per full multi-agent cycle: "
+            f"{cycle_billing_units:g}"
+        )
+        if cycle_billing_units > 0:
+            cycles = allowance / cycle_billing_units
             print(
                 f"Approx full cycles before {allowance:g} premium requests are exhausted: "
                 f"{cycles:.1f}"
             )
         else:
-            print("All mapped models are included-tier in this catalogue.")
+            print("All mapped models are included-tier in this catalogue (multiplier 0).")
+
+        daily_activity_units = recent_daily_units(log_root, cycle_activity_units, days)
+        daily_ai_credits = daily_activity_units * credits_per_activity_unit
+
+        print()
+        print("Usage-based AI-credit estimate")
+        print("-" * 30)
+        print(
+            f"Estimated activity units/day (last {days}d): {daily_activity_units:.2f}"
+        )
+        print(
+            f"Calibration factor: {credits_per_activity_unit:.3f} AI credits per activity unit"
+        )
+        print(f"Estimated AI credits/day: {daily_ai_credits:.2f}")
+
+        if daily_ai_credits > 0:
+            days_to_included = included_ai_credits / daily_ai_credits
+            days_to_total = total_credit_capacity / daily_ai_credits
+            print(
+                f"Projected days to exhaust included credits ({included_ai_credits:.0f}): "
+                f"{days_to_included:.1f}"
+            )
+            print(
+                f"Projected days to exhaust included + additional ({total_credit_capacity:.0f}): "
+                f"{days_to_total:.1f}"
+            )
+        else:
+            print("Insufficient recent activity to project exhaustion runway.")
 
     print()
     print("Usage-based billing reminder")
     print("-" * 29)
-    credits = budget_usd * 100
+    credits = additional_ai_credits
+    print(f"Included AI credits/month: {included_ai_credits:.0f}")
     print(
         f"Additional budget ${budget_usd:.2f} ~= {credits:.0f} AI credits "
         "(1 credit = $0.01)."
     )
+    print(f"Total estimated monthly AI-credit capacity: {total_credit_capacity:.0f}")
     print(
         "This local script cannot read your account's exact consumed AI credits; "
         "check GitHub Copilot usage dashboard for authoritative totals."
@@ -335,6 +433,12 @@ def main() -> int:
     agent_models = parse_agent_models(repo_root)
     workspace_counts = count_workspace_factors(repo_root)
 
+    credits_per_activity_unit = (
+        args.credits_per_activity_unit
+        if args.credits_per_activity_unit is not None
+        else args.credits_per_premium_unit
+    )
+
     print_report(
         log_root=log_root,
         models=models,
@@ -345,6 +449,8 @@ def main() -> int:
         days=args.days,
         allowance=args.legacy_premium_allowance,
         budget_usd=args.additional_budget_usd,
+        included_ai_credits=args.included_ai_credits,
+        credits_per_activity_unit=credits_per_activity_unit,
     )
 
     return 0

@@ -1,9 +1,9 @@
 .xp-widget {
   min-width: 10.5rem;
-  border: 1px solid #c7d2fe;
+  border: 1px solid var(--colour-border);
   border-radius: 0.875rem;
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
-  box-shadow: 0 4px 10px rgb(30 27 75 / 0.08);
+  background: var(--colour-xp-widget-bg);
+  box-shadow: var(--colour-card-shadow);
   padding: 0.45rem 0.6rem;
   display: grid;
   gap: 0.22rem;
@@ -18,8 +18,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgb(30 41 59 / 0.08);
+  background: var(--colour-xp-widget-compact-bg);
+  box-shadow: var(--colour-card-shadow);
   white-space: nowrap;
 }
 
@@ -33,7 +33,7 @@
 }
 
 .xp-widget__divider {
-  color: #64748b;
+  color: var(--colour-xp-muted);
   font-size: 0.72rem;
   line-height: 1;
 }
@@ -48,7 +48,7 @@
 
 .xp-widget__level {
   margin: 0;
-  color: #312e81;
+  color: var(--colour-xp-level);
   font-family: "Nunito", sans-serif;
   font-size: 0.86rem;
   font-weight: 800;
@@ -58,7 +58,7 @@
 .xp-widget__total,
 .xp-widget__remaining {
   margin: 0;
-  color: #475569;
+  color: var(--colour-xp-muted);
   font-family: "Inter", sans-serif;
   font-size: 0.72rem;
   font-weight: 600;
@@ -69,8 +69,8 @@
   margin-top: 0.12rem;
   height: 0.45rem;
   border-radius: 9999px;
-  border: 1px solid #bae6fd;
-  background: #e0f2fe;
+  border: 1px solid var(--colour-border);
+  background: var(--colour-surface-soft);
   overflow: hidden;
 }
 

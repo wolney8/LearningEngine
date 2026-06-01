@@ -390,11 +390,6 @@ export function PackageListPage() {
 
   return (
     <main className="package-list-page">
-      <p className="package-list-page__subtitle">
-        {isAuthenticated && effectiveScope === "library"
-          ? "Your selected courses"
-          : "Pick a package to start learning"}
-      </p>
       {(authStatus === "authenticated" || dailyStreak > 0) && (
         <div className="package-list-page__status-strip">
           {authStatus === "authenticated" && user && (

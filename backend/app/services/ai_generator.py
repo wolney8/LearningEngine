@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Literal
 
 import yaml
@@ -49,13 +50,73 @@ QUESTION DIFFICULTY TAGGING:
         large ones?"
 """
 
+AI_ERROR_CODE_MISSING_API_KEY = "ai_missing_api_key"
+AI_ERROR_CODE_PROVIDER_OVERLOADED = "ai_provider_overloaded"
+AI_ERROR_CODE_PROVIDER_UNAVAILABLE = "ai_provider_unavailable"
+AI_ERROR_CODE_UPSTREAM_FAILURE = "ai_upstream_failure"
+
 
 class AIGenerationError(Exception):
     """Raised when the AI generator fails to produce a valid package."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = AI_ERROR_CODE_UPSTREAM_FAILURE,
+    ):
+        super().__init__(message)
+        self.error_code = error_code
+
 
 DEFAULT_AI_PROVIDER: Literal["gemini"] = "gemini"
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
+
+
+def _normalise_tags(raw_tags: object) -> list[str]:
+    if not isinstance(raw_tags, list):
+        return []
+
+    normalised: list[str] = []
+    seen: set[str] = set()
+    for raw_tag in raw_tags:
+        if not isinstance(raw_tag, str):
+            continue
+        tag = raw_tag.strip()
+        if not tag:
+            continue
+        dedupe_key = tag.casefold()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        normalised.append(tag)
+    return normalised
+
+
+def _slugify_tag(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+    return slug
+
+
+def _fallback_generation_tags(topic: str, audience: str) -> list[str]:
+    candidates: list[str] = []
+    topic_tag = _slugify_tag(topic)
+    audience_tag = _slugify_tag(audience)
+
+    if topic_tag:
+        candidates.append(topic_tag)
+    if audience_tag:
+        candidates.append(f"audience-{audience_tag}")
+    candidates.append("ai-generated")
+
+    fallback = _normalise_tags(candidates)
+    if fallback:
+        return fallback
+    return ["ai-generated", "general-learning"]
+
+
+def _with_tags(pkg: Package, tags: list[str]) -> Package:
+    return pkg.model_copy(update={"tags": tags})
 
 
 def _resolve_provider_and_model(
@@ -81,6 +142,54 @@ def _resolve_provider_and_model(
     return provider, model_name
 
 
+def _extract_status_code(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+
+    response = getattr(exc, "response", None)
+    response_status = getattr(response, "status_code", None)
+    if isinstance(response_status, int):
+        return response_status
+
+    return None
+
+
+def _classify_provider_failure(exc: Exception) -> str:
+    status_code = _extract_status_code(exc)
+    if status_code == 429:
+        return AI_ERROR_CODE_PROVIDER_OVERLOADED
+    if status_code in {502, 503, 504}:
+        return AI_ERROR_CODE_PROVIDER_UNAVAILABLE
+
+    text = f"{type(exc).__name__} {exc}".casefold()
+    overloaded_markers = (
+        "overload",
+        "overloaded",
+        "high demand",
+        "too many requests",
+        "rate limit",
+        "quota",
+        "capacity",
+        "busy",
+    )
+    unavailable_markers = (
+        "unavailable",
+        "service unavailable",
+        "temporarily unavailable",
+        "timeout",
+        "timed out",
+        "bad gateway",
+        "gateway timeout",
+    )
+
+    if any(marker in text for marker in overloaded_markers):
+        return AI_ERROR_CODE_PROVIDER_OVERLOADED
+    if any(marker in text for marker in unavailable_markers):
+        return AI_ERROR_CODE_PROVIDER_UNAVAILABLE
+    return AI_ERROR_CODE_UPSTREAM_FAILURE
+
+
 def _get_agent(
     *,
     settings: GameSettings | None = None,
@@ -96,7 +205,10 @@ def _get_agent(
 
     api_key = api_key_override or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise AIGenerationError("GEMINI_API_KEY is not set. Add it to backend/.env")
+        raise AIGenerationError(
+            "AI service is not configured.",
+            error_code=AI_ERROR_CODE_MISSING_API_KEY,
+        )
 
     provider = GoogleGLAProvider(api_key=api_key)
     model = GeminiModel(model_name, provider=provider)
@@ -133,9 +245,18 @@ async def generate_package(
     try:
         result = await agent.run(prompt)
     except Exception as exc:
-        raise AIGenerationError(f"Gemini API call failed: {exc}") from exc
+        raise AIGenerationError(
+            "AI provider request failed.",
+            error_code=_classify_provider_failure(exc),
+        ) from exc
 
     pkg: Package = result.output
+    generated_tags = _normalise_tags(pkg.tags)
+    if generated_tags:
+        pkg = _with_tags(pkg, generated_tags)
+    else:
+        pkg = _with_tags(pkg, _fallback_generation_tags(topic, audience))
+
     pkg_dict = pkg.model_dump(mode="python")
     return yaml.dump(
         pkg_dict,
@@ -165,9 +286,25 @@ async def refresh_package(
     try:
         result = await agent.run(prompt)
     except Exception as exc:
-        raise AIGenerationError(f"Gemini API call failed: {exc}") from exc
+        raise AIGenerationError(
+            "AI provider request failed.",
+            error_code=_classify_provider_failure(exc),
+        ) from exc
 
     pkg: Package = result.output
+    generated_tags = _normalise_tags(pkg.tags)
+    if generated_tags:
+        pkg = _with_tags(pkg, generated_tags)
+    else:
+        existing_tags = _normalise_tags(existing.tags)
+        if existing_tags:
+            pkg = _with_tags(pkg, existing_tags)
+        else:
+            pkg = _with_tags(
+                pkg,
+                _fallback_generation_tags(existing.title, "existing-audience"),
+            )
+
     pkg_dict = pkg.model_dump(mode="python")
     return yaml.dump(
         pkg_dict,
@@ -183,7 +320,13 @@ async def test_connection(
     api_key: str,
     provider_override: Literal["gemini"] | None = None,
     model_override: str | None = None,
-) -> None:
+) -> str:
+    _, model_name = _resolve_provider_and_model(
+        settings=settings,
+        provider_override=provider_override,
+        model_override=model_override,
+    )
+
     agent = _get_agent(
         settings=settings,
         provider_override=provider_override,
@@ -194,5 +337,8 @@ async def test_connection(
         await agent.run("Reply with exactly: ok")
     except Exception as exc:
         raise AIGenerationError(
-            "Connection test failed. Check provider, model, and API key."
+            "Connection test failed. Check provider, model, and API key.",
+            error_code=_classify_provider_failure(exc),
         ) from exc
+
+    return model_name

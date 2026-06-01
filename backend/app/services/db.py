@@ -35,6 +35,17 @@ def _ensure_sqlite_user_schema_compatibility() -> None:
                 "ADD COLUMN streak_count INTEGER NOT NULL DEFAULT 0"
             )
 
+        if "pending_bonus_xp" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "user" '
+                "ADD COLUMN pending_bonus_xp INTEGER NOT NULL DEFAULT 0"
+            )
+
+        if "pending_bonus_reason" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "user" ADD COLUMN pending_bonus_reason TEXT'
+            )
+
         if "last_practised_date" not in existing_columns:
             connection.exec_driver_sql(
                 'ALTER TABLE "user" ADD COLUMN last_practised_date DATE'
@@ -102,7 +113,7 @@ def _ensure_sqlite_user_test_result_schema_compatibility() -> None:
 
 
 def init_db() -> None:
-    # Ensure metadata includes user tables before creating schema.
+    # Ensure metadata includes user-related tables before creating schema.
     from app.models.user import UserLibraryItem, UserTestResult  # noqa: F401
 
     if DATABASE_URL.startswith("sqlite"):

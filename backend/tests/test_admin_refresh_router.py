@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
+import yaml
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
@@ -15,6 +17,7 @@ from app.routers.admin import (
     get_settings_cache,
 )
 from app.routers.users import require_admin_user
+from app.services import ai_generator
 from app.services.ai_generator import AIGenerationError
 
 
@@ -380,3 +383,48 @@ async def test_refresh_updates_last_refreshed_metadata(monkeypatch, tmp_path) ->
 
     assert response.status_code == 200
     assert refresh_metadata[pkg.id].last_refreshed_at is not None
+
+
+async def test_ai_generate_package_applies_fallback_tags_when_empty(
+    monkeypatch,
+) -> None:
+    generated = _sample_package().model_copy(update={"tags": []})
+
+    class FakeAgent:
+        async def run(self, prompt: str):
+            return SimpleNamespace(output=generated)
+
+    monkeypatch.setattr(ai_generator, "_get_agent", lambda **kwargs: FakeAgent())
+
+    yaml_content = await ai_generator.generate_package(
+        topic="Cyber Security Essentials",
+        audience="New Employees",
+        num_pages=1,
+        num_questions=1,
+        settings=None,
+    )
+
+    raw = yaml.safe_load(yaml_content)
+    assert raw["tags"] == [
+        "cyber-security-essentials",
+        "audience-new-employees",
+        "ai-generated",
+    ]
+
+
+async def test_ai_refresh_preserves_existing_tags_when_generated_tags_empty(
+    monkeypatch,
+) -> None:
+    existing = _sample_package().model_copy(update={"tags": ["existing", "Focus"]})
+    refreshed = _sample_package().model_copy(update={"tags": ["", " "]})
+
+    class FakeAgent:
+        async def run(self, prompt: str):
+            return SimpleNamespace(output=refreshed)
+
+    monkeypatch.setattr(ai_generator, "_get_agent", lambda **kwargs: FakeAgent())
+
+    yaml_content = await ai_generator.refresh_package(existing, settings=None)
+
+    raw = yaml.safe_load(yaml_content)
+    assert raw["tags"] == ["existing", "Focus"]

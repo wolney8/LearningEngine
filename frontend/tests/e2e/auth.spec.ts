@@ -74,6 +74,61 @@ test.describe("Optional auth shell", () => {
     await expect(page.getByText("Sample Package")).toBeVisible();
   });
 
+  test("theme toggle persists explicit light or dark choice across reload", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const themeToggle = page.getByRole("button", {
+      name: "Switch to dark theme",
+    });
+    await themeToggle.click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("dark");
+
+    await page.reload();
+
+    await expect(
+      page.getByRole("button", { name: "Switch to light theme" }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("dark");
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("lle_theme_mode")))
+      .toBe("dark");
+  });
+
+  test("system default tracks emulated OS colour scheme with no stored choice", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/");
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("dark");
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("lle_theme_mode")))
+      .toBeNull();
+
+    await page.emulateMedia({ colorScheme: "light" });
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("light");
+  });
+
   test("register page submits and returns to home", async ({ page }) => {
     let registerBody: {
       username: string;
@@ -181,6 +236,175 @@ test.describe("Optional auth shell", () => {
     await page.goto("/register");
     await checkA11y(page);
     await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
+  });
+
+  test("login shows one-time Bonus XP notice when provided by auth response", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 3,
+      username: "learner-bonus",
+      email: "learner-bonus@example.com",
+      role: "student",
+      xp: 110,
+      bonus_xp_notice: {
+        xp: 30,
+        reason: "Outstanding peer support",
+      },
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-bonus-notice",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("learner-bonus");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("/");
+    const bonusNotice = page.locator(".app-top-bar__bonus-notice");
+    await expect(bonusNotice).toBeVisible();
+    await expect(bonusNotice).toContainText("Level boost unlocked");
+    await expect(bonusNotice).toContainText(
+      "+30 XP for Outstanding peer support. Keep the momentum!",
+    );
+    await expect(bonusNotice).not.toContainText("Reason:");
+
+    await page.getByRole("button", { name: "Dismiss" }).click();
+    await expect(bonusNotice).toHaveCount(0);
+  });
+
+  test("admin top bar links remain intact and sign-out restores guest CTAs", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 5,
+      username: "admin-nav",
+      email: "admin-nav@example.com",
+      role: "admin",
+      xp: 18,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-admin-nav",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("admin-nav");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    const topBar = page.getByTestId("app-top-bar");
+    await expect(topBar.getByText("admin-nav")).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Admin panel" })).toHaveAttribute(
+      "href",
+      "/admin/users",
+    );
+    await expect(topBar.getByRole("link", { name: "Learner view" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    await expect(topBar.getByRole("link", { name: "Profile" })).toHaveAttribute(
+      "href",
+      "/profile",
+    );
+    await expect(
+      topBar.getByRole("button", { name: "Sign out" }).first(),
+    ).toBeVisible();
+
+    await topBar.getByRole("button", { name: "Sign out" }).first().click();
+
+    await expect(topBar.getByRole("link", { name: "Create account" })).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Admin panel" })).toHaveCount(0);
+    await expect(topBar.getByRole("link", { name: "Profile" })).toHaveCount(0);
+  });
+
+  test("mobile account menu closes on outside click and Escape", async ({ page }) => {
+    const authUser = {
+      id: 4,
+      username: "admin-mobile",
+      email: "admin-mobile@example.com",
+      role: "admin",
+      xp: 10,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-mobile-menu",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("admin-mobile");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    const accountButton = page.getByRole("button", { name: "Account" });
+    await accountButton.click();
+    const accountMenu = page.locator("#app-top-bar-mobile-menu");
+    await expect(accountMenu.getByText("admin-mobile")).toBeVisible();
+    await expect(accountMenu.getByRole("link", { name: "Learner view" })).toBeVisible();
+
+    await page.mouse.click(8, 8);
+    await expect(accountMenu).toHaveCount(0);
+
+    await accountButton.click();
+    await expect(accountMenu.getByRole("link", { name: "Profile" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(accountMenu).toHaveCount(0);
   });
 
   test("profile route redirects unauthenticated users to login", async ({ page }) => {

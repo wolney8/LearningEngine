@@ -1,0 +1,393 @@
+id: sample-demo
+title: Python Basics Demo
+description: A short demo package covering Python fundamentals, used for testing the
+  schema layer.
+version: 1.0.1
+tags:
+- Python
+- Basics
+- Programming
+passing_score: 0.8
+pages:
+- id: intro-variables-data-types
+  title: Introduction to Python, Variables, and Data Types
+  content: "# Introduction to Python\n\nPython is a high-level, interpreted programming\
+    \ language known for its readability and versatility. It supports multiple programming\
+    \ paradigms, including object-oriented, imperative, and functional programming.\n\
+    \n## Basic Syntax and Comments\n\nPython code is structured using indentation.\
+    \ Comments start with a `#`.\n\n```python\n# This is a single-line comment\nprint(\"\
+    Hello, Python!\") # This prints a string to the console\n```\n\n## Variables\n\
+    \nVariables are used to store data values. Python is dynamically typed, meaning\
+    \ you don't need to declare the type of a variable when you create it.\n\n```python\n\
+    name = \"Alice\"      # A string variable\nage = 30            # An integer variable\n\
+    height = 1.75       # A float variable\nis_student = True   # A boolean variable\n\
+    ```\n\n## Common Data Types\n\nPython has several built-in data types:\n\n*  \
+    \ **Numeric Types:**\n    *   `int`: Whole numbers (e.g., `5`, `-100`).\n    *\
+    \   `float`: Decimal numbers (e.g., `3.14`, `-0.001`).\n    *   `complex`: Complex\
+    \ numbers (e.g., `1 + 2j`).\n\n*   **Sequence Types:**\n    *   `str`: Immutable\
+    \ sequences of characters (e.g., `\"hello\"`, `'world'`).\n    *   `list`: Mutable,\
+    \ ordered sequences of items (e.g., `[1, 2, 3]`, `['apple', 'banana']`). Items\
+    \ can be of different types.\n    *   `tuple`: Immutable, ordered sequences of\
+    \ items (e.g., `(1, 2, 3)`, `('red', 'green')`).\n\n*   **Mapping Type:**\n  \
+    \  *   `dict`: Mutable, unordered collections of key-value pairs (e.g., `{\"name\"\
+    : \"Bob\", \"age\": 25}`). Keys must be unique and immutable.\n\n*   **Set Types:**\n\
+    \    *   `set`: Mutable, unordered collections of unique items (e.g., `{1, 2,\
+    \ 3}`).\n    *   `frozenset`: Immutable version of a set.\n\n*   **Boolean Type:**\n\
+    \    *   `bool`: Represents truth values (`True` or `False`).\n"
+- id: control-flow
+  title: 'Control Flow: Conditionals and Loops'
+  content: "# Control Flow in Python\n\nControl flow statements determine the order\
+    \ in which code is executed. Python primarily uses `if/elif/else` for conditional\
+    \ execution and `for`/`while` for looping.\n\n## Conditional Statements: `if`,\
+    \ `elif`, `else`\n\nThese statements allow your program to make decisions based\
+    \ on conditions.\n\n```python\nscore = 85\n\nif score >= 90:\n    print(\"Grade\
+    \ A\")\nelif score >= 80:\n    print(\"Grade B\")\nelif score >= 70:\n    print(\"\
+    Grade C\")\nelse:\n    print(\"Grade D\")\n```\n\n*   An `if` statement evaluates\
+    \ a condition. If `True`, its indented block is executed.\n*   `elif` (short for\
+    \ \"else if\") allows checking multiple conditions sequentially.\n*   `else` provides\
+    \ a fallback block if none of the preceding `if` or `elif` conditions are `True`.\n\
+    \n## Looping Statements\n\nLoops allow you to execute a block of code repeatedly.\n\
+    \n### `for` Loops\n\n`for` loops are used for iterating over a sequence (like\
+    \ a list, tuple, dictionary, set, or string) or other iterable objects.\n\n```python\n\
+    # Iterating over a list\nfruits = [\"apple\", \"banana\", \"cherry\"]\nfor fruit\
+    \ in fruits:\n    print(f\"I like {fruit}\")\n\n# Using range() for a specific\
+    \ number of iterations\nfor i in range(3): # range(3) generates 0, 1, 2\n    print(f\"\
+    Count: {i+1}\")\n```\n\n### `while` Loops\n\n`while` loops execute a block of\
+    \ code as long as a condition is `True`.\n\n```python\ncount = 0\nwhile count\
+    \ < 5:\n    print(f\"Current count is {count}\")\n    count += 1\n```\n\n## Loop\
+    \ Control Statements\n\n*   `break`: Terminates the loop entirely.\n*   `continue`:\
+    \ Skips the rest of the current iteration and moves to the next.\n\n```python\n\
+    for i in range(10):\n    if i == 3:\n        continue # Skip printing 3\n    if\
+    \ i == 7:\n        break    # Stop the loop at 7\n    print(i)\n```\n"
+- id: functions
+  title: Functions in Python
+  content: "# Functions in Python\n\nFunctions are blocks of organized, reusable code\
+    \ that perform a single, related action. They help in breaking down complex problems\
+    \ into smaller, manageable chunks and promote code reusability.\n\n## Defining\
+    \ a Function\n\nFunctions are defined using the `def` keyword, followed by the\
+    \ function name, parentheses `()`, and a colon `:`. The function body is indented.\n\
+    \n```python\ndef greet():\n    \"\"\"This function prints a simple greeting.\"\
+    \"\"\n    print(\"Hello there!\")\n\n# Calling the function\ngreet()\n```\n\n\
+    ## Parameters and Arguments\n\nInformation can be passed into functions as arguments.\
+    \ Arguments are specified after the function name, inside the parentheses.\n\n\
+    ```python\ndef greet_person(name): # 'name' is a parameter\n    print(f\"Hello,\
+    \ {name}!\")\n\ngreet_person(\"Alice\") # 'Alice' is an argument\ngreet_person(\"\
+    Bob\")\n```\n\n### Default Arguments\n\nYou can specify a default value for a\
+    \ parameter. If no argument is provided for that parameter, the default value\
+    \ is used.\n\n```python\ndef add(a, b=5):\n    return a + b\n\nprint(add(10))\
+    \    # b uses default value: 10 + 5 = 15\nprint(add(10, 2)) # b is overridden:\
+    \ 10 + 2 = 12\n```\n\n### Keyword Arguments\n\nYou can pass arguments by specifying\
+    \ the parameter name, which allows you to pass them in any order.\n\n```python\n\
+    def describe_pet(animal_type, pet_name):\n    print(f\"I have a {animal_type}\
+    \ named {pet_name}.\")\n\ndescribe_pet(animal_type=\"dog\", pet_name=\"Buddy\"\
+    )\ndescribe_pet(pet_name=\"Whiskers\", animal_type=\"cat\")\n```\n\n## Return\
+    \ Values\n\nFunctions can return data as a result. The `return` statement is used\
+    \ for this purpose.\n\n```python\ndef multiply(x, y):\n    return x * y\n\nresult\
+    \ = multiply(4, 5)\nprint(result) # Output: 20\n```\n\nIf a function doesn't explicitly\
+    \ `return` a value, it implicitly returns `None`."
+questions:
+- id: easy-q1-print-hello
+  difficulty: easy
+  text: What is the correct way to print "Hello, World!" in Python?
+  answers:
+  - id: a1
+    text: print("Hello, World!")
+  - id: a2
+    text: echo "Hello, World!"
+  - id: a3
+    text: console.log("Hello, World!")
+  - id: a4
+    text: System.out.println("Hello, World!")
+  correct_answer: a1
+  weight: 25.0
+  feedback: '`print()` is the standard function for output in Python.'
+  revision_page_ids:
+  - intro-variables-data-types
+- id: easy-q2-valid-variable
+  difficulty: easy
+  text: Which of the following is a valid Python variable name?
+  answers:
+  - id: a1
+    text: my_variable
+  - id: a2
+    text: 1st_variable
+  - id: a3
+    text: my-variable
+  - id: a4
+    text: _variable?
+  correct_answer: a1
+  weight: 25.0
+  feedback: Variable names can contain letters, numbers, and underscores, but cannot
+    start with a number. Hyphens are not allowed.
+  revision_page_ids:
+  - intro-variables-data-types
+- id: easy-q3-data-type-float
+  difficulty: easy
+  text: What data type is the value `3.14` in Python?
+  answers:
+  - id: a1
+    text: integer
+  - id: a2
+    text: string
+  - id: a3
+    text: float
+  - id: a4
+    text: boolean
+  correct_answer: a3
+  weight: 25.0
+  feedback: Decimal numbers in Python are of type `float`.
+  revision_page_ids:
+  - intro-variables-data-types
+- id: easy-q4-operator-precedence
+  difficulty: easy
+  text: What will be the output of `5 + 3 * 2`?
+  answers:
+  - id: a1
+    text: '16'
+  - id: a2
+    text: '11'
+  - id: a3
+    text: '10'
+  - id: a4
+    text: '8'
+  correct_answer: a2
+  weight: 25.0
+  feedback: 'Python follows the standard order of operations (PEMDAS/BODMAS): multiplication
+    before addition. So, 3 * 2 = 6, then 5 + 6 = 11.'
+  revision_page_ids:
+  - intro-variables-data-types
+- id: normal-q1-indentation-importance
+  difficulty: normal
+  text: Why is indentation important in Python?
+  answers:
+  - id: a1
+    text: It improves code readability
+  - id: a2
+    text: It defines code blocks
+  - id: a3
+    text: It is a stylistic choice
+  - id: a4
+    text: It speeds up execution
+  correct_answer: a2
+  weight: 25.0
+  feedback: Python uses indentation to denote blocks of code, such as those within
+    `if` statements, loops, and functions. Incorrect indentation will lead to `IndentationError`.
+  revision_page_ids:
+  - control-flow
+  - functions
+- id: normal-q2-equality-assignment
+  difficulty: normal
+  text: What is the primary difference between `==` and `=` in Python?
+  answers:
+  - id: a1
+    text: == is for assignment, = is for comparison
+  - id: a2
+    text: == is for comparison, = is for assignment
+  - id: a3
+    text: They are interchangeable
+  - id: a4
+    text: = checks type, == checks value
+  correct_answer: a2
+  weight: 25.0
+  feedback: '`==` checks if two values are equal (comparison operator), while `=`
+    assigns a value to a variable (assignment operator).'
+  revision_page_ids:
+  - intro-variables-data-types
+- id: normal-q3-for-loop-range
+  difficulty: normal
+  text: "How many times will the following loop print \"Hello\"?\n```python\nfor i\
+    \ in range(3):\n    print(\"Hello\")\n```"
+  answers:
+  - id: a1
+    text: '2'
+  - id: a2
+    text: '3'
+  - id: a3
+    text: '4'
+  - id: a4
+    text: '0'
+  correct_answer: a2
+  weight: 25.0
+  feedback: '`range(3)` generates a sequence of numbers starting from 0 up to (but
+    not including) 3, which are 0, 1, 2. The loop will iterate for each of these three
+    numbers.'
+  revision_page_ids:
+  - control-flow
+- id: normal-q4-define-function-keyword
+  difficulty: normal
+  text: Which keyword is used to define a function in Python?
+  answers:
+  - id: a1
+    text: function
+  - id: a2
+    text: func
+  - id: a3
+    text: define
+  - id: a4
+    text: def
+  correct_answer: a4
+  weight: 25.0
+  feedback: The `def` keyword is used to declare and define a function in Python.
+  revision_page_ids:
+  - functions
+- id: hard-q1-list-slicing
+  difficulty: hard
+  text: What will be the output of `my_list = [10, 20, 30, 40]; print(my_list[1:3])`?
+  answers:
+  - id: a1
+    text: '[10, 20]'
+  - id: a2
+    text: '[20, 30]'
+  - id: a3
+    text: '[10, 20, 30]'
+  - id: a4
+    text: '[20, 30, 40]'
+  correct_answer: a2
+  weight: 25.0
+  feedback: List slicing `[start:end]` includes elements from the `start` index up
+    to (but not including) the `end` index. Index 1 is 20, and index 2 is 30. Index
+    3 (40) is excluded.
+  revision_page_ids:
+  - intro-variables-data-types
+- id: hard-q2-nested-if-else
+  difficulty: hard
+  text: "What is the result of the following code?\n```python\nx = 5\nif x > 3:\n\
+    \    if x < 7:\n        print(\"A\")\n    else:\n        print(\"B\")\nelse:\n\
+    \    print(\"C\")\n```"
+  answers:
+  - id: a1
+    text: A
+  - id: a2
+    text: B
+  - id: a3
+    text: C
+  - id: a4
+    text: Error
+  correct_answer: a1
+  weight: 25.0
+  feedback: First, `x > 3` (5 > 3) is `True`. Then, the inner `if` condition `x <
+    7` (5 < 7) is also `True`, leading to the execution of `print("A")`.
+  revision_page_ids:
+  - control-flow
+- id: hard-q3-variable-scope
+  difficulty: hard
+  text: "Consider the following code:\n```python\nglobal_var = 10\n\ndef my_func():\n\
+    \    local_var = 20\n    print(global_var)\n\nmy_func()\n# print(local_var) #\
+    \ This line would cause an error\n```\nWhich variable is accessible directly after\
+    \ `my_func()` has been called (and assuming `local_var` isn't printed outside)?"
+  answers:
+  - id: a1
+    text: global_var only
+  - id: a2
+    text: local_var only
+  - id: a3
+    text: Both global_var and local_var
+  - id: a4
+    text: Neither
+  correct_answer: a1
+  weight: 25.0
+  feedback: '`local_var` exists only within the scope of `my_func()` and is destroyed
+    once the function completes. `global_var` is defined at the module level and remains
+    accessible.'
+  revision_page_ids:
+  - functions
+- id: hard-q4-mutable-data-type
+  difficulty: hard
+  text: Which of the following Python data types is mutable?
+  answers:
+  - id: a1
+    text: tuple
+  - id: a2
+    text: string
+  - id: a3
+    text: list
+  - id: a4
+    text: int
+  correct_answer: a3
+  weight: 25.0
+  feedback: Lists are mutable, meaning their elements can be changed (added, removed,
+    modified) after creation. Tuples, strings, and integers are immutable.
+  revision_page_ids:
+  - intro-variables-data-types
+- id: expert-q1-generators-vs-lists
+  difficulty: expert
+  text: What is the primary advantage of using a generator expression (`(x*x for x
+    in range(1000000))`) over a list comprehension (`[x*x for x in range(1000000)]`)
+    for very large sequences?
+  answers:
+  - id: a1
+    text: Generators are faster to write
+  - id: a2
+    text: Generators consume less memory
+  - id: a3
+    text: Generators are always more performant
+  - id: a4
+    text: List comprehensions are deprecated
+  correct_answer: a2
+  weight: 25.0
+  feedback: Generator expressions produce items one by one on demand (lazy evaluation),
+    iterating over the sequence without storing the entire sequence in memory. List
+    comprehensions build and store the entire list in memory, which can be very inefficient
+    for large datasets.
+  revision_page_ids:
+  - functions
+- id: expert-q2-decorators-purpose
+  difficulty: expert
+  text: In Python, what is the primary purpose of a decorator?
+  answers:
+  - id: a1
+    text: To define a new class
+  - id: a2
+    text: To modify the behavior of a function or method
+  - id: a3
+    text: To perform arithmetic operations
+  - id: a4
+    text: To declare a variable as constant
+  correct_answer: a2
+  weight: 25.0
+  feedback: Decorators provide a syntactic sugar for wrapping functions or methods
+    with additional functionality (e.g., logging, timing, authentication) without
+    permanently modifying their original code.
+  revision_page_ids:
+  - functions
+- id: expert-q3-init-new
+  difficulty: expert
+  text: What is the key difference between `__init__` and `__new__` methods in Python
+    classes?
+  answers:
+  - id: a1
+    text: __init__ creates an instance, __new__ initializes it
+  - id: a2
+    text: __new__ creates an instance, __init__ initializes it
+  - id: a3
+    text: __new__ is for static methods, __init__ for instance methods
+  - id: a4
+    text: They are synonyms and serve the same purpose
+  correct_answer: a2
+  weight: 25.0
+  feedback: '`__new__` is a class method responsible for the *creation* of a new instance
+    (object), returning the instance. `__init__` is an instance method responsible
+    for the *initialization* of the already created instance, setting up its attributes.'
+  revision_page_ids:
+  - functions
+- id: expert-q4-gil-impact
+  difficulty: expert
+  text: How does the Global Interpreter Lock (GIL) primarily affect multi-threaded
+    Python programs in CPython?
+  answers:
+  - id: a1
+    text: It allows multiple threads to execute Python bytecode in parallel
+  - id: a2
+    text: It ensures all threads access shared resources safely without explicit locks
+  - id: a3
+    text: It prevents multiple Python threads from executing bytecode simultaneously
+  - id: a4
+    text: It has no impact on I/O-bound multi-threaded programs
+  correct_answer: a3
+  weight: 25.0
+  feedback: The GIL ensures that only one thread can execute Python bytecode at a
+    time, even on multi-core processors. This primarily impacts CPU-bound tasks, limiting
+    true parallelism. I/O-bound tasks can still benefit from threading as the GIL
+    is released during I/O operations.
+  revision_page_ids:
+  - intro-variables-data-types

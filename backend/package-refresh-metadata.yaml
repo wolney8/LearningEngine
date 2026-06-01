@@ -1,0 +1,16 @@
+version: 2
+packages:
+  published-demo:
+    added_at: '2026-06-01T16:43:15.931351Z'
+  italian-language-basics:
+    added_at: '2026-05-31T21:42:22.008416Z'
+  japanese-for-beginners-course:
+    added_at: '2026-06-01T12:22:08.551345Z'
+  music-theory-fundamentals-training:
+    added_at: '2026-05-31T07:55:30.847601Z'
+  phishing-and-email-security:
+    added_at: '2026-05-23T16:57:36.040175Z'
+  sample-demo:
+    added_at: '2026-05-31T21:13:19.077607Z'
+  sql-data-analysis-fundamentals:
+    added_at: '2026-05-23T16:57:36.042492Z'

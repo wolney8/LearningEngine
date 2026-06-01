@@ -5,16 +5,16 @@
 }
 
 .profile-page__panel {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--colour-panel-bg);
+  border: 1px solid var(--colour-panel-border);
   border-radius: 16px;
-  box-shadow: 0 10px 28px rgb(30 41 59 / 0.08);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 0.18);
   padding: 1.5rem;
 }
 
 .profile-page__title {
   margin: 0 0 1rem;
-  color: #1e1b4b;
+  color: var(--colour-text-strong);
   font-family: "Nunito", "Segoe UI", sans-serif;
   font-size: 1.9rem;
 }
@@ -29,22 +29,22 @@
 }
 
 .profile-page__stat {
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--colour-panel-border-muted);
   border-radius: 12px;
-  background: #f8fafc;
+  background: var(--colour-panel-bg-muted);
   padding: 0.8rem;
 }
 
 .profile-page__stat h2 {
   margin: 0;
-  color: #334155;
+  color: var(--colour-text-secondary);
   font-family: "Inter", system-ui, sans-serif;
   font-size: 0.9rem;
 }
 
 .profile-page__stat p {
   margin: 0.35rem 0 0;
-  color: #0f172a;
+  color: var(--colour-text-primary);
   font-family: "Nunito", "Segoe UI", sans-serif;
   font-size: 1.25rem;
   font-weight: 700;
@@ -61,21 +61,23 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  color: #0f172a;
+  color: var(--colour-text-primary);
   font-weight: 600;
 }
 
 .profile-page__form input {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--colour-input-border);
   border-radius: 10px;
   min-height: 44px;
   padding: 0.65rem 0.75rem;
   font-size: 1rem;
+  background: var(--colour-input-bg);
+  color: var(--colour-text-strong);
 }
 
 .profile-page__form input:focus-visible,
 .profile-page__form button:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid var(--colour-focus);
   outline-offset: 2px;
 }
 
@@ -85,8 +87,8 @@
   padding: 0.65rem 1rem;
   border: 0;
   border-radius: 9999px;
-  background: #4f46e5;
-  color: #ffffff;
+  background: var(--colour-primary);
+  color: var(--colour-chip-active-text);
   font-family: "Nunito", "Segoe UI", sans-serif;
   font-weight: 700;
   cursor: pointer;
@@ -99,7 +101,7 @@
 
 .profile-page__scores h2 {
   margin: 0 0 0.6rem;
-  color: #1e1b4b;
+  color: var(--colour-text-strong);
   font-family: "Nunito", "Segoe UI", sans-serif;
 }
 
@@ -110,13 +112,13 @@
 
 .profile-page__scores th,
 .profile-page__scores td {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--colour-panel-border);
   text-align: left;
   padding: 0.55rem;
 }
 
 .profile-page__scores th {
-  color: #334155;
+  color: var(--colour-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -126,11 +128,11 @@
 }
 
 .profile-page__message--success {
-  color: #166534;
+  color: var(--colour-success-text);
 }
 
 .profile-page__message--error {
-  color: #b91c1c;
+  color: var(--colour-danger-text);
 }
 
 .profile-page__sr-only {

@@ -3,10 +3,14 @@ import { Route, Routes } from "react-router-dom";
 import { AdminGuard } from "./components/AdminGuard";
 import { AppTopBar } from "./components/AppTopBar";
 import { LevelUpOverlay } from "./components/LevelUpOverlay";
+import { Toast } from "./components/Toast";
 import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider, useToastContext } from "./context/ToastContext";
 import { XPProvider } from "./context/XPContext";
 import { useAuth } from "./hooks/useAuth";
+import { useTheme } from "./hooks/useTheme";
 import { useXP } from "./hooks/useXP";
+import { AdminAuditLogsPage } from "./pages/AdminAuditLogsPage";
 import { AdminPackagesPage } from "./pages/AdminPackagesPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
@@ -18,9 +22,16 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { TestModePage } from "./pages/TestModePage";
 import "./App.css";
 
+function GlobalToastRegion() {
+  const { toasts, dismissToast } = useToastContext();
+
+  return <Toast toasts={toasts} onDismiss={dismissToast} />;
+}
+
 function AppRoutes() {
   const { status, user } = useAuth();
   const { xp, levelProgress, lastChangeKind } = useXP();
+  const { resolvedTheme, setMode: setThemeMode } = useTheme();
   const [levelUpState, setLevelUpState] = useState<{
     level: number;
     totalXP: number;
@@ -54,7 +65,14 @@ function AppRoutes() {
 
   return (
     <div className="app-shell" key={authBoundaryKey} data-auth-status={status}>
-      <AppTopBar xp={xp} levelProgress={levelProgress} />
+      <AppTopBar
+        xp={xp}
+        levelProgress={levelProgress}
+        resolvedTheme={resolvedTheme}
+        onThemeModeChange={(nextMode) => {
+          setThemeMode(nextMode);
+        }}
+      />
       <LevelUpOverlay
         isOpen={levelUpState != null}
         level={levelUpState?.level ?? levelProgress.level}
@@ -71,6 +89,7 @@ function AppRoutes() {
           <Route path="/admin/settings" element={<AdminSettingsPage />} />
           <Route path="/admin/packages" element={<AdminPackagesPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
           <Route path="/packages/:id" element={<LessonPage />} />
           <Route path="/test/exam/:id" element={<TestModePage />} />
           <Route path="/test/practice/:id" element={<TestModePage />} />
@@ -85,6 +104,7 @@ function AppRoutes() {
           />
         </Routes>
       </main>
+      <GlobalToastRegion />
     </div>
   );
 }
@@ -93,7 +113,9 @@ function App() {
   return (
     <AuthProvider>
       <XPProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </XPProvider>
     </AuthProvider>
   );

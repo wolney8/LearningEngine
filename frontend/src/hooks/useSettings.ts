@@ -53,6 +53,13 @@ export const DEFAULT_SETTINGS: Settings = {
       unlock_hidden_package: 250,
     },
   },
+  celebration_effects: {
+    enabled: false,
+    confetti_on_pass: true,
+    confetti_on_bonus_xp_gain: true,
+    lightning_on_streak_milestones: true,
+    respect_reduced_motion: true,
+  },
 };
 
 let cachedSettings: Settings | null = null;

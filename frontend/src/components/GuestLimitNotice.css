@@ -52,7 +52,7 @@
 
 .guest-limit-notice__secondary {
   border: 1px solid #fdba74;
-  background: #ffffff;
+  background: var(--colour-surface);
   color: #9a3412;
 }
 

@@ -94,6 +94,7 @@ const AdminAIConnectionTestSchema = z
   .object({
     success: z.boolean(),
     message: z.string(),
+    model_used: z.string(),
   })
   .strict();
 const AdminPackageGenerateResponseSchema = z
@@ -108,6 +109,49 @@ const AdminManagedUserSchema = z
     username: z.string().min(1),
     email: z.string().email(),
     role: AdminManagedUserRoleSchema,
+    xp: z.number().int().nonnegative(),
+    pending_bonus_xp: z.number().int().nonnegative(),
+    pending_bonus_reason: z.string().nullable(),
+    created_at: z.string().min(1),
+  })
+  .strict();
+const AdminManagedUserXPSchema = z
+  .object({
+    id: z.number().int().positive(),
+    username: z.string().min(1),
+    role: AdminManagedUserRoleSchema,
+    xp: z.number().int().nonnegative(),
+    pending_bonus_xp: z.number().int().nonnegative(),
+    pending_bonus_reason: z.string().nullable(),
+  })
+  .strict();
+const AdminManagedUserProgressResetSchema = z
+  .object({
+    id: z.number().int().positive(),
+    username: z.string().min(1),
+    role: AdminManagedUserRoleSchema,
+    xp: z.number().int().nonnegative(),
+    pending_bonus_xp: z.number().int().nonnegative(),
+    pending_bonus_reason: z.string().nullable(),
+    cleared_progress_count: z.number().int().nonnegative(),
+    reset_xp: z.boolean(),
+  })
+  .strict();
+const AdminPackageDeleteResponseSchema = z
+  .object({
+    package_id: z.string().min(1),
+    operation: z.enum(["archived", "deleted"]),
+    summary: PackageSummarySchema.nullable().optional(),
+  })
+  .strict();
+const AdminAuditLogEntrySchema = z
+  .object({
+    id: z.number().int().positive(),
+    actor_user_id: z.number().int().positive(),
+    action: z.string().min(1),
+    target_user_id: z.number().int().positive().nullable(),
+    package_id: z.string().min(1).nullable(),
+    details: z.record(z.string(), z.unknown()),
     created_at: z.string().min(1),
   })
   .strict();
@@ -119,6 +163,22 @@ export type AdminPackageGenerateResponse = z.infer<
 >;
 export type AdminManagedUserRole = z.infer<typeof AdminManagedUserRoleSchema>;
 export type AdminManagedUser = z.infer<typeof AdminManagedUserSchema>;
+export type AdminManagedUserXP = z.infer<typeof AdminManagedUserXPSchema>;
+export type AdminManagedUserProgressReset = z.infer<
+  typeof AdminManagedUserProgressResetSchema
+>;
+export type AdminPackageDeleteResponse = z.infer<
+  typeof AdminPackageDeleteResponseSchema
+>;
+export type AdminAuditLogEntry = z.infer<typeof AdminAuditLogEntrySchema>;
+
+export interface AdminAuditLogFilters {
+  limit?: number;
+  action?: string;
+  actor_user_id?: number;
+  from?: string;
+  until?: string;
+}
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
@@ -956,6 +1016,178 @@ export async function fetchAdminPackages(
   return z.array(AdminPackageSummarySchema).parse(data);
 }
 
+function extractBackendErrorDetail(payload: unknown): string | null {
+  if (typeof payload === "string") {
+    const trimmed = payload.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const asRecord = payload as Record<string, unknown>;
+  if (typeof asRecord.detail === "string") {
+    const trimmed = asRecord.detail.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  if (Array.isArray(asRecord.detail)) {
+    const detailParts = asRecord.detail
+      .map((entry) => {
+        if (typeof entry === "string") {
+          return entry.trim();
+        }
+        if (entry && typeof entry === "object") {
+          const message = (entry as Record<string, unknown>).msg;
+          return typeof message === "string" ? message.trim() : "";
+        }
+        return "";
+      })
+      .filter((part) => part.length > 0);
+
+    if (detailParts.length > 0) {
+      return detailParts.join("; ");
+    }
+  }
+
+  if (typeof asRecord.message === "string") {
+    const trimmed = asRecord.message.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+async function readBackendErrorMessage(response: Response): Promise<string> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      const payload: unknown = await response.json();
+      const detail = extractBackendErrorDetail(payload);
+      if (detail) {
+        return detail;
+      }
+    } catch {
+      // Fall through to plain-text parsing.
+    }
+  }
+
+  try {
+    const text = (await response.text()).trim();
+    if (text.length > 0) {
+      return text;
+    }
+  } catch {
+    // Ignore parse errors and return fallback.
+  }
+
+  return response.statusText || "Request failed";
+}
+
+const AdminAIErrorPayloadSchema = z
+  .object({
+    error_code: z.string().trim().min(1).optional(),
+    errorCode: z.string().trim().min(1).optional(),
+    detail: z.unknown().optional(),
+    message: z.string().trim().min(1).optional(),
+  })
+  .passthrough();
+
+function extractAdminAIErrorCode(payload: unknown): string | null {
+  const parsed = AdminAIErrorPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return parsed.data.error_code ?? parsed.data.errorCode ?? null;
+}
+
+function extractAdminAIErrorMessage(payload: unknown): string | null {
+  if (typeof payload === "string") {
+    const trimmed = payload.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const parsed = AdminAIErrorPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return extractBackendErrorDetail(payload);
+  }
+
+  if (parsed.data.message) {
+    return parsed.data.message;
+  }
+
+  const detail = extractBackendErrorDetail({ detail: parsed.data.detail });
+  if (detail) {
+    return detail;
+  }
+
+  return extractBackendErrorDetail(payload);
+}
+
+async function parseAdminAIErrorResponse(response: Response): Promise<{
+  errorCode: string;
+  message: string;
+}> {
+  const fallbackMessage = response.statusText || "AI request failed";
+  const fallbackErrorCode = `HTTP_${response.status}`;
+
+  try {
+    const raw = await response.text();
+    const trimmed = raw.trim();
+
+    if (trimmed.length === 0) {
+      return {
+        errorCode: fallbackErrorCode,
+        message: fallbackMessage,
+      };
+    }
+
+    try {
+      const payload: unknown = JSON.parse(trimmed);
+      const message = extractAdminAIErrorMessage(payload) ?? fallbackMessage;
+      const errorCode = extractAdminAIErrorCode(payload) ?? fallbackErrorCode;
+
+      return {
+        errorCode,
+        message,
+      };
+    } catch {
+      return {
+        errorCode: fallbackErrorCode,
+        message: trimmed,
+      };
+    }
+  } catch {
+    return {
+      errorCode: fallbackErrorCode,
+      message: fallbackMessage,
+    };
+  }
+}
+
+export class AdminAIPackageError extends Error {
+  readonly errorCode: string;
+  readonly status: number;
+
+  constructor(message: string, errorCode: string, status: number) {
+    super(message);
+    this.name = "AdminAIPackageError";
+    this.errorCode = errorCode;
+    this.status = status;
+  }
+}
+
 export async function updateAdminPackage(
   token: string,
   packageId: string,
@@ -963,6 +1195,7 @@ export async function updateAdminPackage(
     availability?: "available" | "unavailable" | "hidden";
     enabled?: boolean;
     xp_threshold?: number | null;
+    tags?: string[];
   },
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
@@ -973,7 +1206,10 @@ export async function updateAdminPackage(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update package '${packageId}': ${response.status}`);
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(
+      `Failed to update package '${packageId}' (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -1019,8 +1255,12 @@ export async function generateAdminPackage(
   );
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Failed to generate package (${response.status}): ${detail}`);
+    const parsedError = await parseAdminAIErrorResponse(response);
+    throw new AdminAIPackageError(
+      `Failed to generate package (${response.status}): ${parsedError.message}`,
+      parsedError.errorCode,
+      response.status,
+    );
   }
 
   const data: unknown = await response.json();
@@ -1055,9 +1295,11 @@ export async function refreshAdminPackage(
   );
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(
-      `Failed to refresh package '${packageId}' (${response.status}): ${detail}`,
+    const parsedError = await parseAdminAIErrorResponse(response);
+    throw new AdminAIPackageError(
+      `Failed to refresh package '${packageId}' (${response.status}): ${parsedError.message}`,
+      parsedError.errorCode,
+      response.status,
     );
   }
 
@@ -1097,4 +1339,170 @@ export async function updateAdminUserRole(
 
   const data: unknown = await response.json();
   return AdminManagedUserSchema.parse(data);
+}
+
+export async function setAdminUserXP(
+  token: string,
+  userId: number,
+  xp: number,
+): Promise<AdminManagedUserXP> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/users/${userId}/xp/set`, {
+    method: "PATCH",
+    headers: getAdminHeaders(token),
+    body: JSON.stringify({ xp }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to set user XP (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminManagedUserXPSchema.parse(data);
+}
+
+export async function resetAdminUserXP(
+  token: string,
+  userId: number,
+): Promise<AdminManagedUserXP> {
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/users/${userId}/xp/reset`,
+    {
+      method: "POST",
+      headers: getAdminHeaders(token),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to reset user XP (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminManagedUserXPSchema.parse(data);
+}
+
+export async function grantAdminUserXPBonus(
+  token: string,
+  userId: number,
+  payload: { xp: number; reason: string },
+): Promise<AdminManagedUserXP> {
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/users/${userId}/xp/bonus`,
+    {
+      method: "POST",
+      headers: getAdminHeaders(token),
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to grant user bonus XP (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminManagedUserXPSchema.parse(data);
+}
+
+export async function resetAdminUserProgress(
+  token: string,
+  userId: number,
+  options?: { reset_xp?: boolean },
+): Promise<AdminManagedUserProgressReset> {
+  const body = options?.reset_xp ? { reset_xp: true } : undefined;
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/users/${userId}/progress/reset`,
+    {
+      method: "POST",
+      headers: getAdminHeaders(token),
+      body: body ? JSON.stringify(body) : undefined,
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to reset user progress (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminManagedUserProgressResetSchema.parse(data);
+}
+
+export async function deleteAdminPackage(
+  token: string,
+  packageId: string,
+  options?: {
+    permanent?: boolean;
+    confirm?: boolean;
+  },
+): Promise<AdminPackageDeleteResponse> {
+  const encodedId = encodeURIComponent(packageId);
+  const params = new URLSearchParams();
+  if (options?.permanent) {
+    params.set("permanent", "true");
+  }
+  if (options?.confirm) {
+    params.set("confirm", "true");
+  }
+
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/packages/${encodedId}${query}`,
+    {
+      method: "DELETE",
+      headers: getAdminHeaders(token),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(
+      `Failed to delete package '${packageId}' (${response.status}): ${detail}`,
+    );
+  }
+
+  const data: unknown = await response.json();
+  return AdminPackageDeleteResponseSchema.parse(data);
+}
+
+export async function fetchAdminAuditLogs(
+  token: string,
+  filters: AdminAuditLogFilters = {},
+): Promise<AdminAuditLogEntry[]> {
+  const requestedLimit = filters.limit ?? 50;
+  const actionFilter = filters.action?.trim();
+  const boundedLimit = Math.min(500, Math.max(1, Math.trunc(requestedLimit)));
+  const params = new URLSearchParams({ limit: String(boundedLimit) });
+  if (actionFilter) {
+    params.set("action", actionFilter);
+  }
+  if (
+    typeof filters.actor_user_id === "number" &&
+    Number.isInteger(filters.actor_user_id) &&
+    filters.actor_user_id > 0
+  ) {
+    params.set("actor_user_id", String(filters.actor_user_id));
+  }
+  if (typeof filters.from === "string" && filters.from.length > 0) {
+    params.set("from", filters.from);
+  }
+  if (typeof filters.until === "string" && filters.until.length > 0) {
+    params.set("until", filters.until);
+  }
+
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/audit-logs?${params.toString()}`,
+    {
+      headers: getAdminHeaders(token),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to fetch admin audit logs (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return z.array(AdminAuditLogEntrySchema).parse(data);
 }

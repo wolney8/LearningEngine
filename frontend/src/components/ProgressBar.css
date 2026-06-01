@@ -22,7 +22,7 @@
 .progress-bar__label {
   font-family: "Inter", system-ui, sans-serif;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--colour-text-secondary);
   text-align: right;
 }
 

@@ -2,10 +2,10 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--colour-pill-border);
   border-radius: 9999px;
   padding: 0.5rem 1rem;
-  background: #ffffff;
+  background: var(--colour-pill-bg);
   max-width: 400px;
   width: 100%;
   transition: box-shadow 150ms ease, border-color 150ms ease;
@@ -13,12 +13,12 @@
 
 .search-bar:focus-within {
   outline: none;
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 2px #4f46e5;
+  border-color: var(--colour-focus);
+  box-shadow: 0 0 0 2px var(--colour-focus);
 }
 
 .search-bar__icon {
-  color: #9ca3af;
+  color: var(--colour-search-icon);
   flex-shrink: 0;
 }
 
@@ -29,7 +29,7 @@
   background: transparent;
   font-family: "Inter", sans-serif;
   font-size: 0.9rem;
-  color: #1e1b4b;
+  color: var(--colour-text-strong);
 }
 
 .search-bar__input::-webkit-search-cancel-button {
@@ -40,7 +40,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #9ca3af;
+  color: var(--colour-search-icon);
   font-size: 1.2rem;
   line-height: 1;
   padding: 0 0.125rem;
@@ -50,11 +50,11 @@
 }
 
 .search-bar__clear:hover {
-  color: #374151;
+  color: var(--colour-search-icon-hover);
 }
 
 .search-bar__clear:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid var(--colour-focus);
   outline-offset: 2px;
 }
 

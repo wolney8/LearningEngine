@@ -57,6 +57,36 @@ def parse_args() -> argparse.Namespace:
         help="Legacy premium request allowance for projection (default: 300).",
     )
     parser.add_argument(
+        "--included-ai-credits",
+        type=float,
+        default=1500.0,
+        help="Monthly included AI credits for projection (default: 1500).",
+    )
+    parser.add_argument(
+        "--additional-budget-usd",
+        type=float,
+        default=10.0,
+        help="Additional monthly budget in USD (default: 10).",
+    )
+    parser.add_argument(
+        "--credits-per-premium-unit",
+        type=float,
+        default=1.0,
+        help=(
+            "Deprecated alias for --credits-per-activity-unit. "
+            "If --credits-per-activity-unit is provided, it takes precedence."
+        ),
+    )
+    parser.add_argument(
+        "--credits-per-activity-unit",
+        type=float,
+        default=None,
+        help=(
+            "Estimated AI credits consumed per calculated activity unit "
+            "(default: 1.0). Calibrate from dashboard data."
+        ),
+    )
+    parser.add_argument(
         "--out",
         default="reports/copilot-usage-weekly.csv",
         help="Output CSV path (default: reports/copilot-usage-weekly.csv).",
@@ -173,8 +203,9 @@ def resolve_model_id(model_name: str, models: dict[str, ModelBilling]) -> str | 
 
 def compute_cycle_units(
     agent_models: dict[str, str], models: dict[str, ModelBilling]
-) -> tuple[float, dict[str, str]]:
-    units = 0.0
+) -> tuple[float, float, dict[str, str]]:
+    billing_units = 0.0
+    activity_units = 0.0
     mapping: dict[str, str] = {}
     for agent, model_name in sorted(agent_models.items()):
         resolved = resolve_model_id(model_name, models)
@@ -184,9 +215,10 @@ def compute_cycle_units(
 
         info = models[resolved]
         mapping[agent] = f"{resolved} (x{info.multiplier:g})"
-        units += info.multiplier
+        billing_units += info.multiplier
+        activity_units += info.multiplier if info.multiplier > 0 else 1.0
 
-    return units, mapping
+    return billing_units, activity_units, mapping
 
 
 def collect_session_dates(log_root: Path) -> list[date]:
@@ -222,7 +254,7 @@ def week_start(d: date) -> date:
 
 
 def build_week_rows(
-    session_dates: list[date], cycle_units: float, weeks: int
+    session_dates: list[date], cycle_units: float, weeks: int, credits_per_activity_unit: float
 ) -> list[dict[str, str | int | float]]:
     if not session_dates:
         return []
@@ -237,12 +269,14 @@ def build_week_rows(
     for _ in range(weeks):
         sessions = int(counts.get(wk, 0))
         est_units = sessions * cycle_units
+        est_ai_credits = est_units * credits_per_activity_unit
         rows.append(
             {
                 "week_start": wk.isoformat(),
                 "week_end": (wk + timedelta(days=6)).isoformat(),
                 "session_starts": sessions,
                 "estimated_premium_units": round(est_units, 2),
+                "estimated_ai_credits": round(est_ai_credits, 2),
                 "estimated_full_cycles": round(float(sessions), 2),
             }
         )
@@ -259,6 +293,7 @@ def write_csv(rows: list[dict[str, str | int | float]], out_path: Path) -> None:
         "session_starts",
         "estimated_full_cycles",
         "estimated_premium_units",
+        "estimated_ai_credits",
     ]
     with out_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -290,6 +325,15 @@ def projected_exhaustion_date(allowance: float, daily_units: float) -> str:
     return eta.isoformat()
 
 
+def projected_exhaustion_date_credits(capacity: float, daily_credits: float) -> str:
+    if daily_credits <= 0:
+        return "insufficient data"
+
+    days_left = capacity / daily_credits
+    eta = datetime.now(timezone.utc).date() + timedelta(days=int(days_left))
+    return eta.isoformat()
+
+
 def main() -> int:
     args = parse_args()
     repo_root = Path(args.repo_root).expanduser().resolve()
@@ -298,15 +342,36 @@ def main() -> int:
     log_root = find_workspace_log_root(storage_root, args.workspace_id)
     models = parse_models(log_root)
     agent_models = parse_agent_models(repo_root)
-    cycle_units, mapping = compute_cycle_units(agent_models, models)
+    billing_cycle_units, activity_cycle_units, mapping = compute_cycle_units(agent_models, models)
     session_dates = collect_session_dates(log_root)
 
-    rows = build_week_rows(session_dates, cycle_units, args.weeks)
+    credits_per_activity_unit = (
+        args.credits_per_activity_unit
+        if args.credits_per_activity_unit is not None
+        else args.credits_per_premium_unit
+    )
+
+    rows = build_week_rows(
+        session_dates,
+        activity_cycle_units,
+        args.weeks,
+        credits_per_activity_unit,
+    )
     out_path = Path(args.out).expanduser().resolve()
     write_csv(rows, out_path)
 
-    daily_units = recent_daily_units(session_dates, cycle_units, days=14)
-    projection = projected_exhaustion_date(args.legacy_premium_allowance, daily_units)
+    daily_billing_units = recent_daily_units(session_dates, billing_cycle_units, days=14)
+    daily_activity_units = recent_daily_units(session_dates, activity_cycle_units, days=14)
+    projection = projected_exhaustion_date(args.legacy_premium_allowance, daily_billing_units)
+    daily_ai_credits = daily_activity_units * credits_per_activity_unit
+    additional_ai_credits = args.additional_budget_usd * 100.0
+    total_ai_capacity = args.included_ai_credits + additional_ai_credits
+    projection_credits_included = projected_exhaustion_date_credits(
+        args.included_ai_credits, daily_ai_credits
+    )
+    projection_credits_total = projected_exhaustion_date_credits(
+        total_ai_capacity, daily_ai_credits
+    )
 
     print("Copilot weekly trend report")
     print("=" * 26)
@@ -316,12 +381,22 @@ def main() -> int:
     print("Agent model mapping")
     for agent, value in mapping.items():
         print(f"- {agent}: {value}")
-    print(f"Estimated premium units per full cycle: {cycle_units:g}")
+    print(f"Estimated premium billing units per full cycle: {billing_cycle_units:g}")
+    print(f"Estimated activity units per full cycle: {activity_cycle_units:g}")
     print()
     print("Projection (legacy premium-request era)")
     print(f"- Allowance used for projection: {args.legacy_premium_allowance:g}")
-    print(f"- 14-day average units/day: {daily_units:.2f}")
+    print(f"- 14-day average billing units/day: {daily_billing_units:.2f}")
     print(f"- Projected exhaustion date: {projection}")
+    print()
+    print("Projection (usage-based AI-credit era)")
+    print(f"- Calibration factor: {credits_per_activity_unit:.3f} credits/activity unit")
+    print(f"- 14-day average activity units/day: {daily_activity_units:.2f}")
+    print(f"- 14-day average AI credits/day: {daily_ai_credits:.2f}")
+    print(f"- Included AI credits/month: {args.included_ai_credits:.0f}")
+    print(f"- Additional budget: ${args.additional_budget_usd:.2f} ({additional_ai_credits:.0f} credits)")
+    print(f"- Projected included-credit exhaustion date: {projection_credits_included}")
+    print(f"- Projected included+additional exhaustion date: {projection_credits_total}")
     print()
     print("Note: This is an estimate from local session volume, not account billing truth.")
 
