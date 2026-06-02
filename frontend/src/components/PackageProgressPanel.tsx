@@ -82,7 +82,9 @@ export function PackageProgressPanel({
     null,
   );
 
-  const lastScore = lastDifficulty ? (results[lastDifficulty]?.bestScore ?? 0) : 0;
+  const lastScore = lastDifficulty
+    ? (results[lastDifficulty]?.bestScore ?? 0)
+    : 0;
   const totalBestXp = attemptedDifficulties.reduce((sum, difficulty) => {
     return sum + (results[difficulty]?.bestXpEarned ?? 0);
   }, 0);

@@ -880,7 +880,7 @@ async def test_admin_generate_package_requires_authentication() -> None:
                 "topic": "Cyber awareness",
                 "audience": "new employees",
                 "num_pages": 2,
-                "num_questions": 3,
+                "num_questions": 8,
             },
         )
 
@@ -911,7 +911,7 @@ async def test_admin_generate_package_success(monkeypatch) -> None:
                 "topic": "Cyber awareness",
                 "audience": "new employees",
                 "num_pages": 2,
-                "num_questions": 3,
+                "num_questions": 8,
             },
         )
 
@@ -946,7 +946,7 @@ async def test_admin_generate_package_overloaded_returns_structured_error(
                 "topic": "Cyber awareness",
                 "audience": "new employees",
                 "num_pages": 2,
-                "num_questions": 3,
+                "num_questions": 8,
             },
         )
 
@@ -988,7 +988,7 @@ async def test_admin_generate_package_missing_api_key_returns_structured_error(
                 "topic": "Cyber awareness",
                 "audience": "new employees",
                 "num_pages": 2,
-                "num_questions": 3,
+                "num_questions": 8,
             },
         )
 
@@ -1003,6 +1003,35 @@ async def test_admin_generate_package_missing_api_key_returns_structured_error(
     )
     assert "api-key=leaked" not in response.text
     assert "provider returned key missing body" not in response.text
+
+
+async def test_admin_generate_package_rejects_question_count_below_minimum() -> None:
+    _install_admin_override()
+    app.dependency_overrides[get_settings_cache] = lambda: _sample_settings()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages/generate",
+            json={
+                "topic": "Cyber awareness",
+                "audience": "new employees",
+                "num_pages": 2,
+                "num_questions": 7,
+            },
+        )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    num_questions_error = next(
+        (item for item in detail if item.get("loc") == ["body", "num_questions"]),
+        None,
+    )
+    assert num_questions_error is not None
+    assert "greater than or equal to 8" in num_questions_error["msg"]
 
 
 async def test_admin_refresh_package_overloaded_returns_structured_error(

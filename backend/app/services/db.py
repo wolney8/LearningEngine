@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Generator
 
+from sqlalchemy import text
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.models.user import User
@@ -111,10 +112,60 @@ def _ensure_sqlite_user_test_result_schema_compatibility() -> None:
                 "ADD COLUMN first_completed_at TIMESTAMP"
             )
 
+        if "best_xp_earned" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "usertestresult" '
+                "ADD COLUMN best_xp_earned INTEGER NOT NULL DEFAULT 0"
+            )
+
+        if "difficulty_results_json" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "usertestresult" '
+                "ADD COLUMN difficulty_results_json TEXT"
+            )
+
+
+def _ensure_sqlite_spend_history_schema_compatibility(session: Session) -> None:
+    """Add missing columns to spend_history for existing DBs.
+
+    SQLite does not support ALTER TABLE DROP COLUMN or multi-column ALTER,
+    so we only add missing columns. New installs get the full schema via
+    SQLModel.metadata.create_all().
+    """
+    result = session.exec(text("PRAGMA table_info('spend_history')")).all()
+    existing_cols = {row[1] for row in result}
+
+    if not existing_cols:
+        # Table does not exist yet — create_all will handle it.
+        return
+
+    if "difficulty" not in existing_cols:
+        session.exec(text("ALTER TABLE spend_history ADD COLUMN difficulty TEXT"))
+
+    if "cost" not in existing_cols:
+        session.exec(
+            text(
+                "ALTER TABLE spend_history "
+                "ADD COLUMN cost INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+
+    if "success" not in existing_cols:
+        session.exec(
+            text(
+                "ALTER TABLE spend_history "
+                "ADD COLUMN success INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+
 
 def init_db() -> None:
     # Ensure metadata includes user-related tables before creating schema.
-    from app.models.user import UserLibraryItem, UserTestResult  # noqa: F401
+    from app.models.user import (  # noqa: F401
+        SpendHistory,
+        UserLibraryItem,
+        UserTestResult,
+    )
 
     if DATABASE_URL.startswith("sqlite"):
         sqlite_path = DATABASE_URL.replace("sqlite:///", "", 1)
@@ -122,7 +173,12 @@ def init_db() -> None:
         _ensure_sqlite_user_schema_compatibility()
         _ensure_sqlite_user_library_schema_compatibility()
         _ensure_sqlite_user_test_result_schema_compatibility()
-    SQLModel.metadata.create_all(engine)
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            _ensure_sqlite_spend_history_schema_compatibility(session)
+            session.commit()
+    else:
+        SQLModel.metadata.create_all(engine)
     bootstrap_initial_admin_user()
 
 

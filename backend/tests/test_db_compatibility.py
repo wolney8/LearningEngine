@@ -257,6 +257,8 @@ def test_init_db_adds_missing_user_test_result_columns(
     column_names = [row[1] for row in table_info]
     assert "attempt_count" in column_names
     assert "first_completed_at" in column_names
+    assert "best_xp_earned" in column_names
+    assert "difficulty_results_json" in column_names
 
     attempt_count_column = next(row for row in table_info if row[1] == "attempt_count")
     assert attempt_count_column[2].upper() == "INTEGER"
@@ -270,9 +272,25 @@ def test_init_db_adds_missing_user_test_result_columns(
     assert first_completed_at_column[3] == 0
     assert first_completed_at_column[4] is None
 
+    best_xp_earned_column = next(
+        row for row in table_info if row[1] == "best_xp_earned"
+    )
+    assert best_xp_earned_column[2].upper() == "INTEGER"
+    assert best_xp_earned_column[3] == 1
+    assert best_xp_earned_column[4] == "0"
+
+    difficulty_results_json_column = next(
+        row for row in table_info if row[1] == "difficulty_results_json"
+    )
+    assert difficulty_results_json_column[2].upper() == "TEXT"
+    assert difficulty_results_json_column[3] == 0
+    assert difficulty_results_json_column[4] is None
+
     db.init_db()
     second_pass_columns = [
         row[1] for row in _read_table_info(db_path, "usertestresult")
     ]
     assert second_pass_columns.count("attempt_count") == 1
     assert second_pass_columns.count("first_completed_at") == 1
+    assert second_pass_columns.count("best_xp_earned") == 1
+    assert second_pass_columns.count("difficulty_results_json") == 1

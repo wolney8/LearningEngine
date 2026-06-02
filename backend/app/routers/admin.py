@@ -85,7 +85,7 @@ class GenerateRequest(BaseModel):
     topic: str = Field(min_length=3, max_length=500)
     audience: str = Field(default="general learners", max_length=200)
     num_pages: int = Field(default=3, ge=1, le=10)
-    num_questions: int = Field(default=4, ge=2, le=20)
+    num_questions: int = Field(default=8, ge=8, le=20)
 
 
 class GenerateResponse(BaseModel):

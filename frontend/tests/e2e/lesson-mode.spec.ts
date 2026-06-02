@@ -131,7 +131,9 @@ test.describe("Lesson Mode", () => {
   test("navigating to a package loads the lesson page", async ({ page }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
-    await expect(page.getByRole("heading", { name: "Python Basics" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Python Basics" }),
+    ).toBeVisible();
   });
 
   test("first study page content is visible", async ({ page }) => {
@@ -151,7 +153,9 @@ test.describe("Lesson Mode", () => {
     await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
     await expect(page.getByText("Page 2 of 2")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Variables" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Variables" }),
+    ).toBeVisible();
   });
 
   test("clicking Start Questions on last page enters question phase", async ({
@@ -164,7 +168,9 @@ test.describe("Lesson Mode", () => {
     await expect(page.getByText("Question 1 of 2")).toBeVisible();
   });
 
-  test("answering a question correctly shows correct feedback", async ({ page }) => {
+  test("answering a question correctly shows correct feedback", async ({
+    page,
+  }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Next Page/i }).click();
@@ -187,7 +193,9 @@ test.describe("Lesson Mode", () => {
     await expect(page.getByText("Incorrect", { exact: true })).toBeVisible();
   });
 
-  test("completing all questions shows the completion screen", async ({ page }) => {
+  test("completing all questions shows the completion screen", async ({
+    page,
+  }) => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
@@ -195,7 +203,9 @@ test.describe("Lesson Mode", () => {
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
-    await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Lesson complete!" }),
+    ).toBeVisible();
     await expect(page.getByText("2 / 2 correct")).toBeVisible();
   });
 
@@ -255,12 +265,11 @@ test.describe("Lesson Mode", () => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await expect(page.getByText("Reduced XP this attempt")).toBeVisible();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
-
-    await expect(page.getByText("Reduced XP (×0.5)")).toBeVisible();
   });
 
   test("fourth attempt shows 0 XP practice mode on CompletionScreen", async ({
@@ -335,8 +344,10 @@ test.describe("Lesson Mode", () => {
     };
     const progressRow = {
       package_id: MOCK_PACKAGE_ID,
+      difficulty: "normal",
       latest_weighted_score: 0.4,
       completed: true,
+      best_xp_earned: 10,
       attempt_count: 1,
       first_completed_at: "2026-05-23T08:30:00Z",
       updated_at: "2026-05-23T08:30:00Z",
@@ -372,8 +383,10 @@ test.describe("Lesson Mode", () => {
       `${API_BASE_URL}/users/me/progress/${MOCK_PACKAGE_ID}`,
       async (route) => {
         const payload = route.request().postDataJSON() as {
+          difficulty?: "easy" | "normal" | "hard" | "expert";
           latest_weighted_score: number;
           completed: boolean;
+          best_xp_earned?: number;
           attempt_count?: number;
         };
         capturedAttemptCount = payload.attempt_count ?? null;
@@ -383,8 +396,11 @@ test.describe("Lesson Mode", () => {
           contentType: "application/json",
           body: JSON.stringify({
             ...progressRow,
+            difficulty: payload.difficulty ?? progressRow.difficulty,
             latest_weighted_score: payload.latest_weighted_score,
             completed: payload.completed,
+            best_xp_earned:
+              payload.best_xp_earned ?? progressRow.best_xp_earned,
             attempt_count: payload.attempt_count ?? progressRow.attempt_count,
             updated_at: "2026-05-24T11:00:00Z",
           }),
@@ -420,27 +436,31 @@ test.describe("Lesson Mode", () => {
       });
     });
 
-    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          streak_count: 5,
-          last_practised_date: "2026-05-24",
-        }),
-      });
-    });
+    await page.route(
+      `${API_BASE_URL}/users/me/streak/mark-practised`,
+      (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            streak_count: 5,
+            last_practised_date: "2026-05-24",
+          }),
+        });
+      },
+    );
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await expect(page.getByText("Reduced XP this attempt")).toBeVisible();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
 
     await expect.poll(() => capturedAttemptCount).toBe(2);
-    await expect(page.getByText("Reduced XP (×0.5)")).toBeVisible();
+    await expect(page.getByText("Reduced XP this attempt")).toHaveCount(0);
     await expect(page.getByText("+20 XP bonus")).toHaveCount(0);
 
     const localMetadata = await page.evaluate(() => ({
@@ -506,17 +526,20 @@ test.describe("Lesson Mode", () => {
       });
     });
 
-    await page.route(`${API_BASE_URL}/users/me/streak/mark-practised`, (route) => {
-      streakMarkCalls += 1;
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          streak_count: 6,
-          last_practised_date: "2026-05-24",
-        }),
-      });
-    });
+    await page.route(
+      `${API_BASE_URL}/users/me/streak/mark-practised`,
+      (route) => {
+        streakMarkCalls += 1;
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            streak_count: 6,
+            last_practised_date: "2026-05-24",
+          }),
+        });
+      },
+    );
 
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
@@ -526,7 +549,9 @@ test.describe("Lesson Mode", () => {
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
 
-    await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Lesson complete!" }),
+    ).toBeVisible();
     await expect.poll(() => streakMarkCalls).toBe(1);
   });
 });

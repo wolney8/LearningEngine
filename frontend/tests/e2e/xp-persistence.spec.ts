@@ -388,7 +388,7 @@ test.describe("XP persistence", () => {
 
     await completeLessonRun(page);
     await expect.poll(() => savedXPValues.length).toBe(2);
-    expect(savedXPValues[1]).toBe(45);
+    expect(savedXPValues[1]).toBe(70);
 
     const localXP = await page.evaluate(() => localStorage.getItem("lle_xp"));
     expect(localXP).toBeNull();

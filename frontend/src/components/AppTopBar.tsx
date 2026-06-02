@@ -29,7 +29,6 @@ export function AppTopBar({
   const nextTheme: ResolvedTheme = resolvedTheme === "dark" ? "light" : "dark";
   const themeToggleLabel =
     nextTheme === "dark" ? "Switch to dark theme" : "Switch to light theme";
-  const themeToggleText = nextTheme === "dark" ? "Use dark" : "Use light";
 
   useEffect(() => {
     if (!bonusXPNotice) {
@@ -96,7 +95,6 @@ export function AppTopBar({
             <span className="app-top-bar__theme-indicator" aria-hidden="true">
               {resolvedTheme === "dark" ? "◐" : "◑"}
             </span>
-            <span className="app-top-bar__theme-toggle-text">{themeToggleText}</span>
           </button>
 
           {isAuthenticated && user ? (
@@ -150,9 +148,6 @@ export function AppTopBar({
                     >
                       <span className="app-top-bar__theme-indicator" aria-hidden="true">
                         {resolvedTheme === "dark" ? "◐" : "◑"}
-                      </span>
-                      <span className="app-top-bar__theme-toggle-text">
-                        {themeToggleText}
                       </span>
                     </button>
                     <p className="app-top-bar__menu-profile">{user.username}</p>
@@ -234,9 +229,6 @@ export function AppTopBar({
                     >
                       <span className="app-top-bar__theme-indicator" aria-hidden="true">
                         {resolvedTheme === "dark" ? "◐" : "◑"}
-                      </span>
-                      <span className="app-top-bar__theme-toggle-text">
-                        {themeToggleText}
                       </span>
                     </button>
                     <Link

@@ -95,14 +95,14 @@
 }
 
 .study-page-view__btn--primary {
-  background: #4f46e5;
-  color: #ffffff;
-  border-color: #4f46e5;
+  background: var(--colour-primary);
+  color: var(--colour-on-primary);
+  border-color: var(--colour-primary);
 }
 
 .study-page-view__btn--primary:hover {
-  background: #4338ca;
-  border-color: #4338ca;
+  background: var(--colour-primary-hover);
+  border-color: var(--colour-primary-hover);
 }
 
 .study-page-view__btn--ghost {
@@ -125,7 +125,7 @@
 }
 
 .study-page-view__btn:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid var(--colour-focus);
   outline-offset: 2px;
 }
 

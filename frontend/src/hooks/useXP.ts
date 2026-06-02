@@ -5,6 +5,7 @@ export function useXP(): {
   xp: number;
   addXP: (amount: number) => void;
   subtractXP: (amount: number) => void;
+  syncXP: (value: number) => void;
   levelProgress: LevelProgress;
   changeVersion: number;
   lastChangeKind: "add" | "subtract" | "sync" | null;

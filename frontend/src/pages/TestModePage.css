@@ -23,6 +23,26 @@
   color: var(--colour-text-secondary);
 }
 
+.test-mode-page__spend-callout {
+  border-radius: 12px;
+  border: 1px solid var(--colour-primary);
+  background: var(--colour-panel-bg);
+  padding: 0.8rem 0.9rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.test-mode-page__spend-callout h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--colour-text-strong);
+}
+
+.test-mode-page__spend-callout p {
+  margin: 0;
+  color: var(--colour-text-secondary);
+}
+
 .test-mode-page__header--compact {
   grid-template-columns: 1fr;
   gap: 0.4rem;
@@ -59,32 +79,31 @@
 
 .test-mode-page__difficulty-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgb(15 23 42 / 0.18);
+  box-shadow: var(--colour-test-mode-difficulty-hover-shadow);
 }
 
 .test-mode-page__difficulty-card--easy {
-  border-color: #166534;
-  background: linear-gradient(180deg, rgb(22 101 52 / 0.18), rgb(17 24 39 / 0.92));
+  border-color: var(--colour-difficulty-pass-easy);
+  background: var(--colour-test-mode-difficulty-easy-bg);
 }
 
 .test-mode-page__difficulty-card--normal {
-  border-color: #4f46e5;
-  background: linear-gradient(180deg, rgb(79 70 229 / 0.18), rgb(17 24 39 / 0.92));
+  border-color: var(--colour-difficulty-pass-normal);
+  background: var(--colour-test-mode-difficulty-normal-bg);
 }
 
 .test-mode-page__difficulty-card--hard {
-  border-color: #b45309;
-  background: linear-gradient(180deg, rgb(180 83 9 / 0.18), rgb(17 24 39 / 0.92));
+  border-color: var(--colour-difficulty-pass-hard);
+  background: var(--colour-test-mode-difficulty-hard-bg);
 }
 
 .test-mode-page__difficulty-card--expert {
-  border-color: #dc2626;
-  background: linear-gradient(180deg, rgb(220 38 38 / 0.18), rgb(17 24 39 / 0.92));
+  border-color: var(--colour-difficulty-pass-expert);
+  background: var(--colour-test-mode-difficulty-expert-bg);
 }
 
 .test-mode-page__difficulty-label {
   font-size: 1.15rem;
-  font-weight: 800;
   color: var(--colour-text-strong);
 }
 

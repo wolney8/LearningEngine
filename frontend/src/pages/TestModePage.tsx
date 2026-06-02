@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useBlocker, useNavigate, useParams } from "react-router-dom";
 import { GuestLimitNotice } from "../components/GuestLimitNotice";
 import { QuestionCard } from "../components/QuestionCard";
+import { SpendConfirmModal } from "../components/SpendConfirmModal";
 import { TestNavigator } from "../components/TestNavigator";
 import { TestResultsScreen } from "../components/TestResultsScreen";
 import { useAttempts } from "../hooks/useAttempts";
@@ -13,10 +14,13 @@ import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
 import { useTestResults } from "../hooks/useTestResults";
 import { useXP } from "../hooks/useXP";
+import { useXPSpend } from "../hooks/useXPSpend";
 import type { Package, Question } from "../schemas/package";
+import type { UnlockedDifficulties } from "../schemas/xpSpend";
 import {
   ANONYMOUS_GUEST_PACKAGE_CAP,
   fetchPackage,
+  fetchUnlockedDifficulties,
   getAnonymousGuestPackageCapStatus,
   markAnonymousGuestPackageEngaged,
 } from "../services/api";
@@ -71,19 +75,31 @@ export function TestModePage() {
   const [submitWarning, setSubmitWarning] = useState<
     "zero-answer" | "few-answer" | null
   >(null);
+  const [unlockedDifficulties, setUnlockedDifficulties] =
+    useState<UnlockedDifficulties>({
+      hard: false,
+      expert: false,
+    });
+  const [pendingSpendDifficulty, setPendingSpendDifficulty] = useState<
+    "hard" | "expert" | null
+  >(null);
 
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { attemptNumber, recordAttempt } = useAttempts(`test_${id}`);
   const { isFirstCompletion, markCompleted } = useFirstCompletion(`test_${id}`);
-  const { addXP, subtractXP } = useXP();
+  const { addXP, subtractXP, xp } = useXP();
   const { markPractised } = useStreak();
   const { triggerConfetti } = useCelebrationEffects();
-  const { status } = useAuth();
+  const { status, token } = useAuth();
   const { saveResult, progressMetadata } = useTestResults(id);
   const { settings } = useSettings();
+  const { spend, loading: spendLoading, error: spendError, reset } = useXPSpend();
 
   const isAuthenticated = status === "authenticated";
+  const spendEconomyEnabled = settings.spend_economy?.enabled ?? false;
+  const spendCosts = settings.spend_economy?.costs;
+  const difficultyUnlockCost = spendCosts?.increase_difficulty_cap ?? 0;
   const activeAttemptNumber = isAuthenticated
     ? (progressMetadata?.attemptCount ?? 0) + 1
     : attemptNumber;
@@ -116,6 +132,37 @@ export function TestModePage() {
       (phase.difficulty === "hard" || phase.difficulty === "expert") &&
       currentLocation.pathname !== nextLocation.pathname,
   );
+
+  useEffect(() => {
+    if (phase.kind !== "difficulty-select") {
+      setPendingSpendDifficulty(null);
+      reset();
+      return;
+    }
+
+    if (!spendEconomyEnabled || !token || !phase.pkg.id) {
+      setUnlockedDifficulties({ hard: false, expert: false });
+      return;
+    }
+
+    let cancelled = false;
+
+    fetchUnlockedDifficulties(token, phase.pkg.id)
+      .then((nextUnlocked) => {
+        if (!cancelled) {
+          setUnlockedDifficulties(nextUnlocked);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUnlockedDifficulties({ hard: false, expert: false });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, reset, spendEconomyEnabled, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -449,6 +496,24 @@ export function TestModePage() {
 
   if (phase.kind === "difficulty-select") {
     const { pkg } = phase;
+    const showDifficultySpendHint = spendEconomyEnabled && isAuthenticated;
+    const isLockedDifficulty = (
+      difficulty: Difficulty,
+    ): difficulty is "hard" | "expert" =>
+      spendEconomyEnabled &&
+      isAuthenticated &&
+      (difficulty === "hard" || difficulty === "expert") &&
+      !unlockedDifficulties[difficulty];
+
+    const handleDifficultyCardClick = (difficulty: Difficulty): void => {
+      if (isLockedDifficulty(difficulty)) {
+        setPendingSpendDifficulty(difficulty);
+        reset();
+        return;
+      }
+
+      handleSelectDifficulty(difficulty);
+    };
 
     return (
       <main className="test-mode-page">
@@ -462,15 +527,21 @@ export function TestModePage() {
           </button>
           <h1>{pkg.title}</h1>
           <p>Choose your difficulty to begin the timed exam.</p>
+          {showDifficultySpendHint && (
+            <section className="test-mode-page__spend-callout" aria-live="polite">
+              <h2>Unlock Hard and Expert tests with XP.</h2>
+            </section>
+          )}
         </header>
 
         <div className="test-mode-page__difficulty-grid">
           {(["easy", "normal", "hard", "expert"] as Difficulty[]).map((d) => (
+            // Hard/expert can require XP spend in authenticated mode when spend economy is enabled.
             <button
               key={d}
               type="button"
               className={`test-mode-page__difficulty-card test-mode-page__difficulty-card--${d}`}
-              onClick={() => handleSelectDifficulty(d)}
+              onClick={() => handleDifficultyCardClick(d)}
             >
               <span className="test-mode-page__difficulty-label">
                 {DIFFICULTY_LABEL[d]}
@@ -481,9 +552,48 @@ export function TestModePage() {
               <span className="test-mode-page__difficulty-xp">
                 ×{settings.difficulty.xp_multiplier[d]} XP
               </span>
+
+              {isLockedDifficulty(d) && (
+                <span className="test-mode-page__difficulty-xp" aria-live="polite">
+                  🔒 {difficultyUnlockCost} XP to unlock
+                </span>
+              )}
             </button>
           ))}
         </div>
+
+        <SpendConfirmModal
+          open={pendingSpendDifficulty !== null}
+          actionLabel={`Unlock ${pendingSpendDifficulty === "hard" ? "Hard" : "Expert"} difficulty`}
+          cost={difficultyUnlockCost}
+          currentXP={xp}
+          onConfirm={async () => {
+            if (!pendingSpendDifficulty) {
+              return;
+            }
+
+            try {
+              await spend("difficulty_unlock", pkg.id, pendingSpendDifficulty);
+              setUnlockedDifficulties((prev) => ({
+                ...prev,
+                [pendingSpendDifficulty]: true,
+              }));
+
+              const unlockedDifficulty = pendingSpendDifficulty;
+              setPendingSpendDifficulty(null);
+              reset();
+              handleSelectDifficulty(unlockedDifficulty);
+            } catch {
+              // useXPSpend already stores the error; keep modal open for user feedback.
+            }
+          }}
+          onCancel={() => {
+            setPendingSpendDifficulty(null);
+            reset();
+          }}
+          loading={spendLoading}
+          error={spendError}
+        />
       </main>
     );
   }

@@ -1,7 +1,7 @@
 .guest-limit-notice {
-  border: 1px solid #f9a8d4;
+  border: 1px solid var(--colour-guest-notice-border);
   border-radius: 0.85rem;
-  background: linear-gradient(135deg, #fff7ed 0%, #fff1f2 100%);
+  background: var(--colour-guest-notice-bg);
   padding: 0.85rem 1rem;
   display: grid;
   gap: 0.55rem;
@@ -9,7 +9,7 @@
 
 .guest-limit-notice__title {
   margin: 0;
-  color: #7f1d1d;
+  color: var(--colour-guest-notice-title);
   font-family: "Nunito", sans-serif;
   font-size: 1rem;
   font-weight: 800;
@@ -17,7 +17,7 @@
 
 .guest-limit-notice__message {
   margin: 0;
-  color: #7c2d12;
+  color: var(--colour-guest-notice-message);
   font-family: "Inter", sans-serif;
   font-size: 0.92rem;
   line-height: 1.4;
@@ -45,19 +45,19 @@
 }
 
 .guest-limit-notice__primary {
-  border: 1px solid #9f1239;
-  background: #9f1239;
-  color: #ffffff;
+  border: 1px solid var(--colour-guest-notice-primary-border);
+  background: var(--colour-guest-notice-primary-bg);
+  color: var(--colour-guest-notice-primary-text);
 }
 
 .guest-limit-notice__secondary {
-  border: 1px solid #fdba74;
+  border: 1px solid var(--colour-guest-notice-secondary-border);
   background: var(--colour-surface);
-  color: #9a3412;
+  color: var(--colour-guest-notice-secondary-text);
 }
 
 .guest-limit-notice__primary:focus-visible,
 .guest-limit-notice__secondary:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid var(--colour-focus);
   outline-offset: 2px;
 }

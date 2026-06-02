@@ -16,7 +16,11 @@ import {
   PackageSchema,
   PackageSummarySchema,
 } from "../schemas/package";
-import type { AdminPackageSummary, Package, PackageSummary } from "../schemas/package";
+import type {
+  AdminPackageSummary,
+  Package,
+  PackageSummary,
+} from "../schemas/package";
 import {
   UserProgressRecordSchema,
   UserProgressUpsertRequestSchema,
@@ -27,6 +31,15 @@ import type {
 } from "../schemas/progress";
 import { SettingsSchema } from "../schemas/settings";
 import type { Settings } from "../schemas/settings";
+import {
+  UnlockedDifficultiesSchema,
+  XpSpendResponseSchema,
+} from "../schemas/xpSpend";
+import type {
+  UnlockedDifficulties,
+  XpSpendAction,
+  XpSpendResponse,
+} from "../schemas/xpSpend";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const TIMEOUT_MS = 10_000;
@@ -39,7 +52,8 @@ const ANONYMOUS_ATTEMPT_KEY_PREFIX = "lle_attempt_";
 const ANONYMOUS_FIRST_COMPLETION_KEY_PREFIX = "lle_completed_";
 const ANONYMOUS_TEST_RESULTS_KEY_PREFIX = "lle_test_results_";
 const ANONYMOUS_GUEST_ENGAGED_PACKAGES_KEY = "lle_guest_engaged_packages";
-const ANONYMOUS_GUEST_TEST_ENGAGED_PACKAGES_KEY = "lle_guest_test_engaged_packages";
+const ANONYMOUS_GUEST_TEST_ENGAGED_PACKAGES_KEY =
+  "lle_guest_test_engaged_packages";
 const XP_RECONCILIATION_DECISION_KEY_PREFIX = "lle_xp_reconciled_user_";
 const ISO_LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const ANONYMOUS_GUEST_PACKAGE_CAP = 2;
@@ -157,7 +171,9 @@ const AdminAuditLogEntrySchema = z
   .strict();
 
 export type AdminAIConfig = z.infer<typeof AdminAIConfigSchema>;
-export type AdminAIConnectionTestResult = z.infer<typeof AdminAIConnectionTestSchema>;
+export type AdminAIConnectionTestResult = z.infer<
+  typeof AdminAIConnectionTestSchema
+>;
 export type AdminPackageGenerateResponse = z.infer<
   typeof AdminPackageGenerateResponseSchema
 >;
@@ -222,7 +238,9 @@ export async function fetchMyLibrary(token: string): Promise<PackageSummary[]> {
   return z.array(PackageSummarySchema).parse(data);
 }
 
-export async function fetchMyCatalogue(token: string): Promise<PackageSummary[]> {
+export async function fetchMyCatalogue(
+  token: string,
+): Promise<PackageSummary[]> {
   const response = await fetchWithTimeout(`${BASE_URL}/users/me/catalogue`, {
     headers: getAuthHeaders(token),
   });
@@ -238,10 +256,13 @@ export async function addToLibrary(
   packageId: string,
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
-  const response = await fetchWithTimeout(`${BASE_URL}/users/me/library/${encodedId}`, {
-    method: "PUT",
-    headers: getAuthHeaders(token),
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/users/me/library/${encodedId}`,
+    {
+      method: "PUT",
+      headers: getAuthHeaders(token),
+    },
+  );
   if (!response.ok) {
     throw new Error(`Failed to add to library: ${response.status}`);
   }
@@ -254,10 +275,13 @@ export async function removeFromLibrary(
   packageId: string,
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
-  const response = await fetchWithTimeout(`${BASE_URL}/users/me/library/${encodedId}`, {
-    method: "DELETE",
-    headers: getAuthHeaders(token),
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/users/me/library/${encodedId}`,
+    {
+      method: "DELETE",
+      headers: getAuthHeaders(token),
+    },
+  );
   if (!response.ok) {
     throw new Error(`Failed to remove from library: ${response.status}`);
   }
@@ -461,7 +485,10 @@ function readAnonymousResultSnapshot(packageId: string): {
         lastAttemptedAt?: unknown;
       };
 
-      if (typeof result.bestScore === "number" && Number.isFinite(result.bestScore)) {
+      if (
+        typeof result.bestScore === "number" &&
+        Number.isFinite(result.bestScore)
+      ) {
         highestScore = Math.max(highestScore, result.bestScore);
       }
 
@@ -504,7 +531,11 @@ export function readAnonymousProgressSeeds(): AnonymousProgressSeed[] {
       const resultsSnapshot = readAnonymousResultSnapshot(packageId);
       const completed = completionFlag || resultsSnapshot.completed;
 
-      if (attemptCount <= 0 && !completed && resultsSnapshot.latestWeightedScore <= 0) {
+      if (
+        attemptCount <= 0 &&
+        !completed &&
+        resultsSnapshot.latestWeightedScore <= 0
+      ) {
         continue;
       }
 
@@ -528,9 +559,13 @@ export function readAnonymousStreakSnapshot(): AnonymousStreakSnapshot {
     const rawStreak = localStorage.getItem(ANONYMOUS_DAILY_STREAK_KEY);
     const streakNumber = Number(rawStreak);
     const streakCount =
-      Number.isFinite(streakNumber) && streakNumber >= 0 ? Math.floor(streakNumber) : 0;
+      Number.isFinite(streakNumber) && streakNumber >= 0
+        ? Math.floor(streakNumber)
+        : 0;
 
-    const rawLastPractisedDate = localStorage.getItem(ANONYMOUS_LAST_ACTIVE_KEY);
+    const rawLastPractisedDate = localStorage.getItem(
+      ANONYMOUS_LAST_ACTIVE_KEY,
+    );
     const lastPractisedDate =
       typeof rawLastPractisedDate === "string" &&
       ISO_LOCAL_DATE_RE.test(rawLastPractisedDate)
@@ -707,7 +742,9 @@ export function markXPReconciliationDecision(userId: number): void {
   }
 }
 
-export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
+export async function registerUser(
+  payload: RegisterRequest,
+): Promise<AuthResponse> {
   const parsed = RegisterRequestSchema.parse(payload);
   const response = await fetchWithTimeout(`${BASE_URL}/auth/register`, {
     method: "POST",
@@ -748,7 +785,9 @@ export async function fetchCurrentUser(token: string): Promise<User> {
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Could not fetch current user (${response.status}): ${detail}`);
+    throw new Error(
+      `Could not fetch current user (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -811,6 +850,70 @@ export async function updateMyXP(token: string, xp: number): Promise<number> {
   return UserXPSchema.parse(data).xp;
 }
 
+export async function spendXP(
+  token: string,
+  action: XpSpendAction,
+  packageId: string,
+  difficulty?: "hard" | "expert",
+): Promise<XpSpendResponse> {
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/xp/spend`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify({
+      action,
+      package_id: packageId,
+      difficulty,
+    }),
+  });
+
+  if (response.status === 401) {
+    throw new Error("You must be logged in to spend XP");
+  }
+  if (response.status === 402) {
+    throw new Error("Insufficient XP");
+  }
+  if (response.status === 404) {
+    throw new Error("Package not found");
+  }
+  if (response.status === 409) {
+    throw new Error("Already unlocked");
+  }
+  if (response.status === 423) {
+    throw new Error("XP spending is currently disabled");
+  }
+  if (!response.ok) {
+    throw new Error("Failed to spend XP");
+  }
+
+  const data: unknown = await response.json();
+  return XpSpendResponseSchema.parse(data);
+}
+
+export async function fetchUnlockedDifficulties(
+  token: string,
+  packageId: string,
+): Promise<UnlockedDifficulties> {
+  const encodedId = encodeURIComponent(packageId);
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/users/me/unlocked-difficulties/${encodedId}`,
+    {
+      headers: getAuthHeaders(token),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch unlocked difficulties: ${response.status}`,
+    );
+  }
+
+  const data: unknown = await response.json();
+  return UnlockedDifficultiesSchema.parse(data);
+}
+
 export async function fetchMyStreak(token: string): Promise<{
   streak_count: number;
   last_practised_date: string | null;
@@ -821,7 +924,9 @@ export async function fetchMyStreak(token: string): Promise<{
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Could not fetch user streak (${response.status}): ${detail}`);
+    throw new Error(
+      `Could not fetch user streak (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -842,7 +947,9 @@ export async function markMyStreakPractisedToday(token: string): Promise<{
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Could not update user streak (${response.status}): ${detail}`);
+    throw new Error(
+      `Could not update user streak (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -870,21 +977,27 @@ export async function updateMyStreakSnapshot(
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Could not update user streak (${response.status}): ${detail}`);
+    throw new Error(
+      `Could not update user streak (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
   return UserStreakSchema.parse(data);
 }
 
-export async function fetchMyProgress(token: string): Promise<UserProgressRecord[]> {
+export async function fetchMyProgress(
+  token: string,
+): Promise<UserProgressRecord[]> {
   const response = await fetchWithTimeout(`${BASE_URL}/users/me/progress`, {
     headers: getAuthHeaders(token),
   });
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Could not fetch user progress (${response.status}): ${detail}`);
+    throw new Error(
+      `Could not fetch user progress (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -950,7 +1063,9 @@ export async function updateAdminSettings(
   return SettingsSchema.parse(data);
 }
 
-export async function fetchAdminAIConfig(token: string): Promise<AdminAIConfig> {
+export async function fetchAdminAIConfig(
+  token: string,
+): Promise<AdminAIConfig> {
   const response = await fetchWithTimeout(`${BASE_URL}/admin/ai-config`, {
     headers: getAdminHeaders(token),
   });
@@ -1199,11 +1314,14 @@ export async function updateAdminPackage(
   },
 ): Promise<PackageSummary> {
   const encodedId = encodeURIComponent(packageId);
-  const response = await fetchWithTimeout(`${BASE_URL}/admin/packages/${encodedId}`, {
-    method: "PATCH",
-    headers: getAdminHeaders(token),
-    body: JSON.stringify(patch),
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/packages/${encodedId}`,
+    {
+      method: "PATCH",
+      headers: getAdminHeaders(token),
+      body: JSON.stringify(patch),
+    },
+  );
 
   if (!response.ok) {
     const detail = await readBackendErrorMessage(response);
@@ -1228,7 +1346,9 @@ export async function publishAdminPackage(
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Failed to publish package (${response.status}): ${detail}`);
+    throw new Error(
+      `Failed to publish package (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -1307,14 +1427,18 @@ export async function refreshAdminPackage(
   return RefreshResultSchema.parse(data);
 }
 
-export async function fetchAdminUsers(token: string): Promise<AdminManagedUser[]> {
+export async function fetchAdminUsers(
+  token: string,
+): Promise<AdminManagedUser[]> {
   const response = await fetchWithTimeout(`${BASE_URL}/admin/users`, {
     headers: getAdminHeaders(token),
   });
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Failed to fetch admin users (${response.status}): ${detail}`);
+    throw new Error(
+      `Failed to fetch admin users (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -1326,15 +1450,20 @@ export async function updateAdminUserRole(
   userId: number,
   role: AdminManagedUserRole,
 ): Promise<AdminManagedUser> {
-  const response = await fetchWithTimeout(`${BASE_URL}/admin/users/${userId}/role`, {
-    method: "PATCH",
-    headers: getAdminHeaders(token),
-    body: JSON.stringify({ role: AdminManagedUserRoleSchema.parse(role) }),
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/users/${userId}/role`,
+    {
+      method: "PATCH",
+      headers: getAdminHeaders(token),
+      body: JSON.stringify({ role: AdminManagedUserRoleSchema.parse(role) }),
+    },
+  );
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Failed to update user role (${response.status}): ${detail}`);
+    throw new Error(
+      `Failed to update user role (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -1346,11 +1475,14 @@ export async function setAdminUserXP(
   userId: number,
   xp: number,
 ): Promise<AdminManagedUserXP> {
-  const response = await fetchWithTimeout(`${BASE_URL}/admin/users/${userId}/xp/set`, {
-    method: "PATCH",
-    headers: getAdminHeaders(token),
-    body: JSON.stringify({ xp }),
-  });
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/users/${userId}/xp/set`,
+    {
+      method: "PATCH",
+      headers: getAdminHeaders(token),
+      body: JSON.stringify({ xp }),
+    },
+  );
 
   if (!response.ok) {
     const detail = await response.text();
@@ -1398,7 +1530,9 @@ export async function grantAdminUserXPBonus(
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Failed to grant user bonus XP (${response.status}): ${detail}`);
+    throw new Error(
+      `Failed to grant user bonus XP (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -1422,7 +1556,9 @@ export async function resetAdminUserProgress(
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Failed to reset user progress (${response.status}): ${detail}`);
+    throw new Error(
+      `Failed to reset user progress (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();
@@ -1500,7 +1636,9 @@ export async function fetchAdminAuditLogs(
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Failed to fetch admin audit logs (${response.status}): ${detail}`);
+    throw new Error(
+      `Failed to fetch admin audit logs (${response.status}): ${detail}`,
+    );
   }
 
   const data: unknown = await response.json();

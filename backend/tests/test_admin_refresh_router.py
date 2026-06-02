@@ -416,7 +416,33 @@ async def test_ai_refresh_preserves_existing_tags_when_generated_tags_empty(
     monkeypatch,
 ) -> None:
     existing = _sample_package().model_copy(update={"tags": ["existing", "Focus"]})
-    refreshed = _sample_package().model_copy(update={"tags": ["", " "]})
+    refreshed = Package.model_validate(
+        {
+            **_sample_package().model_dump(mode="python"),
+            "tags": ["", " "],
+            "pages": [
+                {
+                    "id": "p1",
+                    "title": "Updated Page 1",
+                    "content": "Refreshed content body.",
+                }
+            ],
+            "questions": [
+                {
+                    "id": "q1",
+                    "text": "Updated refreshed question?",
+                    "answers": [
+                        {"id": "a", "text": "Yes"},
+                        {"id": "b", "text": "No"},
+                    ],
+                    "correct_answer": "a",
+                    "weight": 100.0,
+                    "feedback": "Updated feedback.",
+                    "revision_page_ids": ["p1"],
+                }
+            ],
+        }
+    )
 
     class FakeAgent:
         async def run(self, prompt: str):
@@ -428,3 +454,187 @@ async def test_ai_refresh_preserves_existing_tags_when_generated_tags_empty(
 
     raw = yaml.safe_load(yaml_content)
     assert raw["tags"] == ["existing", "Focus"]
+
+
+def _sample_package_two_questions() -> Package:
+    return Package.model_validate(
+        {
+            "id": "sample-two-questions",
+            "title": "Sample Two Questions",
+            "description": "A package with two questions for refresh quality tests.",
+            "version": "1.0.0",
+            "tags": ["demo"],
+            "passing_score": 0.75,
+            "pages": [
+                {"id": "p1", "title": "Page 1", "content": "Original content"},
+                {"id": "p2", "title": "Page 2", "content": "Original content 2"},
+            ],
+            "questions": [
+                {
+                    "id": "q1",
+                    "text": "Original question one?",
+                    "answers": [
+                        {"id": "a", "text": "Yes"},
+                        {"id": "b", "text": "No"},
+                    ],
+                    "correct_answer": "a",
+                    "weight": 50.0,
+                    "feedback": "Correct.",
+                    "revision_page_ids": ["p1"],
+                },
+                {
+                    "id": "q2",
+                    "text": "Original question two?",
+                    "answers": [
+                        {"id": "a", "text": "True"},
+                        {"id": "b", "text": "False"},
+                    ],
+                    "correct_answer": "a",
+                    "weight": 50.0,
+                    "feedback": "Correct.",
+                    "revision_page_ids": ["p2"],
+                },
+            ],
+        }
+    )
+
+
+def _package_with_updates(base: Package, updates: dict[str, object]) -> Package:
+    data = base.model_dump(mode="python")
+    data.update(updates)
+    return Package.model_validate(data)
+
+
+async def test_ai_refresh_retries_on_low_quality_then_succeeds(monkeypatch) -> None:
+    existing = _sample_package()
+    low_quality = existing
+    good_refresh = _package_with_updates(
+        existing,
+        {
+            "title": "Refreshed Title",
+            "description": "Refreshed Description",
+            "pages": [
+                {
+                    "id": "p1",
+                    "title": "Updated Page 1",
+                    "content": "Completely refreshed page content.",
+                }
+            ],
+            "questions": [
+                {
+                    "id": "q1",
+                    "text": "What changed in this refreshed package?",
+                    "answers": [
+                        {"id": "a", "text": "The page and question content"},
+                        {"id": "b", "text": "Nothing"},
+                    ],
+                    "correct_answer": "a",
+                    "weight": 100.0,
+                    "feedback": "Correct.",
+                    "revision_page_ids": ["p1"],
+                }
+            ],
+        },
+    )
+
+    class FakeAgent:
+        def __init__(self):
+            self.calls = 0
+
+        async def run(self, prompt: str):
+            self.calls += 1
+            if self.calls == 1:
+                return SimpleNamespace(output=low_quality)
+            return SimpleNamespace(output=good_refresh)
+
+    fake_agent = FakeAgent()
+    monkeypatch.setattr(ai_generator, "_get_agent", lambda **kwargs: fake_agent)
+
+    yaml_content = await ai_generator.refresh_package(existing, settings=None)
+
+    raw = yaml.safe_load(yaml_content)
+    assert raw["title"] == "Refreshed Title"
+    assert raw["questions"][0]["text"] == "What changed in this refreshed package?"
+    assert fake_agent.calls == 2
+
+
+async def test_ai_refresh_fails_after_max_attempts_on_low_quality(monkeypatch) -> None:
+    existing = _sample_package()
+
+    class FakeAgent:
+        def __init__(self):
+            self.calls = 0
+
+        async def run(self, prompt: str):
+            self.calls += 1
+            return SimpleNamespace(output=existing)
+
+    fake_agent = FakeAgent()
+    monkeypatch.setattr(ai_generator, "_get_agent", lambda **kwargs: fake_agent)
+
+    try:
+        await ai_generator.refresh_package(existing, settings=None)
+        raise AssertionError("Expected AIGenerationError")
+    except AIGenerationError as exc:
+        assert "did not meet quality requirements" in str(exc)
+
+    assert fake_agent.calls == ai_generator.REFRESH_MAX_ATTEMPTS
+
+
+async def test_ai_refresh_quality_rejects_duplicate_question_text(monkeypatch) -> None:
+    existing = _sample_package_two_questions()
+    duplicate_questions_refresh = _package_with_updates(
+        existing,
+        {
+            "pages": [
+                {
+                    "id": "p1",
+                    "title": "Updated Page 1",
+                    "content": "New content one.",
+                },
+                {
+                    "id": "p2",
+                    "title": "Updated Page 2",
+                    "content": "New content two.",
+                },
+            ],
+            "questions": [
+                {
+                    "id": "q1",
+                    "text": "Duplicated question text?",
+                    "answers": [
+                        {"id": "a", "text": "One"},
+                        {"id": "b", "text": "Two"},
+                    ],
+                    "correct_answer": "a",
+                    "weight": 50.0,
+                    "feedback": "Feedback one.",
+                    "revision_page_ids": ["p1"],
+                },
+                {
+                    "id": "q2",
+                    "text": "Duplicated question text?",
+                    "answers": [
+                        {"id": "a", "text": "Three"},
+                        {"id": "b", "text": "Four"},
+                    ],
+                    "correct_answer": "a",
+                    "weight": 50.0,
+                    "feedback": "Feedback two.",
+                    "revision_page_ids": ["p2"],
+                },
+            ],
+        },
+    )
+
+    class FakeAgent:
+        async def run(self, prompt: str):
+            return SimpleNamespace(output=duplicate_questions_refresh)
+
+    monkeypatch.setattr(ai_generator, "_get_agent", lambda **kwargs: FakeAgent())
+
+    try:
+        await ai_generator.refresh_package(existing, settings=None)
+        raise AssertionError("Expected AIGenerationError")
+    except AIGenerationError as exc:
+        assert "duplicate questions" in str(exc).lower()

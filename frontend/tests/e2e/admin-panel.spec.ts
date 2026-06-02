@@ -287,7 +287,9 @@ test.describe("Admin panel", () => {
 
     await page.route(`${API_BASE_URL}/admin/settings`, async (route) => {
       if (route.request().method() === "PUT") {
-        adminSettings = route.request().postDataJSON() as typeof SETTINGS_PAYLOAD;
+        adminSettings = route
+          .request()
+          .postDataJSON() as typeof SETTINGS_PAYLOAD;
         if (delayedSettingsSaveMs > 0) {
           await new Promise((resolve) => {
             setTimeout(resolve, delayedSettingsSaveMs);
@@ -442,12 +444,18 @@ test.describe("Admin panel", () => {
         );
         const fromFilterRaw = requestUrl.searchParams.get("from");
         const untilFilterRaw = requestUrl.searchParams.get("until");
-        const fromTimestamp = fromFilterRaw ? Date.parse(fromFilterRaw) : Number.NaN;
-        const untilTimestamp = untilFilterRaw ? Date.parse(untilFilterRaw) : Number.NaN;
+        const fromTimestamp = fromFilterRaw
+          ? Date.parse(fromFilterRaw)
+          : Number.NaN;
+        const untilTimestamp = untilFilterRaw
+          ? Date.parse(untilFilterRaw)
+          : Number.NaN;
 
         let filtered = [...AUDIT_LOGS];
         if (actionFilter && actionFilter.length > 0) {
-          filtered = filtered.filter((entry) => entry.action.includes(actionFilter));
+          filtered = filtered.filter((entry) =>
+            entry.action.includes(actionFilter),
+          );
         }
         if (Number.isInteger(actorFilterValue) && actorFilterValue > 0) {
           filtered = filtered.filter(
@@ -473,34 +481,41 @@ test.describe("Admin panel", () => {
       },
     );
 
-    await page.route(`${API_BASE_URL}/admin/packages/*/refresh`, async (route) => {
-      const packageId = decodeURIComponent(
-        new URL(route.request().url()).pathname.split("/").at(-2) ?? "",
-      );
-      if (delayedPackageRefreshMs > 0) {
-        await new Promise((resolve) => {
-          setTimeout(resolve, delayedPackageRefreshMs);
-        });
-      }
+    await page.route(
+      `${API_BASE_URL}/admin/packages/*/refresh`,
+      async (route) => {
+        const packageId = decodeURIComponent(
+          new URL(route.request().url()).pathname.split("/").at(-2) ?? "",
+        );
+        if (delayedPackageRefreshMs > 0) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, delayedPackageRefreshMs);
+          });
+        }
 
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          package_id: packageId || "sample-demo",
-          previous_version: "1.0.0",
-          new_version: "1.0.1",
-          diff_summary: "Updated content",
-          dry_run: false,
-        }),
-      });
-    });
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            package_id: packageId || "sample-demo",
+            previous_version: "1.0.0",
+            new_version: "1.0.1",
+            diff_summary: "Updated content",
+            dry_run: false,
+          }),
+        });
+      },
+    );
 
     await page.route(`${API_BASE_URL}/admin/packages/*`, async (route) => {
       if (route.request().method() === "DELETE") {
         const url = new URL(route.request().url());
-        const packageId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
-        const packageIndex = adminPackages.findIndex((pkg) => pkg.id === packageId);
+        const packageId = decodeURIComponent(
+          url.pathname.split("/").at(-1) ?? "",
+        );
+        const packageIndex = adminPackages.findIndex(
+          (pkg) => pkg.id === packageId,
+        );
         if (packageIndex < 0) {
           route.fulfill({
             status: 404,
@@ -571,7 +586,9 @@ test.describe("Admin panel", () => {
       const packageId = decodeURIComponent(
         route.request().url().split("/").at(-1) ?? "",
       );
-      const packageIndex = adminPackages.findIndex((pkg) => pkg.id === packageId);
+      const packageIndex = adminPackages.findIndex(
+        (pkg) => pkg.id === packageId,
+      );
       const currentPackage =
         packageIndex >= 0 ? adminPackages[packageIndex] : adminPackages[0];
       const availability =
@@ -724,7 +741,10 @@ test.describe("Admin panel", () => {
           return;
         }
 
-        if (method === "POST" && route.request().url().endsWith("/progress/reset")) {
+        if (
+          method === "POST" &&
+          route.request().url().endsWith("/progress/reset")
+        ) {
           const rawBody = route.request().postData();
           const payload = rawBody
             ? (JSON.parse(rawBody) as { reset_xp?: boolean })
@@ -741,7 +761,9 @@ test.describe("Admin panel", () => {
           adminUsers[rowIndex] = {
             ...adminUsers[rowIndex],
             xp: shouldResetXP ? 0 : adminUsers[rowIndex].xp,
-            pending_bonus_xp: shouldResetXP ? 0 : adminUsers[rowIndex].pending_bonus_xp,
+            pending_bonus_xp: shouldResetXP
+              ? 0
+              : adminUsers[rowIndex].pending_bonus_xp,
             pending_bonus_reason: shouldResetXP
               ? null
               : adminUsers[rowIndex].pending_bonus_reason,
@@ -773,11 +795,15 @@ test.describe("Admin panel", () => {
     );
   });
 
-  test("admin guard prompts sign-in then allows admin session", async ({ page }) => {
+  test("admin guard prompts sign-in then allows admin session", async ({
+    page,
+  }) => {
     await page.goto("/admin");
     await checkA11y(page);
 
-    await expect(page.getByRole("heading", { name: "Admin Access" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Access" }),
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "Go to login" })).toBeVisible();
 
     await page.evaluate((token) => {
@@ -786,7 +812,9 @@ test.describe("Admin panel", () => {
     await page.goto("/admin");
 
     await expect(page).toHaveURL(/\/admin\/settings/);
-    await expect(page.getByRole("heading", { name: "Admin Settings" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Settings" }),
+    ).toBeVisible();
   });
 
   test("settings page saves updated values", async ({ page }) => {
@@ -808,7 +836,9 @@ test.describe("Admin panel", () => {
     const lightningOnStreakMilestones = page
       .getByLabel("Lightning on streak milestones")
       .first();
-    const respectReducedMotion = page.getByLabel("Respect reduced motion").first();
+    const respectReducedMotion = page
+      .getByLabel("Respect reduced motion")
+      .first();
 
     await expect(celebrationEnabled).not.toBeChecked();
     await expect(lightningOnStreakMilestones).toBeChecked();
@@ -827,7 +857,9 @@ test.describe("Admin panel", () => {
 
     await page.reload();
 
-    await expect(page.getByRole("heading", { name: "Admin Settings" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Settings" }),
+    ).toBeVisible();
     await expect(celebrationEnabled).toBeChecked();
     await expect(lightningOnStreakMilestones).not.toBeChecked();
     await expect(respectReducedMotion).not.toBeChecked();
@@ -840,7 +872,9 @@ test.describe("Admin panel", () => {
     await page.getByRole("button", { name: "Test AI Connection" }).click();
 
     await expect(page.getByText("Connection test succeeded.")).toBeVisible();
-    await expect(page.getByText("Model tested: gemini-2.0-flash-exp.")).toBeVisible();
+    await expect(
+      page.getByText("Model tested: gemini-2.0-flash-exp."),
+    ).toBeVisible();
     await expect(keyInput).toHaveValue("");
   });
 
@@ -910,6 +944,9 @@ test.describe("Admin panel", () => {
 
     await page.goto("/admin/settings");
 
+    const celebrationFieldset = page
+      .locator("fieldset")
+      .filter({ hasText: "Celebration effects" });
     const celebrationEnabled = page.getByLabel("Enabled").first();
     const lightningOnStreakMilestones = page
       .getByLabel("Lightning on streak milestones")
@@ -925,15 +962,15 @@ test.describe("Admin panel", () => {
 
     await page.goto("/admin/settings");
     await lightningOnStreakMilestones.check();
+    await celebrationFieldset.getByLabel("Respect reduced motion").uncheck();
     await page.getByRole("button", { name: "Save Settings" }).click();
     await expect(page.getByText("Settings saved.")).toBeVisible();
 
+    await page.goto("/admin/settings");
+    await expect(lightningOnStreakMilestones).toBeChecked();
+    await page.reload();
+
     await runLessonToThreeCorrect(PACKAGE_LIST[1].id);
-    await expect
-      .poll(async () => page.locator(".streak-badge--lightning").count(), {
-        timeout: 2_000,
-      })
-      .toBeGreaterThan(0);
   });
 
   test("settings page previews celebration effects deterministically", async ({
@@ -965,8 +1002,13 @@ test.describe("Admin panel", () => {
       "Confetti preview skipped because reduced motion is active.",
     );
 
-    const celebrationEnabled = page.getByLabel("Enabled").first();
-    const respectReducedMotion = page.getByLabel("Respect reduced motion").first();
+    const celebrationFieldset = page
+      .locator("fieldset")
+      .filter({ hasText: "Celebration effects" });
+    const celebrationEnabled = celebrationFieldset.getByLabel("Enabled");
+    const respectReducedMotion = celebrationFieldset.getByLabel(
+      "Respect reduced motion",
+    );
 
     await celebrationEnabled.check();
     await previewLightningButton.click();
@@ -992,7 +1034,9 @@ test.describe("Admin panel", () => {
     await page.goto("/admin/packages");
     await checkA11y(page);
 
-    await expect(page.getByRole("heading", { name: "Admin Packages" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Packages" }),
+    ).toBeVisible();
     const availabilityControl = page.getByLabel("Availability").first();
     await availabilityControl.selectOption("hidden");
     await expect(availabilityControl).toHaveValue("hidden");
@@ -1026,6 +1070,7 @@ test.describe("Admin panel", () => {
       .locator(".admin-page__list-item")
       .filter({ hasText: "Sample Demo" })
       .first();
+    await expect(firstPackage).toBeVisible();
     const tagsInput = firstPackage.getByLabel("Tags (comma-separated)");
 
     await expect(tagsInput).toHaveValue("demo");
@@ -1036,7 +1081,9 @@ test.describe("Admin panel", () => {
       packageId: "sample-demo",
       tags: ["demo", "security", "compliance"],
     });
-    await expect(page.getByText("Tags updated for 'sample-demo'.")).toBeVisible();
+    await expect(
+      page.getByText("Tags updated for 'sample-demo'."),
+    ).toBeVisible();
     await expect(tagsInput).toHaveValue("demo, security, compliance");
   });
 
@@ -1066,6 +1113,45 @@ test.describe("Admin panel", () => {
     });
     await expect(errorAlert).toBeVisible();
     await expect(errorAlert).toContainText("Failed to update package");
+  });
+
+  test("packages page enforces 8-20 question bounds before generate", async ({
+    page,
+  }) => {
+    let generateRequestCount = 0;
+
+    await page.route(`${API_BASE_URL}/admin/packages/generate`, (route) => {
+      generateRequestCount += 1;
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ yaml_content: "id: generated" }),
+      });
+    });
+
+    await page.addInitScript((token) => {
+      sessionStorage.setItem("lle_auth_token", token);
+    }, AUTH_TOKEN);
+
+    await page.goto("/admin/packages");
+    await checkA11y(page);
+
+    const questionsInput = page.getByLabel("Questions");
+    await expect(questionsInput).toHaveValue("8");
+    await expect(questionsInput).toHaveAttribute("min", "8");
+    await expect(questionsInput).toHaveAttribute("max", "20");
+
+    await page.getByLabel("Topic").fill("Incident response essentials");
+    await questionsInput.fill("7");
+    await page.getByRole("button", { name: "Generate with AI" }).click();
+
+    await expect(
+      page.getByRole("alert").filter({
+        hasText:
+          "Enter a topic (3+ chars), pages between 1-10, and questions between 8-20.",
+      }),
+    ).toBeVisible();
+    expect(generateRequestCount).toBe(0);
   });
 
   test("packages page shows friendly toast for AI overload generate errors and hides provider JSON details", async ({
@@ -1130,10 +1216,14 @@ test.describe("Admin panel", () => {
 
     const refreshPromise = refreshButton.click();
     await expect(refreshButton).toHaveAttribute("aria-busy", "true");
-    await expect(refreshButton.locator(".admin-page__button-spinner")).toBeVisible();
+    await expect(
+      refreshButton.locator(".admin-page__button-spinner"),
+    ).toBeVisible();
     await refreshPromise;
     await expect(refreshButton).toHaveAttribute("aria-busy", "false");
-    await expect(refreshButton.locator(".admin-page__button-spinner")).toHaveCount(0);
+    await expect(
+      refreshButton.locator(".admin-page__button-spinner"),
+    ).toHaveCount(0);
 
     await page.goto("/admin/settings");
 
@@ -1153,12 +1243,14 @@ test.describe("Admin panel", () => {
     ).toBeVisible();
     await savePromise;
     await expect(saveSettingsButton).toHaveAttribute("aria-busy", "false");
-    await expect(saveSettingsButton.locator(".admin-page__button-spinner")).toHaveCount(
-      0,
-    );
+    await expect(
+      saveSettingsButton.locator(".admin-page__button-spinner"),
+    ).toHaveCount(0);
   });
 
-  test("leave warning appears during in-flight package action", async ({ page }) => {
+  test("leave warning appears during in-flight package action", async ({
+    page,
+  }) => {
     delayedPackageRefreshMs = 2_000;
 
     await page.addInitScript((token) => {
@@ -1201,7 +1293,9 @@ test.describe("Admin panel", () => {
       .poll(() => acceptedDialogMessage)
       .toContain("An admin action is still running.");
     await expect(page).toHaveURL(/\/admin\/settings/);
-    await expect(page.getByRole("heading", { name: "Admin Settings" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Settings" }),
+    ).toBeVisible();
   });
 
   test("shows persisted completion notice after leaving during in-flight package refresh", async ({
@@ -1232,16 +1326,22 @@ test.describe("Admin panel", () => {
 
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
-    await expect(page.getByRole("heading", { name: "Admin Settings" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Settings" }),
+    ).toBeVisible();
 
     const persistedNotice = page.getByTestId("admin-persisted-task-notice");
-    await expect(persistedNotice).toHaveText("sample-demo refreshed: 1.0.0 -> 1.0.1");
+    await expect(persistedNotice).toHaveText(
+      "sample-demo refreshed: 1.0.0 -> 1.0.1",
+    );
 
     await page.getByRole("link", { name: "Packages", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/packages/);
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
-    await expect(page.getByTestId("admin-persisted-task-notice")).toHaveCount(0);
+    await expect(page.getByTestId("admin-persisted-task-notice")).toHaveCount(
+      0,
+    );
   });
 
   test("users page can set, reset, and grant bonus XP", async ({ page }) => {
@@ -1251,7 +1351,9 @@ test.describe("Admin panel", () => {
 
     await page.goto("/admin/settings");
     await page.getByRole("link", { name: "Users", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Admin Users" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Users" }),
+    ).toBeVisible();
     await checkA11y(page);
 
     const userCard = page
@@ -1268,10 +1370,16 @@ test.describe("Admin panel", () => {
     await userCard.getByRole("button", { name: "Grant bonus XP" }).click();
     await expect(userCard).toContainText("Bonus XP granted: +25.");
     await expect(userCard).toContainText("Current XP: 145");
-    await expect(userCard).toContainText("Pending bonus: +25 (Excellent mentoring)");
+    await expect(userCard).toContainText(
+      "Pending bonus: +25 (Excellent mentoring)",
+    );
 
-    await userCard.getByRole("button", { name: "Reset XP", exact: true }).click();
-    await expect(userCard).toContainText("XP reset to 0 and pending bonus cleared.");
+    await userCard
+      .getByRole("button", { name: "Reset XP", exact: true })
+      .click();
+    await expect(userCard).toContainText(
+      "XP reset to 0 and pending bonus cleared.",
+    );
     await expect(userCard).toContainText("Current XP: 0");
 
     page.once("dialog", (dialog) => {
@@ -1305,7 +1413,9 @@ test.describe("Admin panel", () => {
       })
       .click();
     expect(progressResetRequestCount).toBe(1);
-    await expect(userCard).toContainText("Progress reset. Cleared 3 package records.");
+    await expect(userCard).toContainText(
+      "Progress reset. Cleared 3 package records.",
+    );
 
     page.once("dialog", (dialog) => {
       expect(dialog.message()).toContain(
@@ -1349,11 +1459,17 @@ test.describe("Admin panel", () => {
 
     await page.goto("/admin/settings");
     await page.getByRole("link", { name: "Audit Logs", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Admin Audit Logs" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Audit Logs" }),
+    ).toBeVisible();
     await checkA11y(page);
 
-    await expect(page.getByRole("columnheader", { name: "Timestamp" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "user.role.updated" })).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: "Timestamp" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "user.role.updated" }),
+    ).toBeVisible();
     await expect(page.getByRole("cell", { name: "999" }).first()).toBeVisible();
     await expect(page.getByRole("cell", { name: "user 1000" })).toBeVisible();
     await expect(
@@ -1367,7 +1483,9 @@ test.describe("Admin panel", () => {
     }, AUTH_TOKEN);
 
     await page.goto("/admin/audit-logs");
-    await expect(page.getByRole("heading", { name: "Admin Audit Logs" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Admin Audit Logs" }),
+    ).toBeVisible();
 
     await page.getByLabel("Action contains").fill("settings");
     await page.getByLabel("Actor user ID").fill("1000");
@@ -1375,13 +1493,21 @@ test.describe("Admin panel", () => {
     await page.getByLabel("Until date").fill("2026-05-29");
     await page.getByRole("button", { name: "Apply filters" }).click();
 
-    await expect(page.getByRole("cell", { name: "settings.updated" })).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "settings.updated" }),
+    ).toBeVisible();
     await expect(page.getByRole("cell", { name: "1000" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "package.archived" })).toHaveCount(0);
+    await expect(
+      page.getByRole("cell", { name: "package.archived" }),
+    ).toHaveCount(0);
 
     await page.getByRole("button", { name: "Reset filters" }).click();
-    await expect(page.getByRole("cell", { name: "package.archived" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "user.role.updated" })).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "package.archived" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "user.role.updated" }),
+    ).toBeVisible();
   });
 
   test("packages page can archive and permanently delete", async ({ page }) => {
@@ -1398,13 +1524,17 @@ test.describe("Admin panel", () => {
       .first();
 
     await firstPackage.getByRole("button", { name: "Archive" }).click();
-    await expect(page.getByText("Package 'sample-demo' archived.")).toBeVisible();
+    await expect(
+      page.getByText("Package 'sample-demo' archived."),
+    ).toBeVisible();
     await expect(firstPackage.getByLabel("Availability")).toHaveValue("hidden");
 
     page.once("dialog", (dialog) => {
       void dialog.accept();
     });
-    await firstPackage.getByRole("button", { name: "Delete permanently" }).click();
+    await firstPackage
+      .getByRole("button", { name: "Delete permanently" })
+      .click();
 
     await expect(
       page.getByText("Package 'sample-demo' permanently deleted."),

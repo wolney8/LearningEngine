@@ -63,24 +63,24 @@
 }
 
 .difficulty-circle--passed {
-  color: #ffffff;
+  color: var(--colour-on-primary);
   border: none;
 }
 
 .difficulty-circle--passed[data-difficulty="easy"] {
-  background-color: #15803d;
+  background-color: var(--colour-difficulty-pass-easy);
 }
 
 .difficulty-circle--passed[data-difficulty="normal"] {
-  background-color: #4f46e5;
+  background-color: var(--colour-difficulty-pass-normal);
 }
 
 .difficulty-circle--passed[data-difficulty="hard"] {
-  background-color: #b45309;
+  background-color: var(--colour-difficulty-pass-hard);
 }
 
 .difficulty-circle--passed[data-difficulty="expert"] {
-  background-color: #dc2626;
+  background-color: var(--colour-difficulty-pass-expert);
 }
 
 .difficulty-circle--passed .difficulty-circle__status-badge {

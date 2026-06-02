@@ -50,12 +50,15 @@ export function QuestionView({
       </div>
 
       <fieldset className="question-view__fieldset" disabled={submitted}>
-        <legend className="question-view__question-text">{question.text}</legend>
+        <legend className="question-view__question-text">
+          {question.text}
+        </legend>
 
         <ul className="question-view__answers">
           {question.answers.map((answer) => {
             const isSelected = selectedAnswer === answer.id;
-            const isThisCorrect = submitted && answer.id === question.correct_answer;
+            const isThisCorrect =
+              submitted && answer.id === question.correct_answer;
             const isThisWrong = submitted && isSelected && !isThisCorrect;
 
             let modifier = "";
@@ -78,7 +81,10 @@ export function QuestionView({
                 >
                   {answer.text}
                   {submitted && isThisCorrect && (
-                    <span className="question-view__sr-only"> - correct answer</span>
+                    <span className="question-view__sr-only">
+                      {" "}
+                      - correct answer
+                    </span>
                   )}
                   {isThisWrong && (
                     <span className="question-view__sr-only">

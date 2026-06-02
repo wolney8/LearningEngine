@@ -63,9 +63,12 @@ type NumberPath =
   | "difficulty.xp_multiplier.easy"
   | "difficulty.xp_multiplier.normal"
   | "difficulty.xp_multiplier.hard"
-  | "difficulty.xp_multiplier.expert";
+  | "difficulty.xp_multiplier.expert"
+  | "spend_economy.costs.increase_difficulty_cap"
+  | "spend_economy.costs.unlock_hidden_package";
 
 type BooleanPath =
+  | "spend_economy.enabled"
   | "celebration_effects.enabled"
   | "celebration_effects.confetti_on_pass"
   | "celebration_effects.confetti_on_bonus_xp_gain"
@@ -138,6 +141,12 @@ function setNumberValue(settings: Settings, path: NumberPath, value: number): Se
     case "difficulty.xp_multiplier.expert":
       next.difficulty.xp_multiplier.expert = value;
       break;
+    case "spend_economy.costs.increase_difficulty_cap":
+      next.spend_economy.costs.increase_difficulty_cap = value;
+      break;
+    case "spend_economy.costs.unlock_hidden_package":
+      next.spend_economy.costs.unlock_hidden_package = value;
+      break;
     default:
       break;
   }
@@ -151,6 +160,9 @@ function setBooleanValue(
 ): Settings {
   const next = structuredClone(settings);
   switch (path) {
+    case "spend_economy.enabled":
+      next.spend_economy.enabled = value;
+      break;
     case "celebration_effects.enabled":
       next.celebration_effects.enabled = value;
       break;
@@ -479,6 +491,25 @@ export function AdminSettingsPage() {
     },
   ];
 
+  const spendEconomyCostFields: Array<{
+    key: NumberPath;
+    label: string;
+    step?: string;
+  }> = [
+    {
+      key: "spend_economy.costs.increase_difficulty_cap",
+      label: "Cost: increase difficulty cap",
+    },
+    {
+      key: "spend_economy.costs.unlock_hidden_package",
+      label: "Cost: unlock hidden package",
+    },
+  ];
+
+  const spendEconomyToggleFields: Array<{ key: BooleanPath; label: string }> = [
+    { key: "spend_economy.enabled", label: "Enabled" },
+  ];
+
   const celebrationFields: Array<{ key: BooleanPath; label: string }> = [
     { key: "celebration_effects.enabled", label: "Enabled" },
     {
@@ -543,6 +574,10 @@ export function AdminSettingsPage() {
         return s.difficulty.xp_multiplier.hard;
       case "difficulty.xp_multiplier.expert":
         return s.difficulty.xp_multiplier.expert;
+      case "spend_economy.costs.increase_difficulty_cap":
+        return s.spend_economy.costs.increase_difficulty_cap;
+      case "spend_economy.costs.unlock_hidden_package":
+        return s.spend_economy.costs.unlock_hidden_package;
       default:
         return 0;
     }
@@ -550,6 +585,8 @@ export function AdminSettingsPage() {
 
   function readBooleanValue(s: Settings, path: BooleanPath): boolean {
     switch (path) {
+      case "spend_economy.enabled":
+        return s.spend_economy.enabled;
       case "celebration_effects.enabled":
         return s.celebration_effects.enabled;
       case "celebration_effects.confetti_on_pass":
@@ -655,6 +692,47 @@ export function AdminSettingsPage() {
                 </label>
               ))}
             </div>
+
+            <fieldset className="admin-page__fieldset">
+              <legend>Spend economy</legend>
+              <div className="admin-page__toggle-grid">
+                {spendEconomyToggleFields.map((field) => (
+                  <label key={field.key} className="admin-page__toggle">
+                    <input
+                      type="checkbox"
+                      checked={readBooleanValue(settings, field.key)}
+                      onChange={(event) =>
+                        setSettings(
+                          setBooleanValue(settings, field.key, event.target.checked),
+                        )
+                      }
+                    />
+                    <span>{field.label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="admin-page__grid">
+                {spendEconomyCostFields.map((field) => (
+                  <label key={field.key} className="admin-page__field">
+                    <span>{field.label}</span>
+                    <input
+                      type="number"
+                      step={field.step ?? "1"}
+                      value={readValue(settings, field.key)}
+                      onChange={(event) =>
+                        setSettings(
+                          setNumberValue(
+                            settings,
+                            field.key,
+                            Number(event.target.value),
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
             <fieldset className="admin-page__fieldset">
               <legend>Celebration effects</legend>

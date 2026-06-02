@@ -55,7 +55,7 @@ export function AdminPackagesPage() {
   const [generateTopic, setGenerateTopic] = useState("");
   const [generateAudience, setGenerateAudience] = useState("general learners");
   const [generatePages, setGeneratePages] = useState("3");
-  const [generateQuestions, setGenerateQuestions] = useState("4");
+  const [generateQuestions, setGenerateQuestions] = useState("8");
   const [generateStatus, setGenerateStatus] = useState<
     "idle" | "generating" | "success" | "error"
   >("idle");
@@ -251,12 +251,12 @@ export function AdminPackagesPage() {
       parsedPages < 1 ||
       parsedPages > 10 ||
       Number.isNaN(parsedQuestions) ||
-      parsedQuestions < 2 ||
+      parsedQuestions < 8 ||
       parsedQuestions > 20
     ) {
       setGenerateStatus("error");
       setGenerateMessage(
-        "Enter a topic (3+ chars), pages between 1-10, and questions between 2-20.",
+        "Enter a topic (3+ chars), pages between 1-10, and questions between 8-20.",
       );
       return;
     }
@@ -475,7 +475,7 @@ export function AdminPackagesPage() {
             <input
               id="generate-questions"
               type="number"
-              min={2}
+              min={8}
               max={20}
               value={generateQuestions}
               onChange={(event) => setGenerateQuestions(event.target.value)}

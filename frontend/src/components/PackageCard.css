@@ -199,7 +199,7 @@
 .package-card__library-error {
   flex-basis: 100%;
   margin: 0;
-  color: #b91c1c;
+  color: var(--colour-danger-text);
   font-size: 0.9rem;
   font-weight: 600;
 }

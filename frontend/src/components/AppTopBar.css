@@ -122,7 +122,7 @@
   border: 1px solid var(--colour-menu-border);
   border-radius: 0.75rem;
   background: var(--colour-surface);
-  box-shadow: 0 10px 24px rgb(30 41 59 / 0.18);
+  box-shadow: var(--colour-app-top-bar-menu-shadow);
   padding: 0.35rem;
   display: grid;
   gap: 0.2rem;
@@ -157,11 +157,11 @@
 }
 
 .app-top-bar__theme-toggle[data-theme-current="dark"] .app-top-bar__theme-indicator {
-  color: #fbbf24;
+  color: var(--colour-app-top-bar-theme-indicator-dark);
 }
 
 .app-top-bar__theme-toggle[data-theme-current="light"] .app-top-bar__theme-indicator {
-  color: #1d4ed8;
+  color: var(--colour-app-top-bar-theme-indicator-light);
 }
 
 .app-top-bar__theme-indicator {
@@ -189,9 +189,9 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.6rem 1.5rem;
-  border-top: 1px solid #fbcfe8;
-  background: linear-gradient(92deg, #fef3c7 0%, #ffedd5 45%, #fee2e2 100%);
-  color: #7c2d12;
+  border-top: 1px solid var(--colour-app-top-bar-bonus-border);
+  background: var(--colour-app-top-bar-bonus-bg);
+  color: var(--colour-app-top-bar-bonus-text);
   font-family: "Inter", sans-serif;
   font-size: 0.9rem;
 }
@@ -201,12 +201,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    120deg,
-    rgb(255 255 255 / 0) 15%,
-    rgb(255 255 255 / 0.4) 45%,
-    rgb(255 255 255 / 0) 65%
-  );
+  background: var(--colour-app-top-bar-bonus-shimmer);
   transform: translateX(-35%);
   animation: app-top-bar-bonus-shimmer 3s linear infinite;
 }
@@ -223,7 +218,7 @@
   width: fit-content;
   padding: 0.15rem 0.55rem;
   border-radius: 9999px;
-  background: rgb(124 45 18 / 0.12);
+  background: var(--colour-app-top-bar-bonus-kicker-bg);
   font-family: "Nunito", sans-serif;
   font-size: 0.75rem;
   font-weight: 800;
@@ -240,10 +235,10 @@
   position: relative;
   z-index: 1;
   min-height: 2rem;
-  border: 1px solid #b45309;
+  border: 1px solid var(--colour-app-top-bar-bonus-dismiss-border);
   border-radius: 9999px;
-  background: #ffffff;
-  color: #7c2d12;
+  background: var(--colour-app-top-bar-bonus-dismiss-bg);
+  color: var(--colour-app-top-bar-bonus-dismiss-text);
   font-family: "Inter", sans-serif;
   font-size: 0.82rem;
   font-weight: 700;
@@ -253,7 +248,7 @@
 
 .app-top-bar__bonus-dismiss:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgb(124 45 18 / 0.2);
+  box-shadow: var(--colour-app-top-bar-bonus-dismiss-hover-shadow);
 }
 
 @keyframes app-top-bar-bonus-shimmer {

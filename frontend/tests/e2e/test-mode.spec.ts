@@ -814,7 +814,7 @@ test.describe("Test Mode", () => {
     await page.getByRole("button", { name: "Finish" }).click();
     await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
 
-    await expect.poll(() => capturedAttemptCount).toBe(3);
+    await expect.poll(() => capturedAttemptCount).toBe(1);
     await expect.poll(() => streakMarkCalls).toBe(1);
 
     const localMetadata = await page.evaluate(() => ({

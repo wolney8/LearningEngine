@@ -12,15 +12,15 @@
 }
 
 .streak-badge--zap {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: var(--colour-streak-zap-bg);
+  color: var(--colour-streak-zap-text);
+  border: 1px solid var(--colour-streak-zap-border);
 }
 
 .streak-badge--flame {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
+  background: var(--colour-streak-flame-bg);
+  color: var(--colour-streak-flame-text);
+  border: 1px solid var(--colour-streak-flame-border);
 }
 
 .streak-badge__lightning {
@@ -28,16 +28,11 @@
   inset: -30% -12%;
   opacity: 0;
   pointer-events: none;
-  background: linear-gradient(
-      125deg,
-      rgb(255 255 255 / 0) 12%,
-      rgb(255 255 255 / 0.86) 42%,
-      rgb(255 255 255 / 0) 72%
-    ), linear-gradient(300deg, rgb(56 189 248 / 0.08), rgb(59 130 246 / 0.18));
+  background: var(--colour-streak-lightning-sheen), var(--colour-streak-lightning-glow);
 }
 
 .streak-badge--lightning {
-  box-shadow: 0 0 0 1px rgb(59 130 246 / 0.5), 0 6px 16px rgb(37 99 235 / 0.25);
+  box-shadow: var(--colour-streak-lightning-ring);
 }
 
 .streak-badge--lightning .streak-badge__lightning {
