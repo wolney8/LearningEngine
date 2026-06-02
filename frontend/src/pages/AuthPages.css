@@ -38,7 +38,7 @@
   color: var(--colour-text-primary);
 }
 
-.auth-page__form input {
+.auth-page__form input:not([type="checkbox"]) {
   border: 1px solid var(--colour-input-border);
   border-radius: 10px;
   padding: 0.65rem 0.75rem;
@@ -47,7 +47,7 @@
   color: var(--colour-text-strong);
 }
 
-.auth-page__form input:focus {
+.auth-page__form input:not([type="checkbox"]):focus {
   outline: 2px solid var(--colour-focus);
   outline-offset: 1px;
 }
@@ -78,16 +78,26 @@
   gap: 0.45rem;
 }
 
-.auth-page__course-option {
+.auth-page__form .auth-page__course-option {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.5rem;
   font-weight: 500;
 }
 
-.auth-page__course-option input {
+.auth-page__form .auth-page__course-option input[type="checkbox"] {
+  flex: 0 0 auto;
   inline-size: 1rem;
   block-size: 1rem;
+  margin: 0;
+}
+
+.auth-page__form .auth-page__course-option span {
+  display: inline-flex;
+  align-items: center;
 }
 
 .auth-page__muted {
