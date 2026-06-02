@@ -209,6 +209,82 @@ const SEEDED_TEST_RESULTS = {
   }),
 };
 
+const SETTINGS_LIGHTNING_ENABLED = {
+  version: 1,
+  xp: {
+    lesson_base_xp_per_correct: 10,
+    base_xp_per_level: 500,
+    first_completion_bonus: 20,
+    attempt_multipliers: {
+      "1": 1.0,
+      "2": 0.5,
+      "3": 0.25,
+    },
+    hard_expert_exit_penalty: 50,
+    hard_expert_low_answer_penalty: 50,
+    min_correct_for_xp: {
+      easy: 2,
+      normal: 2,
+      hard: 0,
+      expert: 0,
+    },
+  },
+  difficulty: {
+    seconds_per_question: {
+      easy: 90,
+      normal: 45,
+      hard: 20,
+      expert: 10,
+    },
+    xp_multiplier: {
+      easy: 0.5,
+      normal: 1,
+      hard: 1.5,
+      expert: 2,
+    },
+  },
+  content_refresh: {
+    stale_after_days: 90,
+  },
+  ai: {
+    provider: "gemini",
+    model: "gemini-2.0-flash-exp",
+  },
+  spend_economy: {
+    enabled: false,
+    allow_non_admin_ai_generation_spend: false,
+    costs: {
+      generate_ai_course: 500,
+      refresh_stale_course: 300,
+      increase_difficulty_cap: 200,
+      unlock_hidden_package: 250,
+    },
+  },
+  celebration_effects: {
+    enabled: true,
+    confetti_on_pass: false,
+    confetti_on_bonus_xp_gain: false,
+    lightning_on_streak_milestones: true,
+    respect_reduced_motion: false,
+  },
+};
+
+const SETTINGS_LIGHTNING_DISABLED = {
+  ...SETTINGS_LIGHTNING_ENABLED,
+  celebration_effects: {
+    ...SETTINGS_LIGHTNING_ENABLED.celebration_effects,
+    lightning_on_streak_milestones: false,
+  },
+};
+
+const SETTINGS_LIGHTNING_REDUCED_MOTION = {
+  ...SETTINGS_LIGHTNING_ENABLED,
+  celebration_effects: {
+    ...SETTINGS_LIGHTNING_ENABLED.celebration_effects,
+    respect_reduced_motion: true,
+  },
+};
+
 async function checkA11y(page: import("@playwright/test").Page): Promise<void> {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
@@ -513,9 +589,121 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(page.getByText("Current streak")).toBeVisible();
-    await expect(page.getByText("3 days streak")).toBeVisible();
-    await expect(page.getByLabel("3 day streak")).toBeVisible();
+    await expect(page.getByText("Current streak")).toHaveCount(0);
+    await expect(page.getByText("3 days streak")).toHaveCount(0);
+    await expect(page.locator(".package-list-page__status-strip")).toHaveCount(0);
+  });
+
+  test("status strip stays near the top and old subtitles do not reappear", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("lle_daily_streak", "2");
+      localStorage.setItem("lle_last_active", "2026-05-24");
+    });
+
+    await page.goto("/");
+    await checkA11y(page);
+
+    const statusStrip = page.locator(".package-list-page__status-strip");
+    await expect(statusStrip).toHaveCount(0);
+
+    await expect(
+      page.getByText("Previously completed difficulties", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Shows your best previous test outcome for each difficulty.", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
+  });
+
+  test("lesson streak milestone applies lightning class when setting is enabled", async ({
+    page,
+  }) => {
+    await page.route(`${API_BASE_URL}/api/settings`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(SETTINGS_LIGHTNING_ENABLED),
+      });
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGES[0].id}`);
+    await checkA11y(page);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+
+    for (let index = 0; index < 3; index++) {
+      await page.locator(".question-view__answer").first().click();
+      await page.getByRole("button", { name: "Next" }).click();
+    }
+
+    const streakBadge = page.locator(".streak-badge");
+    await expect(streakBadge).toHaveAttribute(
+      "aria-label",
+      "Streak: 3 correct in a row",
+    );
+    await expect
+      .poll(async () => page.locator(".streak-badge--lightning").count(), {
+        timeout: 2_000,
+      })
+      .toBeGreaterThan(0);
+  });
+
+  test("lesson streak milestone does not apply lightning class when setting is disabled", async ({
+    page,
+  }) => {
+    await page.route(`${API_BASE_URL}/api/settings`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(SETTINGS_LIGHTNING_DISABLED),
+      });
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGES[0].id}`);
+    await checkA11y(page);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+
+    for (let index = 0; index < 3; index++) {
+      await page.locator(".question-view__answer").first().click();
+      await page.getByRole("button", { name: "Next" }).click();
+    }
+
+    await expect(page.locator(".streak-badge")).toHaveAttribute(
+      "aria-label",
+      "Streak: 3 correct in a row",
+    );
+    await expect(page.locator(".streak-badge--lightning")).toHaveCount(0);
+  });
+
+  test("lesson streak milestone suppresses lightning when reduced motion is respected", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+
+    await page.route(`${API_BASE_URL}/api/settings`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(SETTINGS_LIGHTNING_REDUCED_MOTION),
+      });
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGES[0].id}`);
+    await checkA11y(page);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+
+    for (let index = 0; index < 3; index++) {
+      await page.locator(".question-view__answer").first().click();
+      await page.getByRole("button", { name: "Next" }).click();
+    }
+
+    await expect(page.locator(".streak-badge")).toHaveAttribute(
+      "aria-label",
+      "Streak: 3 correct in a row",
+    );
+    await expect(page.locator(".streak-badge--lightning")).toHaveCount(0);
   });
 
   test("authenticated users load streak from backend instead of localStorage", async ({
@@ -783,7 +971,7 @@ test.describe("Package search and filter", () => {
     await expect(page.getByRole("button", { name: /All\s*3/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Incomplete\s*1/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Failed\s*1/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Unavailable\s*1/i })).toBeVisible();
   });
 
@@ -901,8 +1089,10 @@ test.describe("Package search and filter", () => {
 
     let progressRows: Array<{
       package_id: string;
+      difficulty: "easy" | "normal" | "hard" | "expert";
       latest_weighted_score: number;
       completed: boolean;
+      best_xp_earned: number;
       attempt_count: number;
       first_completed_at: string | null;
       updated_at: string;
@@ -1012,13 +1202,17 @@ test.describe("Package search and filter", () => {
       `${API_BASE_URL}/users/me/progress/${authPackage.id}`,
       async (route) => {
         const payload = route.request().postDataJSON() as {
+          difficulty?: "easy" | "normal" | "hard" | "expert";
           latest_weighted_score: number;
+          best_xp_earned?: number;
         };
 
         const updated = {
           package_id: authPackage.id,
+          difficulty: payload.difficulty ?? "easy",
           latest_weighted_score: payload.latest_weighted_score,
           completed: true,
+          best_xp_earned: payload.best_xp_earned ?? 10,
           attempt_count: 1,
           first_completed_at: "2026-05-23T12:00:00Z",
           updated_at: "2026-05-23T12:00:00Z",
@@ -1063,7 +1257,7 @@ test.describe("Package search and filter", () => {
       .getByRole("button", { name: "Back to packages", exact: true })
       .click();
 
-    await expect(page.getByRole("button", { name: /Completed\s*1/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Completed/i })).toBeVisible();
     await page.getByRole("button", { name: /Completed/i }).click();
     await assertVisibleTitles(page, [authPackage.title]);
   });

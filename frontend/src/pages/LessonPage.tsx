@@ -6,6 +6,7 @@ import { QuestionView } from "../components/QuestionView";
 import { StudyPageView } from "../components/StudyPageView";
 import { useAttempts } from "../hooks/useAttempts";
 import { useAuth } from "../hooks/useAuth";
+import { useCelebrationEffects } from "../hooks/useCelebrationEffects";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
 import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
@@ -59,6 +60,7 @@ export function LessonPage() {
   const navigate = useNavigate();
   const { addXP } = useXP();
   const { markPractised } = useStreak();
+  const { triggerConfetti } = useCelebrationEffects();
   const { attemptNumber, recordAttempt } = useAttempts(id ?? "");
   const { isFirstCompletion, markCompleted } = useFirstCompletion(id ?? "");
   const { status } = useAuth();
@@ -270,6 +272,8 @@ export function LessonPage() {
         attemptNumber: currentAttemptNumber,
         wasFirstCompletion,
       });
+
+      triggerConfetti("pass");
     } else {
       setPhase({
         kind: "questions",

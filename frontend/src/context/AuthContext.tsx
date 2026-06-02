@@ -7,7 +7,12 @@ import {
   useMemo,
   useState,
 } from "react";
-import type { LoginRequest, RegisterRequest, User } from "../schemas/auth";
+import type {
+  BonusXPNotice,
+  LoginRequest,
+  RegisterRequest,
+  User,
+} from "../schemas/auth";
 import {
   clearAuthToken,
   fetchCurrentUser,
@@ -36,6 +41,8 @@ export type AuthContextValue = {
   token: string | null;
   status: AuthStatus;
   error: string;
+  bonusXPNotice: BonusXPNotice | null;
+  dismissBonusXPNotice: () => void;
   login: (payload: LoginRequest) => Promise<void>;
   register: (payload: RegisterRequest) => Promise<void>;
   logout: () => void;
@@ -64,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [error, setError] = useState<string>("");
+  const [bonusXPNotice, setBonusXPNotice] = useState<BonusXPNotice | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -234,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthToken(response.access_token);
         setToken(response.access_token);
         setUser(response.user);
+        setBonusXPNotice(response.user.bonus_xp_notice ?? null);
         setStatus("authenticated");
         void reconcileAnonymousLocalState(
           response.access_token,
@@ -259,6 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthToken(response.access_token);
         setToken(response.access_token);
         setUser(response.user);
+        setBonusXPNotice(null);
         setStatus("authenticated");
         void reconcileAnonymousLocalState(
           response.access_token,
@@ -280,8 +290,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetAnonymousLocalProgress();
     setToken(null);
     setUser(null);
+    setBonusXPNotice(null);
     setStatus("idle");
     setError("");
+  }, []);
+
+  const dismissBonusXPNotice = useCallback(() => {
+    setBonusXPNotice(null);
   }, []);
 
   const setCurrentUser = useCallback((nextUser: User) => {
@@ -294,13 +309,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       status,
       error,
+      bonusXPNotice,
+      dismissBonusXPNotice,
       login,
       register,
       logout,
       resetAnonymousLocalProgress,
       setCurrentUser,
     }),
-    [error, login, logout, register, setCurrentUser, status, token, user],
+    [
+      bonusXPNotice,
+      dismissBonusXPNotice,
+      error,
+      login,
+      logout,
+      register,
+      setCurrentUser,
+      status,
+      token,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

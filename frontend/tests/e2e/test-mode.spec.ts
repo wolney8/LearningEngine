@@ -329,6 +329,28 @@ test.describe("Test Mode", () => {
     await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
   });
 
+  test("easy and normal difficulties bypass hard/expert warning gate", async ({
+    page,
+  }) => {
+    await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
+
+    await page.getByRole("button", { name: /Easy/i }).click();
+    await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
+    await expect(page.locator(".test-mode-page__warning-callout")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Confirm — Start Exam" }),
+    ).toHaveCount(0);
+
+    await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await page.getByRole("button", { name: /Normal/i }).click();
+    await expect(page.getByText(/Question 1 of 4/i)).toBeVisible();
+    await expect(page.locator(".test-mode-page__warning-callout")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Confirm — Start Exam" }),
+    ).toHaveCount(0);
+  });
+
   test("timer displays in MM:SS format", async ({ page }) => {
     await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
@@ -792,7 +814,7 @@ test.describe("Test Mode", () => {
     await page.getByRole("button", { name: "Finish" }).click();
     await expect(page.getByRole("heading", { name: "Test Complete" })).toBeVisible();
 
-    await expect.poll(() => capturedAttemptCount).toBe(3);
+    await expect.poll(() => capturedAttemptCount).toBe(1);
     await expect.poll(() => streakMarkCalls).toBe(1);
 
     const localMetadata = await page.evaluate(() => ({

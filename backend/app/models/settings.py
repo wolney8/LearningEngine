@@ -125,6 +125,16 @@ class SpendEconomySettings(BaseModel):
     costs: SpendActionCostSettings = Field(default_factory=SpendActionCostSettings)
 
 
+class CelebrationEffectsSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    confetti_on_pass: bool = True
+    confetti_on_bonus_xp_gain: bool = True
+    lightning_on_streak_milestones: bool = True
+    respect_reduced_motion: bool = True
+
+
 class GameSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -136,3 +146,6 @@ class GameSettings(BaseModel):
     )
     ai: AISettings = Field(default_factory=AISettings)
     spend_economy: SpendEconomySettings = Field(default_factory=SpendEconomySettings)
+    celebration_effects: CelebrationEffectsSettings = Field(
+        default_factory=CelebrationEffectsSettings
+    )

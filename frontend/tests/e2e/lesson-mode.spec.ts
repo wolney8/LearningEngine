@@ -255,12 +255,11 @@ test.describe("Lesson Mode", () => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await expect(page.getByText("Reduced XP this attempt")).toBeVisible();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
-
-    await expect(page.getByText("Reduced XP (×0.5)")).toBeVisible();
   });
 
   test("fourth attempt shows 0 XP practice mode on CompletionScreen", async ({
@@ -335,8 +334,10 @@ test.describe("Lesson Mode", () => {
     };
     const progressRow = {
       package_id: MOCK_PACKAGE_ID,
+      difficulty: "normal",
       latest_weighted_score: 0.4,
       completed: true,
+      best_xp_earned: 10,
       attempt_count: 1,
       first_completed_at: "2026-05-23T08:30:00Z",
       updated_at: "2026-05-23T08:30:00Z",
@@ -372,8 +373,10 @@ test.describe("Lesson Mode", () => {
       `${API_BASE_URL}/users/me/progress/${MOCK_PACKAGE_ID}`,
       async (route) => {
         const payload = route.request().postDataJSON() as {
+          difficulty?: "easy" | "normal" | "hard" | "expert";
           latest_weighted_score: number;
           completed: boolean;
+          best_xp_earned?: number;
           attempt_count?: number;
         };
         capturedAttemptCount = payload.attempt_count ?? null;
@@ -383,8 +386,10 @@ test.describe("Lesson Mode", () => {
           contentType: "application/json",
           body: JSON.stringify({
             ...progressRow,
+            difficulty: payload.difficulty ?? progressRow.difficulty,
             latest_weighted_score: payload.latest_weighted_score,
             completed: payload.completed,
+            best_xp_earned: payload.best_xp_earned ?? progressRow.best_xp_earned,
             attempt_count: payload.attempt_count ?? progressRow.attempt_count,
             updated_at: "2026-05-24T11:00:00Z",
           }),
@@ -434,13 +439,14 @@ test.describe("Lesson Mode", () => {
     await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
     await checkA11y(page);
     await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await expect(page.getByText("Reduced XP this attempt")).toBeVisible();
     await page.getByRole("button", { name: "A programming language" }).click();
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
 
     await expect.poll(() => capturedAttemptCount).toBe(2);
-    await expect(page.getByText("Reduced XP (×0.5)")).toBeVisible();
+    await expect(page.getByText("Reduced XP this attempt")).toHaveCount(0);
     await expect(page.getByText("+20 XP bonus")).toHaveCount(0);
 
     const localMetadata = await page.evaluate(() => ({

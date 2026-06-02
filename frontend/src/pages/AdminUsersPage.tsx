@@ -4,26 +4,42 @@ import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
   type AdminManagedUser,
+  type AdminManagedUserProgressReset,
   type AdminManagedUserRole,
+  type AdminManagedUserXP,
   fetchAdminUsers,
+  grantAdminUserXPBonus,
+  resetAdminUserProgress,
+  resetAdminUserXP,
+  setAdminUserXP,
   updateAdminUserRole,
 } from "../services/api";
 import "./AdminSettingsPage.css";
 
-function toRoleErrorMessage(error: unknown): string {
+function toAdminErrorMessage(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) {
-    return "Could not update user role. Please try again.";
+    return fallback;
   }
 
   if (error.message.includes("(409)")) {
-    return "Cannot remove the last remaining admin.";
+    if (error.message.toLowerCase().includes("last remaining admin")) {
+      return "Cannot remove the last remaining admin.";
+    }
+    if (error.message.toLowerCase().includes("last remaining package")) {
+      return "Cannot permanently delete the last remaining package.";
+    }
+    return "Request conflicts with current data. Refresh and try again.";
   }
 
   if (error.message.includes("(403)")) {
     return "Only admins can change user roles.";
   }
 
-  return "Could not update user role. Please try again.";
+  if (error.message.includes("(404)")) {
+    return "User no longer exists.";
+  }
+
+  return fallback;
 }
 
 function formatDate(value: string): string {
@@ -47,6 +63,13 @@ export function AdminUsersPage() {
   const [updatingUserId, setUpdatingUserId] = useState<number | null>(null);
   const [messageByUserId, setMessageByUserId] = useState<Record<number, string>>({});
   const [errorByUserId, setErrorByUserId] = useState<Record<number, string>>({});
+  const [xpInputByUserId, setXPInputByUserId] = useState<Record<number, string>>({});
+  const [bonusXPInputByUserId, setBonusXPInputByUserId] = useState<
+    Record<number, string>
+  >({});
+  const [bonusReasonByUserId, setBonusReasonByUserId] = useState<
+    Record<number, string>
+  >({});
 
   useEffect(() => {
     if (!canAccess || !token) {
@@ -62,6 +85,14 @@ export function AdminUsersPage() {
             number,
             AdminManagedUserRole
           >,
+        );
+        setXPInputByUserId(
+          Object.fromEntries(
+            rows.map((row) => [
+              row.id,
+              typeof row.xp === "number" ? String(row.xp) : "",
+            ]),
+          ) as Record<number, string>,
         );
         setLoadingState("ready");
       } catch {
@@ -99,6 +130,54 @@ export function AdminUsersPage() {
 
   const adminToken = token;
 
+  function applyXPUpdate(updatedXP: AdminManagedUserXP) {
+    setUsers((current) =>
+      current.map((item) =>
+        item.id === updatedXP.id
+          ? {
+              ...item,
+              xp: updatedXP.xp,
+              pending_bonus_xp: updatedXP.pending_bonus_xp,
+              pending_bonus_reason: updatedXP.pending_bonus_reason,
+            }
+          : item,
+      ),
+    );
+    setXPInputByUserId((current) => ({
+      ...current,
+      [updatedXP.id]: String(updatedXP.xp),
+    }));
+  }
+
+  function applyProgressResetUpdate(updated: AdminManagedUserProgressReset) {
+    setUsers((current) =>
+      current.map((item) =>
+        item.id === updated.id
+          ? {
+              ...item,
+              xp: updated.xp,
+              pending_bonus_xp: updated.pending_bonus_xp,
+              pending_bonus_reason: updated.pending_bonus_reason,
+            }
+          : item,
+      ),
+    );
+    setXPInputByUserId((current) => ({
+      ...current,
+      [updated.id]: String(updated.xp),
+    }));
+    if (updated.reset_xp) {
+      setBonusReasonByUserId((current) => ({
+        ...current,
+        [updated.id]: "",
+      }));
+      setBonusXPInputByUserId((current) => ({
+        ...current,
+        [updated.id]: "",
+      }));
+    }
+  }
+
   async function handleRoleSave(targetUser: AdminManagedUser) {
     const nextRole = pendingRoles[targetUser.id] ?? targetUser.role;
     if (nextRole === targetUser.role) {
@@ -130,7 +209,196 @@ export function AdminUsersPage() {
     } catch (error) {
       setErrorByUserId((current) => ({
         ...current,
-        [targetUser.id]: toRoleErrorMessage(error),
+        [targetUser.id]: toAdminErrorMessage(
+          error,
+          "Could not update user role. Please try again.",
+        ),
+      }));
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
+  async function handleSetXP(targetUser: AdminManagedUser) {
+    const rawValue = xpInputByUserId[targetUser.id] ?? "";
+    const parsedXP = Number.parseInt(rawValue, 10);
+    if (Number.isNaN(parsedXP) || parsedXP < 0) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: "XP must be a whole number greater than or equal to 0.",
+      }));
+      return;
+    }
+
+    setUpdatingUserId(targetUser.id);
+    setMessageByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+    setErrorByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+
+    try {
+      const updated = await setAdminUserXP(adminToken, targetUser.id, parsedXP);
+      applyXPUpdate(updated);
+      setMessageByUserId((current) => ({
+        ...current,
+        [targetUser.id]: `XP set to ${updated.xp}.`,
+      }));
+    } catch (error) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: toAdminErrorMessage(
+          error,
+          "Could not set XP. Please try again.",
+        ),
+      }));
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
+  async function handleResetXP(targetUser: AdminManagedUser) {
+    setUpdatingUserId(targetUser.id);
+    setMessageByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+    setErrorByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+
+    try {
+      const updated = await resetAdminUserXP(adminToken, targetUser.id);
+      applyXPUpdate(updated);
+      setBonusReasonByUserId((current) => ({
+        ...current,
+        [targetUser.id]: "",
+      }));
+      setBonusXPInputByUserId((current) => ({
+        ...current,
+        [targetUser.id]: "",
+      }));
+      setMessageByUserId((current) => ({
+        ...current,
+        [targetUser.id]: "XP reset to 0 and pending bonus cleared.",
+      }));
+    } catch (error) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: toAdminErrorMessage(
+          error,
+          "Could not reset XP. Please try again.",
+        ),
+      }));
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
+  async function handleGrantBonusXP(targetUser: AdminManagedUser) {
+    const rawXP = bonusXPInputByUserId[targetUser.id] ?? "";
+    const bonusXP = Number.parseInt(rawXP, 10);
+    const reason = (bonusReasonByUserId[targetUser.id] ?? "").trim();
+
+    if (Number.isNaN(bonusXP) || bonusXP <= 0) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: "Bonus XP must be a whole number greater than 0.",
+      }));
+      return;
+    }
+
+    if (reason.length === 0) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: "Enter a short reason for the bonus XP notice.",
+      }));
+      return;
+    }
+
+    setUpdatingUserId(targetUser.id);
+    setMessageByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+    setErrorByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+
+    try {
+      const updated = await grantAdminUserXPBonus(adminToken, targetUser.id, {
+        xp: bonusXP,
+        reason,
+      });
+      applyXPUpdate(updated);
+      setBonusXPInputByUserId((current) => ({
+        ...current,
+        [targetUser.id]: "",
+      }));
+      setMessageByUserId((current) => ({
+        ...current,
+        [targetUser.id]: `Bonus XP granted: +${bonusXP}. The learner will see this reason on next login.`,
+      }));
+    } catch (error) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: toAdminErrorMessage(
+          error,
+          "Could not grant bonus XP. Please try again.",
+        ),
+      }));
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
+  async function handleResetProgress(targetUser: AdminManagedUser) {
+    const confirmed = window.confirm(
+      `This will permanently reset all saved learning progress for ${targetUser.username}. XP will remain at ${targetUser.xp}. This action cannot be undone. Continue?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingUserId(targetUser.id);
+    setMessageByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+    setErrorByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+
+    try {
+      const updated = await resetAdminUserProgress(adminToken, targetUser.id);
+      applyProgressResetUpdate(updated);
+      setMessageByUserId((current) => ({
+        ...current,
+        [targetUser.id]: `Progress reset. Cleared ${updated.cleared_progress_count} package records.`,
+      }));
+    } catch (error) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: toAdminErrorMessage(
+          error,
+          "Could not reset progress. Please try again.",
+        ),
+      }));
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
+  async function handleResetProgressAndXP(targetUser: AdminManagedUser) {
+    const confirmed = window.confirm(
+      `This will permanently reset all saved learning progress and set XP to 0 for ${targetUser.username}. This action cannot be undone. Continue?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingUserId(targetUser.id);
+    setMessageByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+    setErrorByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+
+    try {
+      const updated = await resetAdminUserProgress(adminToken, targetUser.id, {
+        reset_xp: true,
+      });
+      applyProgressResetUpdate(updated);
+      setMessageByUserId((current) => ({
+        ...current,
+        [targetUser.id]: `Progress and XP reset. Cleared ${updated.cleared_progress_count} package records.`,
+      }));
+    } catch (error) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: toAdminErrorMessage(
+          error,
+          "Could not reset progress and XP. Please try again.",
+        ),
       }));
     } finally {
       setUpdatingUserId(null);
@@ -145,6 +413,7 @@ export function AdminUsersPage() {
           <Link to="/admin/settings">Settings</Link>
           <Link to="/admin/packages">Packages</Link>
           <Link to="/admin/users">Users</Link>
+          <Link to="/admin/audit-logs">Audit Logs</Link>
           <button
             type="button"
             onClick={() => {
@@ -169,6 +438,13 @@ export function AdminUsersPage() {
                 <div>
                   <h2>{row.username}</h2>
                   <p>{row.email}</p>
+                  <p>Current XP: {row.xp}</p>
+                  {row.pending_bonus_xp && row.pending_bonus_xp > 0 && (
+                    <p>
+                      Pending bonus: +{row.pending_bonus_xp}
+                      {row.pending_bonus_reason ? ` (${row.pending_bonus_reason})` : ""}
+                    </p>
+                  )}
                   <p>Created: {formatDate(row.created_at)}</p>
                 </div>
                 <div className="admin-page__inline-actions">
@@ -203,6 +479,117 @@ export function AdminUsersPage() {
                     disabled={updatingUserId === row.id}
                   >
                     {updatingUserId === row.id ? "Saving…" : "Save role"}
+                  </button>
+                  <label htmlFor={`set-xp-${row.id}`}>
+                    Set XP
+                    <input
+                      id={`set-xp-${row.id}`}
+                      type="number"
+                      min={0}
+                      value={xpInputByUserId[row.id] ?? ""}
+                      onChange={(event) => {
+                        setXPInputByUserId((current) => ({
+                          ...current,
+                          [row.id]: event.target.value,
+                        }));
+                        setMessageByUserId((current) => ({
+                          ...current,
+                          [row.id]: "",
+                        }));
+                        setErrorByUserId((current) => ({
+                          ...current,
+                          [row.id]: "",
+                        }));
+                      }}
+                      disabled={updatingUserId === row.id}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleSetXP(row)}
+                    disabled={updatingUserId === row.id}
+                  >
+                    {updatingUserId === row.id ? "Saving…" : "Set XP"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResetXP(row)}
+                    disabled={updatingUserId === row.id}
+                  >
+                    {updatingUserId === row.id ? "Saving…" : "Reset XP"}
+                  </button>
+                  <label htmlFor={`bonus-xp-${row.id}`}>
+                    Bonus XP
+                    <input
+                      id={`bonus-xp-${row.id}`}
+                      type="number"
+                      min={1}
+                      value={bonusXPInputByUserId[row.id] ?? ""}
+                      onChange={(event) => {
+                        setBonusXPInputByUserId((current) => ({
+                          ...current,
+                          [row.id]: event.target.value,
+                        }));
+                        setMessageByUserId((current) => ({
+                          ...current,
+                          [row.id]: "",
+                        }));
+                        setErrorByUserId((current) => ({
+                          ...current,
+                          [row.id]: "",
+                        }));
+                      }}
+                      disabled={updatingUserId === row.id}
+                    />
+                  </label>
+                  <label htmlFor={`bonus-reason-${row.id}`}>
+                    Bonus reason
+                    <input
+                      id={`bonus-reason-${row.id}`}
+                      type="text"
+                      maxLength={500}
+                      value={bonusReasonByUserId[row.id] ?? ""}
+                      onChange={(event) => {
+                        setBonusReasonByUserId((current) => ({
+                          ...current,
+                          [row.id]: event.target.value,
+                        }));
+                        setMessageByUserId((current) => ({
+                          ...current,
+                          [row.id]: "",
+                        }));
+                        setErrorByUserId((current) => ({
+                          ...current,
+                          [row.id]: "",
+                        }));
+                      }}
+                      disabled={updatingUserId === row.id}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleGrantBonusXP(row)}
+                    disabled={updatingUserId === row.id}
+                  >
+                    {updatingUserId === row.id ? "Saving…" : "Grant bonus XP"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResetProgress(row)}
+                    disabled={updatingUserId === row.id}
+                  >
+                    {updatingUserId === row.id
+                      ? "Saving…"
+                      : "Reset all progress (irreversible)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResetProgressAndXP(row)}
+                    disabled={updatingUserId === row.id}
+                  >
+                    {updatingUserId === row.id
+                      ? "Saving…"
+                      : "Reset all progress and XP (irreversible)"}
                   </button>
                 </div>
                 {messageByUserId[row.id] && (

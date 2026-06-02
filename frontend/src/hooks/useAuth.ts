@@ -5,6 +5,8 @@ export function useAuth(): {
   token: string | null;
   status: ReturnType<typeof useAuthContext>["status"];
   error: string;
+  bonusXPNotice: ReturnType<typeof useAuthContext>["bonusXPNotice"];
+  dismissBonusXPNotice: ReturnType<typeof useAuthContext>["dismissBonusXPNotice"];
   login: ReturnType<typeof useAuthContext>["login"];
   register: ReturnType<typeof useAuthContext>["register"];
   logout: () => void;

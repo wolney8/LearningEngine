@@ -1,11 +1,17 @@
 import { z } from "zod";
 
+export const BonusXPNoticeSchema = z.object({
+  xp: z.number().int().positive(),
+  reason: z.string().min(1),
+});
+
 export const UserSchema = z.object({
   id: z.number().int().positive(),
   username: z.string().min(1),
   email: z.string().email(),
   role: z.enum(["student", "admin"]),
   xp: z.number().int().nonnegative(),
+  bonus_xp_notice: BonusXPNoticeSchema.nullable().optional(),
   created_at: z.string().min(1),
 });
 
@@ -28,6 +34,7 @@ export const RegisterRequestSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+export type BonusXPNotice = z.infer<typeof BonusXPNoticeSchema>;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;

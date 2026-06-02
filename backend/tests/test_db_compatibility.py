@@ -23,6 +23,14 @@ def _read_index_list(db_path: Path, table_name: str) -> list[tuple]:
         return connection.execute(f'PRAGMA index_list("{table_name}")').fetchall()
 
 
+def _read_table_names(db_path: Path) -> list[str]:
+    with sqlite3.connect(db_path) as connection:
+        rows = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    return [row[0] for row in rows]
+
+
 def test_init_db_adds_missing_user_streak_and_last_practised_columns(
     tmp_path: Path,
     monkeypatch,
@@ -57,8 +65,24 @@ def test_init_db_adds_missing_user_streak_and_last_practised_columns(
 
     table_info = _read_user_table_info(db_path)
     column_names = [row[1] for row in table_info]
+    assert "pending_bonus_xp" in column_names
+    assert "pending_bonus_reason" in column_names
     assert "streak_count" in column_names
     assert "last_practised_date" in column_names
+
+    pending_bonus_xp_column = next(
+        row for row in table_info if row[1] == "pending_bonus_xp"
+    )
+    assert pending_bonus_xp_column[2].upper() == "INTEGER"
+    assert pending_bonus_xp_column[3] == 1
+    assert pending_bonus_xp_column[4] == "0"
+
+    pending_bonus_reason_column = next(
+        row for row in table_info if row[1] == "pending_bonus_reason"
+    )
+    assert pending_bonus_reason_column[2].upper() == "TEXT"
+    assert pending_bonus_reason_column[3] == 0
+    assert pending_bonus_reason_column[4] is None
 
     streak_column = next(row for row in table_info if row[1] == "streak_count")
     assert streak_column[2].upper() == "INTEGER"
@@ -74,8 +98,13 @@ def test_init_db_adds_missing_user_streak_and_last_practised_columns(
 
     db.init_db()
     second_pass_columns = [row[1] for row in _read_user_table_info(db_path)]
+    assert second_pass_columns.count("pending_bonus_xp") == 1
+    assert second_pass_columns.count("pending_bonus_reason") == 1
     assert second_pass_columns.count("streak_count") == 1
     assert second_pass_columns.count("last_practised_date") == 1
+
+    table_names = _read_table_names(db_path)
+    assert "admin_audit_log" in table_names
 
 
 def test_init_db_keeps_fresh_sqlite_create_all_flow(
@@ -95,6 +124,8 @@ def test_init_db_keeps_fresh_sqlite_create_all_flow(
     db.init_db()
 
     column_names = [row[1] for row in _read_user_table_info(db_path)]
+    assert "pending_bonus_xp" in column_names
+    assert "pending_bonus_reason" in column_names
     assert "streak_count" in column_names
     assert "last_practised_date" in column_names
 
@@ -107,6 +138,9 @@ def test_init_db_keeps_fresh_sqlite_create_all_flow(
     assert "status" in user_library_columns
     assert "created_at" in user_library_columns
     assert "updated_at" in user_library_columns
+
+    table_names = _read_table_names(db_path)
+    assert "admin_audit_log" in table_names
 
 
 def test_init_db_adds_missing_user_library_columns_and_unique_index(
@@ -223,6 +257,8 @@ def test_init_db_adds_missing_user_test_result_columns(
     column_names = [row[1] for row in table_info]
     assert "attempt_count" in column_names
     assert "first_completed_at" in column_names
+    assert "best_xp_earned" in column_names
+    assert "difficulty_results_json" in column_names
 
     attempt_count_column = next(row for row in table_info if row[1] == "attempt_count")
     assert attempt_count_column[2].upper() == "INTEGER"
@@ -236,9 +272,25 @@ def test_init_db_adds_missing_user_test_result_columns(
     assert first_completed_at_column[3] == 0
     assert first_completed_at_column[4] is None
 
+    best_xp_earned_column = next(
+        row for row in table_info if row[1] == "best_xp_earned"
+    )
+    assert best_xp_earned_column[2].upper() == "INTEGER"
+    assert best_xp_earned_column[3] == 1
+    assert best_xp_earned_column[4] == "0"
+
+    difficulty_results_json_column = next(
+        row for row in table_info if row[1] == "difficulty_results_json"
+    )
+    assert difficulty_results_json_column[2].upper() == "TEXT"
+    assert difficulty_results_json_column[3] == 0
+    assert difficulty_results_json_column[4] is None
+
     db.init_db()
     second_pass_columns = [
         row[1] for row in _read_table_info(db_path, "usertestresult")
     ]
     assert second_pass_columns.count("attempt_count") == 1
     assert second_pass_columns.count("first_completed_at") == 1
+    assert second_pass_columns.count("best_xp_earned") == 1
+    assert second_pass_columns.count("difficulty_results_json") == 1

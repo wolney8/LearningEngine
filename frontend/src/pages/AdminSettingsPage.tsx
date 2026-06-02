@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useBlocker } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
+import { useCelebrationEffects } from "../hooks/useCelebrationEffects";
 import type { Settings } from "../schemas/settings";
 import {
   type AdminAIConfig,
@@ -11,7 +12,35 @@ import {
   updateAdminAIConfig,
   updateAdminSettings,
 } from "../services/api";
+import {
+  ADMIN_TASK_NOTICE_EVENT,
+  type AdminTaskNotice,
+  type AdminTaskNoticeLevel,
+  consumeNextAdminTaskNotice,
+  enqueueAdminTaskNotice,
+} from "../utils/adminTaskNotices";
 import "./AdminSettingsPage.css";
+
+const LIGHTNING_PREVIEW_DURATION_MS = 640;
+
+const GEMINI_MODEL_PRESETS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-pro",
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-exp",
+] as const;
+
+type GeminiModelPreset = (typeof GEMINI_MODEL_PRESETS)[number];
+type GeminiModelSelection = GeminiModelPreset | "custom";
+
+function resolveGeminiModelSelection(model: string): GeminiModelSelection {
+  if (GEMINI_MODEL_PRESETS.some((preset) => preset === model)) {
+    return model as GeminiModelPreset;
+  }
+
+  return "custom";
+}
 
 type NumberPath =
   | "version"
@@ -34,7 +63,17 @@ type NumberPath =
   | "difficulty.xp_multiplier.easy"
   | "difficulty.xp_multiplier.normal"
   | "difficulty.xp_multiplier.hard"
-  | "difficulty.xp_multiplier.expert";
+  | "difficulty.xp_multiplier.expert"
+  | "spend_economy.costs.increase_difficulty_cap"
+  | "spend_economy.costs.unlock_hidden_package";
+
+type BooleanPath =
+  | "spend_economy.enabled"
+  | "celebration_effects.enabled"
+  | "celebration_effects.confetti_on_pass"
+  | "celebration_effects.confetti_on_bonus_xp_gain"
+  | "celebration_effects.lightning_on_streak_milestones"
+  | "celebration_effects.respect_reduced_motion";
 
 function setNumberValue(settings: Settings, path: NumberPath, value: number): Settings {
   const next = structuredClone(settings);
@@ -102,6 +141,43 @@ function setNumberValue(settings: Settings, path: NumberPath, value: number): Se
     case "difficulty.xp_multiplier.expert":
       next.difficulty.xp_multiplier.expert = value;
       break;
+    case "spend_economy.costs.increase_difficulty_cap":
+      next.spend_economy.costs.increase_difficulty_cap = value;
+      break;
+    case "spend_economy.costs.unlock_hidden_package":
+      next.spend_economy.costs.unlock_hidden_package = value;
+      break;
+    default:
+      break;
+  }
+  return next;
+}
+
+function setBooleanValue(
+  settings: Settings,
+  path: BooleanPath,
+  value: boolean,
+): Settings {
+  const next = structuredClone(settings);
+  switch (path) {
+    case "spend_economy.enabled":
+      next.spend_economy.enabled = value;
+      break;
+    case "celebration_effects.enabled":
+      next.celebration_effects.enabled = value;
+      break;
+    case "celebration_effects.confetti_on_pass":
+      next.celebration_effects.confetti_on_pass = value;
+      break;
+    case "celebration_effects.confetti_on_bonus_xp_gain":
+      next.celebration_effects.confetti_on_bonus_xp_gain = value;
+      break;
+    case "celebration_effects.lightning_on_streak_milestones":
+      next.celebration_effects.lightning_on_streak_milestones = value;
+      break;
+    case "celebration_effects.respect_reduced_motion":
+      next.celebration_effects.respect_reduced_motion = value;
+      break;
     default:
       break;
   }
@@ -119,10 +195,32 @@ export function AdminSettingsPage() {
   const [message, setMessage] = useState<string>("");
   const [aiProvider, setAIProvider] = useState<"gemini">("gemini");
   const [aiModel, setAIModel] = useState<string>("");
+  const [aiModelSelection, setAIModelSelection] =
+    useState<GeminiModelSelection>("gemini-2.5-flash");
   const [aiApiKey, setAIApiKey] = useState<string>("");
   const [aiSaving, setAISaving] = useState<boolean>(false);
   const [aiTesting, setAITesting] = useState<boolean>(false);
   const [aiMessage, setAIMessage] = useState<string>("");
+  const [aiTestedModel, setAITestedModel] = useState<string>("");
+  const [isLightningPreviewActive, setLightningPreviewActive] =
+    useState<boolean>(false);
+  const [celebrationPreviewMessage, setCelebrationPreviewMessage] =
+    useState<string>("");
+  const lightningPreviewTimerRef = useRef<number | null>(null);
+  const [persistedNotice, setPersistedNotice] = useState<AdminTaskNotice | null>(null);
+  const shouldPersistCompletionNoticeRef = useRef(false);
+
+  const { lightningEnabled, shouldReduceMotion, canTriggerConfetti, triggerConfetti } =
+    useCelebrationEffects({
+      celebrationSettingsOverride: settings?.celebration_effects,
+    });
+
+  const isActionInFlight = status === "saving" || aiSaving || aiTesting;
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isActionInFlight && currentLocation.pathname !== nextLocation.pathname,
+  );
 
   useEffect(() => {
     if (!canAccess || !token) {
@@ -139,6 +237,7 @@ export function AdminSettingsPage() {
         setAIConfig(aiData);
         setAIProvider(aiData.provider);
         setAIModel(aiData.model);
+        setAIModelSelection(resolveGeminiModelSelection(aiData.model));
         setAIApiKey("");
         setAIMessage("");
         setStatus("ready");
@@ -149,6 +248,61 @@ export function AdminSettingsPage() {
 
     void load();
   }, [canAccess, token]);
+
+  useEffect(() => {
+    return () => {
+      if (lightningPreviewTimerRef.current !== null) {
+        window.clearTimeout(lightningPreviewTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (blocker.state !== "blocked") {
+      return;
+    }
+
+    const shouldLeave = window.confirm(
+      "An admin action is still running. Leave this page anyway? The backend task will continue.",
+    );
+    if (shouldLeave) {
+      shouldPersistCompletionNoticeRef.current = true;
+      blocker.proceed();
+      return;
+    }
+    blocker.reset();
+  }, [blocker]);
+
+  useEffect(() => {
+    const consumeNotice = () => {
+      const nextNotice = consumeNextAdminTaskNotice();
+      if (nextNotice) {
+        setPersistedNotice(nextNotice);
+      }
+    };
+
+    consumeNotice();
+    window.addEventListener(ADMIN_TASK_NOTICE_EVENT, consumeNotice);
+    return () => {
+      window.removeEventListener(ADMIN_TASK_NOTICE_EVENT, consumeNotice);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isActionInFlight) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isActionInFlight]);
 
   if (authStatus === "loading") {
     return (
@@ -172,6 +326,14 @@ export function AdminSettingsPage() {
 
   const adminToken = token;
 
+  function persistCompletionNotice(level: AdminTaskNoticeLevel, message: string) {
+    if (!shouldPersistCompletionNoticeRef.current) {
+      return;
+    }
+
+    enqueueAdminTaskNotice(level, message);
+  }
+
   async function handleSave() {
     if (!settings) {
       return;
@@ -184,9 +346,11 @@ export function AdminSettingsPage() {
       setSettings(updated);
       setStatus("ready");
       setMessage("Settings saved.");
+      persistCompletionNotice("success", "Settings saved.");
     } catch {
       setStatus("error");
       setMessage("Could not save settings.");
+      persistCompletionNotice("error", "Could not save settings.");
     }
   }
 
@@ -206,9 +370,12 @@ export function AdminSettingsPage() {
       setAIConfig(updated);
       setAIProvider(updated.provider);
       setAIModel(updated.model);
+      setAIModelSelection(resolveGeminiModelSelection(updated.model));
       setAIMessage("AI config saved.");
+      persistCompletionNotice("success", "AI config saved.");
     } catch {
       setAIMessage("Could not save AI config.");
+      persistCompletionNotice("error", "Could not save AI config.");
     } finally {
       setAISaving(false);
     }
@@ -217,11 +384,13 @@ export function AdminSettingsPage() {
   async function handleTestAIConnection() {
     if (!aiApiKey.trim()) {
       setAIMessage("API key is required for connection test.");
+      setAITestedModel("");
       return;
     }
 
     setAITesting(true);
     setAIMessage("");
+    setAITestedModel("");
     try {
       const result = await testAdminAIConnection(adminToken, {
         api_key: aiApiKey,
@@ -229,15 +398,23 @@ export function AdminSettingsPage() {
         model: aiModel.trim() || undefined,
       });
       setAIMessage(result.message);
-    } catch (error) {
-      setAIMessage(
-        error instanceof Error && error.message.trim().length > 0
-          ? error.message
-          : "Could not run AI connection test.",
-      );
+      setAITestedModel(result.model_used);
+      persistCompletionNotice("success", result.message);
+    } catch {
+      const safeErrorMessage =
+        "Could not run AI connection test. Check provider, model, and API key.";
+      setAIMessage(safeErrorMessage);
+      persistCompletionNotice("error", safeErrorMessage);
     } finally {
       setAIApiKey("");
       setAITesting(false);
+    }
+  }
+
+  function handleModelSelectionChange(selection: GeminiModelSelection) {
+    setAIModelSelection(selection);
+    if (selection !== "custom") {
+      setAIModel(selection);
     }
   }
 
@@ -314,6 +491,45 @@ export function AdminSettingsPage() {
     },
   ];
 
+  const spendEconomyCostFields: Array<{
+    key: NumberPath;
+    label: string;
+    step?: string;
+  }> = [
+    {
+      key: "spend_economy.costs.increase_difficulty_cap",
+      label: "Cost: increase difficulty cap",
+    },
+    {
+      key: "spend_economy.costs.unlock_hidden_package",
+      label: "Cost: unlock hidden package",
+    },
+  ];
+
+  const spendEconomyToggleFields: Array<{ key: BooleanPath; label: string }> = [
+    { key: "spend_economy.enabled", label: "Enabled" },
+  ];
+
+  const celebrationFields: Array<{ key: BooleanPath; label: string }> = [
+    { key: "celebration_effects.enabled", label: "Enabled" },
+    {
+      key: "celebration_effects.confetti_on_pass",
+      label: "Confetti on pass",
+    },
+    {
+      key: "celebration_effects.confetti_on_bonus_xp_gain",
+      label: "Confetti on bonus XP gain",
+    },
+    {
+      key: "celebration_effects.lightning_on_streak_milestones",
+      label: "Lightning on streak milestones",
+    },
+    {
+      key: "celebration_effects.respect_reduced_motion",
+      label: "Respect reduced motion",
+    },
+  ];
+
   function readValue(s: Settings, path: NumberPath): number {
     switch (path) {
       case "version":
@@ -358,9 +574,69 @@ export function AdminSettingsPage() {
         return s.difficulty.xp_multiplier.hard;
       case "difficulty.xp_multiplier.expert":
         return s.difficulty.xp_multiplier.expert;
+      case "spend_economy.costs.increase_difficulty_cap":
+        return s.spend_economy.costs.increase_difficulty_cap;
+      case "spend_economy.costs.unlock_hidden_package":
+        return s.spend_economy.costs.unlock_hidden_package;
       default:
         return 0;
     }
+  }
+
+  function readBooleanValue(s: Settings, path: BooleanPath): boolean {
+    switch (path) {
+      case "spend_economy.enabled":
+        return s.spend_economy.enabled;
+      case "celebration_effects.enabled":
+        return s.celebration_effects.enabled;
+      case "celebration_effects.confetti_on_pass":
+        return s.celebration_effects.confetti_on_pass;
+      case "celebration_effects.confetti_on_bonus_xp_gain":
+        return s.celebration_effects.confetti_on_bonus_xp_gain;
+      case "celebration_effects.lightning_on_streak_milestones":
+        return s.celebration_effects.lightning_on_streak_milestones;
+      case "celebration_effects.respect_reduced_motion":
+        return s.celebration_effects.respect_reduced_motion;
+      default:
+        return false;
+    }
+  }
+
+  function handlePreviewConfetti() {
+    if (!canTriggerConfetti("pass")) {
+      setCelebrationPreviewMessage(
+        shouldReduceMotion
+          ? "Confetti preview skipped because reduced motion is active."
+          : "Confetti preview blocked by current celebration settings.",
+      );
+      return;
+    }
+
+    triggerConfetti("pass");
+    setCelebrationPreviewMessage("Confetti preview requested.");
+  }
+
+  function handlePreviewLightning() {
+    if (!lightningEnabled) {
+      setLightningPreviewActive(false);
+      setCelebrationPreviewMessage(
+        shouldReduceMotion
+          ? "Lightning preview skipped because reduced motion is active."
+          : "Lightning preview blocked by current celebration settings.",
+      );
+      return;
+    }
+
+    if (lightningPreviewTimerRef.current !== null) {
+      window.clearTimeout(lightningPreviewTimerRef.current);
+    }
+
+    setLightningPreviewActive(true);
+    setCelebrationPreviewMessage("Lightning preview active.");
+    lightningPreviewTimerRef.current = window.setTimeout(() => {
+      setLightningPreviewActive(false);
+      lightningPreviewTimerRef.current = null;
+    }, LIGHTNING_PREVIEW_DURATION_MS);
   }
 
   return (
@@ -371,6 +647,7 @@ export function AdminSettingsPage() {
           <Link to="/admin/settings">Settings</Link>
           <Link to="/admin/packages">Packages</Link>
           <Link to="/admin/users">Users</Link>
+          <Link to="/admin/audit-logs">Audit Logs</Link>
           <button
             type="button"
             onClick={() => {
@@ -384,6 +661,16 @@ export function AdminSettingsPage() {
 
       {status === "loading" && <p aria-busy="true">Loading settings…</p>}
       {status === "error" && <p role="alert">Could not load admin settings.</p>}
+      {persistedNotice && (
+        <div aria-live={persistedNotice.level === "error" ? "assertive" : "polite"}>
+          <p
+            data-testid="admin-persisted-task-notice"
+            role={persistedNotice.level === "error" ? "alert" : undefined}
+          >
+            {persistedNotice.message}
+          </p>
+        </div>
+      )}
 
       {settings && (
         <>
@@ -406,13 +693,120 @@ export function AdminSettingsPage() {
               ))}
             </div>
 
+            <fieldset className="admin-page__fieldset">
+              <legend>Spend economy</legend>
+              <div className="admin-page__toggle-grid">
+                {spendEconomyToggleFields.map((field) => (
+                  <label key={field.key} className="admin-page__toggle">
+                    <input
+                      type="checkbox"
+                      checked={readBooleanValue(settings, field.key)}
+                      onChange={(event) =>
+                        setSettings(
+                          setBooleanValue(settings, field.key, event.target.checked),
+                        )
+                      }
+                    />
+                    <span>{field.label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="admin-page__grid">
+                {spendEconomyCostFields.map((field) => (
+                  <label key={field.key} className="admin-page__field">
+                    <span>{field.label}</span>
+                    <input
+                      type="number"
+                      step={field.step ?? "1"}
+                      value={readValue(settings, field.key)}
+                      onChange={(event) =>
+                        setSettings(
+                          setNumberValue(
+                            settings,
+                            field.key,
+                            Number(event.target.value),
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="admin-page__fieldset">
+              <legend>Celebration effects</legend>
+              <div className="admin-page__toggle-grid">
+                {celebrationFields.map((field) => (
+                  <label key={field.key} className="admin-page__toggle">
+                    <input
+                      type="checkbox"
+                      checked={readBooleanValue(settings, field.key)}
+                      onChange={(event) =>
+                        setSettings(
+                          setBooleanValue(settings, field.key, event.target.checked),
+                        )
+                      }
+                    />
+                    <span>{field.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <section className="admin-page__preview" aria-label="Celebration preview">
+                <h3 className="admin-page__preview-title">Celebration preview</h3>
+                <p className="admin-page__preview-hint">
+                  Trigger preview effects using the current form values before saving.
+                </p>
+                <div className="admin-page__preview-actions">
+                  <button
+                    type="button"
+                    onClick={handlePreviewConfetti}
+                    aria-label="Preview confetti"
+                  >
+                    Preview confetti
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePreviewLightning}
+                    aria-label="Preview lightning"
+                  >
+                    Preview lightning
+                  </button>
+                </div>
+                <div
+                  className={`admin-page__lightning-preview ${
+                    isLightningPreviewActive
+                      ? "admin-page__lightning-preview--active"
+                      : ""
+                  }`}
+                  data-testid="celebration-lightning-preview"
+                  data-state={isLightningPreviewActive ? "active" : "idle"}
+                  aria-hidden="true"
+                />
+                <p
+                  className="admin-page__preview-status"
+                  data-testid="celebration-preview-status"
+                  aria-live="polite"
+                >
+                  {celebrationPreviewMessage}
+                </p>
+              </section>
+            </fieldset>
+
             <div className="admin-page__actions">
               <button
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={status === "saving"}
+                aria-busy={status === "saving"}
               >
-                {status === "saving" ? "Saving…" : "Save Settings"}
+                <span className="admin-page__button-content">
+                  {status === "saving" && (
+                    <span className="admin-page__button-spinner" aria-hidden="true" />
+                  )}
+                  <span>Save Settings</span>
+                </span>
               </button>
               {message && <p aria-live="polite">{message}</p>}
             </div>
@@ -432,14 +826,35 @@ export function AdminSettingsPage() {
               </label>
 
               <label className="admin-page__field">
-                <span>Model</span>
-                <input
-                  type="text"
-                  value={aiModel}
-                  onChange={(event) => setAIModel(event.target.value)}
-                  placeholder="gemini-2.0-flash-exp"
-                />
+                <span>Model preset</span>
+                <select
+                  value={aiModelSelection}
+                  onChange={(event) =>
+                    handleModelSelectionChange(
+                      event.target.value as GeminiModelSelection,
+                    )
+                  }
+                >
+                  {GEMINI_MODEL_PRESETS.map((preset) => (
+                    <option key={preset} value={preset}>
+                      {preset}
+                    </option>
+                  ))}
+                  <option value="custom">Custom model…</option>
+                </select>
               </label>
+
+              {aiModelSelection === "custom" && (
+                <label className="admin-page__field admin-page__field--wide">
+                  <span>Custom model</span>
+                  <input
+                    type="text"
+                    value={aiModel}
+                    onChange={(event) => setAIModel(event.target.value)}
+                    placeholder="Enter full model name"
+                  />
+                </label>
+              )}
 
               <label className="admin-page__field">
                 <span>Connection test API key (write-only)</span>
@@ -457,22 +872,39 @@ export function AdminSettingsPage() {
                 type="button"
                 onClick={() => void handleSaveAIConfig()}
                 disabled={aiSaving}
+                aria-busy={aiSaving}
               >
-                {aiSaving ? "Saving…" : "Save AI Config"}
+                <span className="admin-page__button-content">
+                  {aiSaving && (
+                    <span className="admin-page__button-spinner" aria-hidden="true" />
+                  )}
+                  <span>Save AI Config</span>
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => void handleTestAIConnection()}
                 disabled={aiTesting}
+                aria-busy={aiTesting}
               >
-                {aiTesting ? "Testing…" : "Test AI Connection"}
+                <span className="admin-page__button-content">
+                  {aiTesting && (
+                    <span className="admin-page__button-spinner" aria-hidden="true" />
+                  )}
+                  <span>Test AI Connection</span>
+                </span>
               </button>
               {aiConfig && (
                 <p aria-live="polite">
                   Key present in runtime env: {aiConfig.key_present ? "Yes" : "No"}
                 </p>
               )}
-              {aiMessage && <p aria-live="polite">{aiMessage}</p>}
+              {aiMessage && (
+                <p aria-live="polite">
+                  {aiMessage}
+                  {aiTestedModel ? ` Model tested: ${aiTestedModel}.` : ""}
+                </p>
+              )}
             </div>
           </section>
         </>

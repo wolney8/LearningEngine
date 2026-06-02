@@ -52,11 +52,26 @@ interface SaveResultOptions {
 }
 
 function toPackageResultsFromServerRow(row: UserProgressRecord): PackageTestResults {
+  if (row.difficulty_results && Object.keys(row.difficulty_results).length > 0) {
+    const mapped: PackageTestResults = {};
+
+    for (const [difficulty, result] of Object.entries(row.difficulty_results)) {
+      mapped[difficulty as Difficulty] = {
+        passed: result.completed,
+        bestScore: Math.round(result.latest_weighted_score * 100),
+        bestXpEarned: result.best_xp_earned,
+        lastAttemptedAt: result.updated_at,
+      };
+    }
+
+    return mapped;
+  }
+
   return {
     normal: {
       passed: row.completed,
       bestScore: Math.round(row.latest_weighted_score * 100),
-      bestXpEarned: 0,
+      bestXpEarned: row.best_xp_earned,
       lastAttemptedAt: row.updated_at,
     },
   };
@@ -215,8 +230,10 @@ export function useTestResults(packageId: string): {
       const latestWeightedScore = Math.min(1, Math.max(0, incoming.bestScore / 100));
 
       void upsertMyProgressForPackage(token, packageId, {
+        difficulty,
         latest_weighted_score: latestWeightedScore,
         completed,
+        best_xp_earned: merged.bestXpEarned,
         attempt_count:
           options?.attemptCount ?? (previousRow ? previousRow.attempt_count + 1 : 1),
       })
@@ -226,22 +243,7 @@ export function useTestResults(packageId: string): {
           }
           cachedProgressByPackage.set(packageId, saved);
 
-          const current = resultsRef.current;
-          const localDifficulty = current[difficulty];
-          const mergedDifficulty: DifficultyResult = {
-            passed: (localDifficulty?.passed ?? false) || saved.completed,
-            bestScore: Math.max(
-              localDifficulty?.bestScore ?? 0,
-              Math.round(saved.latest_weighted_score * 100),
-            ),
-            bestXpEarned: localDifficulty?.bestXpEarned ?? 0,
-            lastAttemptedAt: localDifficulty?.lastAttemptedAt ?? saved.updated_at,
-          };
-
-          const mergedResults: PackageTestResults = {
-            ...current,
-            [difficulty]: mergedDifficulty,
-          };
+          const mergedResults = toPackageResultsFromServerRow(saved);
 
           setResults(mergedResults);
           resultsRef.current = mergedResults;

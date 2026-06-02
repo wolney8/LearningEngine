@@ -1,34 +1,40 @@
-import confetti from "canvas-confetti";
 import { Flame, Zap } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useCelebrationEffects } from "../hooks/useCelebrationEffects";
 import "./StreakBadge.css";
 
 interface StreakBadgeProps {
   streak: number; // current in-lesson consecutive correct answers
 }
 
-function triggerConfetti(): void {
-  // Suppressed when user prefers reduced motion
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    return;
-  }
-  void confetti({
-    particleCount: 80,
-    spread: 60,
-    origin: { y: 0.4 },
-    colors: ["#4f46e5", "#6366f1", "#a5b4fc", "#fbbf24"],
-  });
-}
+const STREAK_MILESTONE = 3;
+const LIGHTNING_DURATION_MS = 640;
 
 export function StreakBadge({ streak }: StreakBadgeProps) {
   const prevStreakRef = useRef<number>(streak);
+  const [isLightningActive, setLightningActive] = useState(false);
+  const { lightningEnabled } = useCelebrationEffects();
 
   useEffect(() => {
-    if (streak >= 5 && prevStreakRef.current < 5) {
-      triggerConfetti();
+    const hitMilestone =
+      streak >= STREAK_MILESTONE &&
+      streak % STREAK_MILESTONE === 0 &&
+      prevStreakRef.current !== streak;
+
+    if (lightningEnabled && hitMilestone) {
+      setLightningActive(true);
+      const timeoutId = window.setTimeout(() => {
+        setLightningActive(false);
+      }, LIGHTNING_DURATION_MS);
+
+      prevStreakRef.current = streak;
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
+
     prevStreakRef.current = streak;
-  }, [streak]);
+  }, [lightningEnabled, streak]);
 
   if (streak < 2) return null;
 
@@ -38,7 +44,11 @@ export function StreakBadge({ streak }: StreakBadgeProps) {
   const modifier = isFlame ? "streak-badge--flame" : "streak-badge--zap";
 
   return (
-    <div className={`streak-badge ${modifier}`} aria-label={label}>
+    <div
+      className={`streak-badge ${modifier} ${isLightningActive ? "streak-badge--lightning" : ""}`}
+      aria-label={label}
+    >
+      <span className="streak-badge__lightning" aria-hidden="true" />
       <Icon size={16} aria-hidden="true" />
       <span className="streak-badge__count">{streak}</span>
     </div>

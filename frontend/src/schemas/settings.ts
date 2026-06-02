@@ -78,6 +78,16 @@ const SpendEconomySettingsSchema = z
   })
   .strict();
 
+const CelebrationEffectsSettingsSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    confetti_on_pass: z.boolean().default(true),
+    confetti_on_bonus_xp_gain: z.boolean().default(true),
+    lightning_on_streak_milestones: z.boolean().default(true),
+    respect_reduced_motion: z.boolean().default(true),
+  })
+  .strict();
+
 export const SettingsSchema = z
   .object({
     version: z.number().int().nonnegative(),
@@ -91,6 +101,7 @@ export const SettingsSchema = z
       model: "gemini-2.0-flash-exp",
     }),
     spend_economy: SpendEconomySettingsSchema.default({}),
+    celebration_effects: CelebrationEffectsSettingsSchema.default({}),
   })
   .strict();
 

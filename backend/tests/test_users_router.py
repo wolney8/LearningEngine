@@ -637,8 +637,11 @@ async def test_users_progress_upserts_latest_result_for_package(
     assert create_response.status_code == 200
     created_body = create_response.json()
     assert created_body["package_id"] == "sample-demo"
+    assert created_body["difficulty"] == "normal"
     assert created_body["latest_weighted_score"] == 0.65
     assert created_body["completed"] is False
+    assert created_body["best_xp_earned"] == 0
+    assert created_body["difficulty_results"] is not None
     assert created_body["attempt_count"] == 1
     assert created_body["first_completed_at"] is None
 
@@ -650,8 +653,11 @@ async def test_users_progress_upserts_latest_result_for_package(
     assert update_response.status_code == 200
     updated_body = update_response.json()
     assert updated_body["package_id"] == "sample-demo"
+    assert updated_body["difficulty"] == "normal"
     assert updated_body["latest_weighted_score"] == 0.92
     assert updated_body["completed"] is True
+    assert updated_body["best_xp_earned"] == 0
+    assert updated_body["difficulty_results"] is not None
     assert updated_body["attempt_count"] == 2
     assert updated_body["first_completed_at"] is not None
     assert updated_body["updated_at"] != created_body["updated_at"]
@@ -661,7 +667,79 @@ async def test_users_progress_upserts_latest_result_for_package(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert get_response.status_code == 200
-    assert get_response.json() == [updated_body]
+    fetched = get_response.json()
+    assert len(fetched) == 1
+    assert fetched[0]["package_id"] == "sample-demo"
+    assert fetched[0]["difficulty"] == "normal"
+    assert fetched[0]["latest_weighted_score"] == 0.92
+    assert fetched[0]["completed"] is True
+    assert fetched[0]["best_xp_earned"] == 0
+    assert fetched[0]["attempt_count"] == 2
+    assert fetched[0]["first_completed_at"] == updated_body["first_completed_at"]
+
+
+async def test_users_progress_persists_per_difficulty_results_and_best_xp(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="progress-difficulty",
+        email="progress-difficulty@example.com",
+    )
+
+    easy_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "easy",
+            "latest_weighted_score": 0.81,
+            "completed": True,
+            "best_xp_earned": 40,
+        },
+    )
+    assert easy_response.status_code == 200
+    easy_body = easy_response.json()
+    assert easy_body["difficulty"] == "easy"
+    assert easy_body["best_xp_earned"] == 40
+
+    normal_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "normal",
+            "latest_weighted_score": 0.63,
+            "completed": True,
+            "best_xp_earned": 25,
+        },
+    )
+    assert normal_response.status_code == 200
+    normal_body = normal_response.json()
+    assert normal_body["difficulty"] == "normal"
+    assert normal_body["best_xp_earned"] == 25
+
+    get_response = await users_client.get(
+        "/users/me/progress",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert get_response.status_code == 200
+
+    body = get_response.json()
+    assert len(body) == 1
+    row = body[0]
+    assert row["package_id"] == "sample-demo"
+    assert row["difficulty"] == "normal"
+    assert row["latest_weighted_score"] == 0.63
+    assert row["best_xp_earned"] == 25
+    assert row["difficulty_results"] is not None
+
+    difficulty_results = row["difficulty_results"]
+    assert set(difficulty_results.keys()) == {"easy", "normal"}
+    assert difficulty_results["easy"]["latest_weighted_score"] == 0.81
+    assert difficulty_results["easy"]["completed"] is True
+    assert difficulty_results["easy"]["best_xp_earned"] == 40
+    assert difficulty_results["normal"]["latest_weighted_score"] == 0.63
+    assert difficulty_results["normal"]["completed"] is True
+    assert difficulty_results["normal"]["best_xp_earned"] == 25
 
 
 async def test_users_progress_attempt_count_can_be_overwritten(
