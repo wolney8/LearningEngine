@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CompletionScreen } from "../components/CompletionScreen";
 import { GuestLimitNotice } from "../components/GuestLimitNotice";
 import { QuestionView } from "../components/QuestionView";
@@ -167,10 +162,7 @@ export function LessonPage() {
     setPhase({
       kind: "studying",
       pageIndex: nextIndex,
-      visitedPageIds: new Set([
-        ...phase.visitedPageIds,
-        pkg.pages[nextIndex].id,
-      ]),
+      visitedPageIds: new Set([...phase.visitedPageIds, pkg.pages[nextIndex].id]),
     });
   }
 
@@ -264,9 +256,7 @@ export function LessonPage() {
           "normal",
           {
             passed: true,
-            bestScore: Math.round(
-              (newCorrectCount / pkg.questions.length) * 100,
-            ),
+            bestScore: Math.round((newCorrectCount / pkg.questions.length) * 100),
             bestXpEarned: earned,
             lastAttemptedAt: new Date().toISOString(),
           },

@@ -49,8 +49,7 @@ export function useCelebrationEffects(options?: UseCelebrationEffectsOptions): {
     celebrationSettings.lightning_on_streak_milestones &&
     !shouldReduceMotion;
 
-  const canTriggerPassConfetti =
-    effectsEnabled && celebrationSettings.confetti_on_pass;
+  const canTriggerPassConfetti = effectsEnabled && celebrationSettings.confetti_on_pass;
   const canTriggerBonusConfetti =
     effectsEnabled && celebrationSettings.confetti_on_bonus_xp_gain;
 

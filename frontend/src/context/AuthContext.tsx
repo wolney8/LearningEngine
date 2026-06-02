@@ -71,9 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [error, setError] = useState<string>("");
-  const [bonusXPNotice, setBonusXPNotice] = useState<BonusXPNotice | null>(
-    null,
-  );
+  const [bonusXPNotice, setBonusXPNotice] = useState<BonusXPNotice | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -188,9 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await upsertMyProgressForPackage(nextToken, localRow.package_id, {
               latest_weighted_score: mergedLatestWeightedScore,
               completed: mergedCompleted,
-              ...(mergedAttemptCount > 0
-                ? { attempt_count: mergedAttemptCount }
-                : {}),
+              ...(mergedAttemptCount > 0 ? { attempt_count: mergedAttemptCount } : {}),
             });
           }
         } catch {

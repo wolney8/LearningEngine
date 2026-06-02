@@ -70,9 +70,7 @@ test.describe("Optional auth shell", () => {
     await checkA11y(page);
 
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Create account" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
     await expect(page.getByText("Sample Package")).toBeVisible();
   });
 
@@ -88,9 +86,7 @@ test.describe("Optional auth shell", () => {
 
     await expect
       .poll(() =>
-        page.evaluate(() =>
-          document.documentElement.getAttribute("data-theme"),
-        ),
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
       )
       .toBe("dark");
 
@@ -101,9 +97,7 @@ test.describe("Optional auth shell", () => {
     ).toBeVisible();
     await expect
       .poll(() =>
-        page.evaluate(() =>
-          document.documentElement.getAttribute("data-theme"),
-        ),
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
       )
       .toBe("dark");
     await expect
@@ -119,9 +113,7 @@ test.describe("Optional auth shell", () => {
 
     await expect
       .poll(() =>
-        page.evaluate(() =>
-          document.documentElement.getAttribute("data-theme"),
-        ),
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
       )
       .toBe("dark");
     await expect
@@ -132,9 +124,7 @@ test.describe("Optional auth shell", () => {
 
     await expect
       .poll(() =>
-        page.evaluate(() =>
-          document.documentElement.getAttribute("data-theme"),
-        ),
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
       )
       .toBe("light");
   });
@@ -186,9 +176,7 @@ test.describe("Optional auth shell", () => {
     expect(registerBody?.selected_package_ids).toEqual([SAMPLE_PACKAGE_ID]);
   });
 
-  test("login page shows API error on invalid credentials", async ({
-    page,
-  }) => {
+  test("login page shows API error on invalid credentials", async ({ page }) => {
     await page.route(`${API_BASE_URL}/auth/login`, (route) => {
       route.fulfill({
         status: 401,
@@ -206,9 +194,7 @@ test.describe("Optional auth shell", () => {
     await expect(page.getByRole("alert")).toContainText("Login failed (401)");
   });
 
-  test("successful login updates shared auth state above routes", async ({
-    page,
-  }) => {
+  test("successful login updates shared auth state above routes", async ({ page }) => {
     const authUser = {
       id: 2,
       username: "learner1",
@@ -245,15 +231,11 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.locator("[data-auth-status='authenticated']"),
-    ).toBeVisible();
+    await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
 
     await page.goto("/register");
     await checkA11y(page);
-    await expect(
-      page.locator("[data-auth-status='authenticated']"),
-    ).toBeVisible();
+    await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
   });
 
   test("login shows one-time Bonus XP notice when provided by auth response", async ({
@@ -349,12 +331,14 @@ test.describe("Optional auth shell", () => {
 
     const topBar = page.getByTestId("app-top-bar");
     await expect(topBar.getByText("admin-nav")).toBeVisible();
-    await expect(
-      topBar.getByRole("link", { name: "Admin panel" }),
-    ).toHaveAttribute("href", "/admin/users");
-    await expect(
-      topBar.getByRole("link", { name: "Learner view" }),
-    ).toHaveAttribute("href", "/");
+    await expect(topBar.getByRole("link", { name: "Admin panel" })).toHaveAttribute(
+      "href",
+      "/admin/users",
+    );
+    await expect(topBar.getByRole("link", { name: "Learner view" })).toHaveAttribute(
+      "href",
+      "/",
+    );
     await expect(topBar.getByRole("link", { name: "Profile" })).toHaveAttribute(
       "href",
       "/profile",
@@ -365,19 +349,13 @@ test.describe("Optional auth shell", () => {
 
     await topBar.getByRole("button", { name: "Sign out" }).first().click();
 
-    await expect(
-      topBar.getByRole("link", { name: "Create account" }),
-    ).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Create account" })).toBeVisible();
     await expect(topBar.getByRole("link", { name: "Sign in" })).toBeVisible();
-    await expect(topBar.getByRole("link", { name: "Admin panel" })).toHaveCount(
-      0,
-    );
+    await expect(topBar.getByRole("link", { name: "Admin panel" })).toHaveCount(0);
     await expect(topBar.getByRole("link", { name: "Profile" })).toHaveCount(0);
   });
 
-  test("mobile account menu closes on outside click and Escape", async ({
-    page,
-  }) => {
+  test("mobile account menu closes on outside click and Escape", async ({ page }) => {
     const authUser = {
       id: 4,
       username: "admin-mobile",
@@ -418,33 +396,25 @@ test.describe("Optional auth shell", () => {
     await accountButton.click();
     const accountMenu = page.locator("#app-top-bar-mobile-menu");
     await expect(accountMenu.getByText("admin-mobile")).toBeVisible();
-    await expect(
-      accountMenu.getByRole("link", { name: "Learner view" }),
-    ).toBeVisible();
+    await expect(accountMenu.getByRole("link", { name: "Learner view" })).toBeVisible();
 
     await page.mouse.click(8, 8);
     await expect(accountMenu).toHaveCount(0);
 
     await accountButton.click();
-    await expect(
-      accountMenu.getByRole("link", { name: "Profile" }),
-    ).toBeVisible();
+    await expect(accountMenu.getByRole("link", { name: "Profile" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(accountMenu).toHaveCount(0);
   });
 
-  test("profile route redirects unauthenticated users to login", async ({
-    page,
-  }) => {
+  test("profile route redirects unauthenticated users to login", async ({ page }) => {
     await page.goto("/profile");
 
     await expect(page).toHaveURL("/login");
     await checkA11y(page);
   });
 
-  test("profile page shows stats and allows username update", async ({
-    page,
-  }) => {
+  test("profile page shows stats and allows username update", async ({ page }) => {
     let authUser = {
       id: 19,
       username: "profile-viewer",
@@ -535,15 +505,11 @@ test.describe("Optional auth shell", () => {
     await checkA11y(page);
 
     const profileStats = page.getByLabel("Profile stats overview");
-    await expect(
-      page.getByRole("heading", { name: "Your Profile" }),
-    ).toBeVisible();
-    await expect(
-      profileStats.getByText("Total XP").locator(".."),
-    ).toContainText("88");
-    await expect(
-      profileStats.getByText("Current streak").locator(".."),
-    ).toContainText(/\d+/);
+    await expect(page.getByRole("heading", { name: "Your Profile" })).toBeVisible();
+    await expect(profileStats.getByText("Total XP").locator("..")).toContainText("88");
+    await expect(profileStats.getByText("Current streak").locator("..")).toContainText(
+      /\d+/,
+    );
     await expect(
       profileStats.getByText("Completed packages").locator(".."),
     ).toContainText("1");
@@ -738,9 +704,7 @@ test.describe("Optional auth shell", () => {
     await expect.poll(() => updatedXP).toBe(125);
     await expect.poll(() => mergedProgress !== null).toBeTruthy();
     await expect.poll(() => mergedProgress?.completed ?? false).toBeTruthy();
-    await expect
-      .poll(() => mergedProgress?.latest_weighted_score ?? 0)
-      .toBe(0.6);
+    await expect.poll(() => mergedProgress?.latest_weighted_score ?? 0).toBe(0.6);
     await expect.poll(() => mergedStreak?.streak_count ?? 0).toBe(5);
     await expect
       .poll(() => mergedStreak?.last_practised_date ?? null)
@@ -851,9 +815,7 @@ test.describe("Optional auth shell", () => {
 
     await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Create account" }),
-    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
 
     const storage = await page.evaluate(() => ({
       xp: localStorage.getItem("lle_xp"),
@@ -973,9 +935,7 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.getByTestId("app-top-bar").getByText("alice"),
-    ).toBeVisible();
+    await expect(page.getByTestId("app-top-bar").getByText("alice")).toBeVisible();
     await expect(page.getByText("Last test: Normal — 90%")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
@@ -988,9 +948,7 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.getByTestId("app-top-bar").getByText("bob"),
-    ).toBeVisible();
+    await expect(page.getByTestId("app-top-bar").getByText("bob")).toBeVisible();
     await expect(page.getByText("alice")).toHaveCount(0);
     await expect(page.getByText("Last test: Normal — 90%")).toHaveCount(0);
     await expect(page.getByLabel("Normal: Not attempted")).toBeVisible();

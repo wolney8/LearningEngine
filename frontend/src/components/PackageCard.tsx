@@ -151,9 +151,7 @@ export function PackageCard({
         )}
 
         {isUnavailableOrHidden && (
-          <p className="package-card__status">
-            {isHidden ? "Hidden" : "Unavailable"}
-          </p>
+          <p className="package-card__status">{isHidden ? "Hidden" : "Unavailable"}</p>
         )}
 
         {isLearningCard && !isUnavailableOrHidden && (
@@ -172,9 +170,7 @@ export function PackageCard({
                 type="button"
                 className="package-card__btn package-card__btn--primary"
                 onClick={() =>
-                  onStartLearning
-                    ? onStartLearning()
-                    : navigate(`/packages/${pkg.id}`)
+                  onStartLearning ? onStartLearning() : navigate(`/packages/${pkg.id}`)
                 }
                 disabled={!isActionEnabled}
                 aria-disabled={!isActionEnabled}

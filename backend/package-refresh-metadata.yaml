@@ -1,18 +1,18 @@
 version: 2
 packages:
   published-demo:
-    added_at: '2026-06-02T11:18:10.386159Z'
+    added_at: '2026-06-02T14:46:44.112150Z'
   ghost-hunting-for-beginners-training:
-    added_at: '2026-06-02T09:48:19.730244Z'
+    added_at: '2026-06-02T14:45:44.690377Z'
   italian-language-basics:
-    added_at: '2026-05-31T21:42:22.008416Z'
+    added_at: '2026-06-02T14:45:44.668936Z'
   japanese-for-beginners-course:
-    added_at: '2026-06-01T12:22:08.551345Z'
+    added_at: '2026-06-02T14:45:44.669207Z'
   music-theory-fundamentals-training:
-    added_at: '2026-05-31T07:55:30.847601Z'
+    added_at: '2026-06-02T14:45:44.669379Z'
   phishing-and-email-security:
     added_at: '2026-05-23T16:57:36.040175Z'
   sample-demo:
-    added_at: '2026-05-31T21:13:19.077607Z'
+    added_at: '2026-06-02T14:45:44.669581Z'
   sql-data-analysis-fundamentals:
     added_at: '2026-05-23T16:57:36.042492Z'
