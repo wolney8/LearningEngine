@@ -834,6 +834,58 @@ test.describe("Optional auth shell", () => {
     expect(storage.results).toBeNull();
   });
 
+  test("inactivity timeout logs out and redirects to login", async ({ page }) => {
+    const authUser = {
+      id: 32,
+      username: "idle-user",
+      email: "idle-user@example.com",
+      role: "student",
+      xp: 25,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.addInitScript(() => {
+      (
+        window as Window & {
+          __LLE_INACTIVITY_TIMEOUT_MS__?: number;
+        }
+      ).__LLE_INACTIVITY_TIMEOUT_MS__ = 150;
+    });
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-idle-user",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await checkA11y(page);
+    await page.getByLabel("Username or email").fill("idle-user");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
+
+    await expect(page).toHaveURL("/login", { timeout: 3_000 });
+    await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  });
+
   test("switching accounts remounts the auth boundary without stale user state", async ({
     page,
   }) => {
