@@ -162,9 +162,12 @@ def _ensure_sqlite_spend_history_schema_compatibility(session: Session) -> None:
 def init_db() -> None:
     # Ensure metadata includes user-related tables before creating schema.
     from app.models.user import (  # noqa: F401
+        AdminAuditLog,
         SpendHistory,
+        User,
         UserLibraryItem,
         UserTestResult,
+        UserXPSpendHistory,
     )
 
     if DATABASE_URL.startswith("sqlite"):

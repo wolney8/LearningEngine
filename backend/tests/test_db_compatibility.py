@@ -23,6 +23,15 @@ def _read_index_list(db_path: Path, table_name: str) -> list[tuple]:
         return connection.execute(f'PRAGMA index_list("{table_name}")').fetchall()
 
 
+def _table_exists(db_path: Path, table_name: str) -> bool:
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        ).fetchone()
+    return row is not None
+
+
 def _read_table_names(db_path: Path) -> list[str]:
     with sqlite3.connect(db_path) as connection:
         rows = connection.execute(
@@ -294,3 +303,32 @@ def test_init_db_adds_missing_user_test_result_columns(
     assert second_pass_columns.count("first_completed_at") == 1
     assert second_pass_columns.count("best_xp_earned") == 1
     assert second_pass_columns.count("difficulty_results_json") == 1
+
+
+def test_init_db_creates_user_xp_spend_history_table(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "spend-history.db"
+    database_url = f"sqlite:///{db_path}"
+    test_engine = create_engine(
+        database_url,
+        connect_args={"check_same_thread": False},
+    )
+
+    monkeypatch.setattr(db, "DATABASE_URL", database_url)
+    monkeypatch.setattr(db, "engine", test_engine)
+
+    db.init_db()
+
+    assert _table_exists(db_path, "user_xp_spend_history") is True
+
+    table_info = _read_table_info(db_path, "user_xp_spend_history")
+    column_names = [row[1] for row in table_info]
+    assert "user_id" in column_names
+    assert "action" in column_names
+    assert "cost" in column_names
+    assert "status" in column_names
+    assert "success" in column_names
+    assert "refunded" in column_names
+    assert "idempotency_key" in column_names

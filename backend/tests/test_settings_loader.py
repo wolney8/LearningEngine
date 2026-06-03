@@ -32,6 +32,14 @@ difficulty:
     normal: 1.0
     hard: 1.5
     expert: 2.0
+spend_economy:
+  enabled: true
+  allow_non_admin_ai_generation_spend: true
+  costs:
+    generate_ai_course: 700
+    refresh_stale_course: 350
+    increase_difficulty_cap: 125
+    unlock_hidden_package: 175
 """
 
 
@@ -47,6 +55,9 @@ def test_load_settings_reads_valid_yaml(tmp_path: Path) -> None:
     assert settings.difficulty.xp_multiplier.hard == 1.5
     assert settings.ai.provider == "gemini"
     assert settings.ai.model == "gemini-2.0-flash-exp"
+    assert settings.spend_economy.enabled is True
+    assert settings.spend_economy.allow_non_admin_ai_generation_spend is True
+    assert settings.spend_economy.costs.generate_ai_course == 700
 
 
 def test_load_settings_raises_when_file_missing(tmp_path: Path) -> None:

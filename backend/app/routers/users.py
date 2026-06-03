@@ -12,7 +12,13 @@ from sqlmodel import Session, select
 
 from app.models.package import Package, PackageSummary
 from app.models.settings import GameSettings
-from app.models.user import SpendHistory, User, UserLibraryItem, UserTestResult
+from app.models.user import (
+    SpendHistory,
+    User,
+    UserLibraryItem,
+    UserTestResult,
+    UserXPSpendHistory,
+)
 from app.routers.packages import (
     build_package_summary,
     get_package_overrides,
@@ -20,7 +26,7 @@ from app.routers.packages import (
     list_visible_package_summaries,
 )
 from app.routers.settings import get_settings
-from app.services.db import engine, get_session
+from app.services.db import get_session
 from app.services.library_selection import (
     normalise_package_id,
     validate_selectable_package_ids,
@@ -91,6 +97,42 @@ class UserProfileUpdateRequest(BaseModel):
 
 class UserCatalogueItemResponse(PackageSummary):
     selected: bool
+
+
+UserSpendAction = Literal[
+    "generate_ai_course",
+    "refresh_stale_course",
+    "increase_difficulty_cap",
+    "unlock_hidden_package",
+    "difficulty_unlock",
+    "package_unlock",
+]
+
+
+class UserXPSpendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: UserSpendAction
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
+    package_id: str | None = Field(default=None, min_length=1, max_length=200)
+    difficulty: Literal["hard", "expert"] | None = None
+
+
+class UserXPSpendResponse(BaseModel):
+    id: int
+    action: UserSpendAction
+    cost: int = Field(ge=0)
+    status: Literal["pending", "succeeded", "failed"]
+    success: bool
+    refunded: bool
+    xp: int = Field(ge=0)
+    idempotency_key: str | None
+    failure_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    xp_remaining: int | None = Field(default=None, ge=0)
+    package_id: str | None = None
+    difficulty: str | None = None
 
 
 class SpendAction(str, Enum):
@@ -230,6 +272,52 @@ def _to_test_result_response(result: UserTestResult) -> UserTestResultResponse:
 
 def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
+
+
+def _normalise_idempotency_key(key: str | None) -> str | None:
+    if key is None:
+        return None
+    return key.strip().lower()
+
+
+def _spend_cost_for_action(settings: GameSettings, action: UserSpendAction) -> int:
+    costs = settings.spend_economy.costs
+    return {
+        "generate_ai_course": costs.generate_ai_course,
+        "refresh_stale_course": costs.refresh_stale_course,
+        "increase_difficulty_cap": costs.increase_difficulty_cap,
+        "unlock_hidden_package": costs.unlock_hidden_package,
+    }[action]
+
+
+def _to_spend_response(
+    history: UserXPSpendHistory,
+    xp: int,
+) -> UserXPSpendResponse:
+    return UserXPSpendResponse(
+        id=history.id or 0,
+        action=history.action,
+        cost=history.cost,
+        status=history.status,
+        success=history.success,
+        refunded=history.refunded,
+        xp=xp,
+        idempotency_key=history.idempotency_key,
+        failure_reason=history.failure_reason,
+        created_at=history.created_at,
+        updated_at=history.updated_at,
+        xp_remaining=xp,
+    )
+
+
+async def _execute_spend_action(
+    *,
+    action: UserSpendAction,
+    user: User,
+) -> None:
+    # Backend-first MVP: this validates and charges; action integrations land later.
+    _ = action
+    _ = user
 
 
 def _read_selected_package_ids_for_user(
@@ -385,6 +473,197 @@ async def update_my_xp(
     session.commit()
     session.refresh(current_user)
     return UserXPResponse(xp=current_user.xp)
+
+
+@router.post("/me/xp/spend", response_model=UserXPSpendResponse)
+async def spend_my_xp(
+    body: UserXPSpendRequest,
+    current_user: User = Depends(get_current_user),
+    settings: GameSettings = Depends(get_settings),
+    cache: dict[str, Package] = Depends(get_packages_cache),
+    session: Session = Depends(get_session),
+) -> UserXPSpendResponse:
+    user_id = _require_current_user_id(current_user)
+    is_unlock_action = body.action in {
+        SpendAction.difficulty_unlock.value,
+        SpendAction.package_unlock.value,
+    }
+
+    if not settings.spend_economy.enabled:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_423_LOCKED
+                if is_unlock_action
+                else status.HTTP_403_FORBIDDEN
+            ),
+            detail=(
+                "XP spend economy is currently disabled"
+                if is_unlock_action
+                else "XP spend economy is disabled"
+            ),
+        )
+
+    if is_unlock_action:
+        if body.package_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="'package_id' is required",
+            )
+
+        if (
+            body.action == SpendAction.difficulty_unlock.value
+            and body.difficulty is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="'difficulty' is required for difficulty_unlock action",
+            )
+
+        normalised_package_id = normalise_package_id(body.package_id)
+        if normalised_package_id not in cache:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Package not found",
+            )
+
+        existing_unlock = session.exec(
+            select(SpendHistory).where(
+                SpendHistory.user_id == user_id,
+                SpendHistory.action == body.action,
+                SpendHistory.package_id == normalised_package_id,
+                SpendHistory.difficulty == body.difficulty,
+                SpendHistory.success == True,  # noqa: E712
+            )
+        ).first()
+        if existing_unlock is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Already unlocked",
+            )
+
+        unlock_cost = (
+            settings.spend_economy.costs.increase_difficulty_cap
+            if body.action == SpendAction.difficulty_unlock.value
+            else settings.spend_economy.costs.unlock_hidden_package
+        )
+        if current_user.xp < unlock_cost:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient XP: need {unlock_cost}, have {current_user.xp}",
+            )
+
+        current_user.xp -= unlock_cost
+        session.add(current_user)
+        session.add(
+            SpendHistory(
+                user_id=user_id,
+                action=body.action,
+                package_id=normalised_package_id,
+                difficulty=body.difficulty,
+                cost=unlock_cost,
+                success=True,
+            )
+        )
+        session.commit()
+        session.refresh(current_user)
+        now = datetime.now(timezone.utc)
+        return UserXPSpendResponse(
+            id=0,
+            action=body.action,
+            cost=unlock_cost,
+            status="succeeded",
+            success=True,
+            refunded=False,
+            xp=current_user.xp,
+            idempotency_key=None,
+            failure_reason=None,
+            created_at=now,
+            updated_at=now,
+            xp_remaining=current_user.xp,
+            package_id=normalised_package_id,
+            difficulty=body.difficulty,
+        )
+
+    if (
+        body.action == "generate_ai_course"
+        and current_user.role != "admin"
+        and not settings.spend_economy.allow_non_admin_ai_generation_spend
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Non-admin AI generation spend is disabled",
+        )
+
+    idempotency_key = _normalise_idempotency_key(body.idempotency_key)
+    if idempotency_key is not None:
+        existing = session.exec(
+            select(UserXPSpendHistory).where(
+                UserXPSpendHistory.user_id == user_id,
+                UserXPSpendHistory.idempotency_key == idempotency_key,
+            )
+        ).first()
+        if existing is not None:
+            if existing.status == "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Spend request is already in progress",
+                )
+            session.refresh(current_user)
+            return _to_spend_response(existing, current_user.xp)
+
+    cost = _spend_cost_for_action(settings, body.action)
+    if current_user.xp < cost:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Insufficient XP balance",
+        )
+
+    current_user.xp -= cost
+    now = datetime.now(timezone.utc)
+    history = UserXPSpendHistory(
+        user_id=user_id,
+        action=body.action,
+        cost=cost,
+        status="pending",
+        success=False,
+        refunded=False,
+        idempotency_key=idempotency_key,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(current_user)
+    session.add(history)
+    session.commit()
+    session.refresh(current_user)
+    session.refresh(history)
+
+    try:
+        await _execute_spend_action(action=body.action, user=current_user)
+    except Exception:
+        current_user.xp += cost
+        history.status = "failed"
+        history.success = False
+        history.refunded = True
+        history.failure_reason = "Spend action execution failed"
+        history.updated_at = datetime.now(timezone.utc)
+        session.add(current_user)
+        session.add(history)
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Spend action failed and XP was refunded",
+        ) from None
+
+    history.status = "succeeded"
+    history.success = True
+    history.refunded = False
+    history.failure_reason = None
+    history.updated_at = datetime.now(timezone.utc)
+    session.add(history)
+    session.commit()
+    session.refresh(current_user)
+    session.refresh(history)
+    return _to_spend_response(history, current_user.xp)
 
 
 @router.get("/me/streak", response_model=UserStreakResponse)
@@ -729,110 +1008,6 @@ async def upsert_my_progress_for_package(
     response.best_xp_earned = response_xp
     response.updated_at = updated_at
     return response
-
-
-@router.post("/me/xp/spend", response_model=XPSpendResponse)
-async def spend_xp(
-    body: XPSpendRequest,
-    current_user: User = Depends(require_authenticated_user),
-    session: Session = Depends(get_session),
-    settings: GameSettings = Depends(get_settings),
-    cache: dict[str, Package] = Depends(get_packages_cache),
-) -> XPSpendResponse:
-    """
-    Atomically spend XP to unlock a difficulty tier or hidden package.
-
-    SQLite serialises writes - the SELECT + UPDATE within a single Session
-    is safe from TOCTOU races in this single-writer SQLite setup.
-
-    Spend flow:
-      1. 423 if economy disabled
-      2. Validate action-specific fields
-      3. Confirm package exists in package cache
-      4. Idempotency: 409 if already unlocked
-      5. 402 if insufficient XP
-      6. Deduct XP + write SpendHistory in one transaction
-    """
-    if not settings.spend_economy.enabled:
-        raise HTTPException(
-            status_code=423,
-            detail="XP spend economy is currently disabled",
-        )
-
-    if body.action == SpendAction.difficulty_unlock and body.difficulty is None:
-        raise HTTPException(
-            status_code=422,
-            detail="'difficulty' is required for difficulty_unlock action",
-        )
-
-    normalised_package_id = normalise_package_id(body.package_id)
-    if normalised_package_id not in cache:
-        raise HTTPException(status_code=404, detail="Package not found")
-
-    existing = session.exec(
-        select(SpendHistory).where(
-            SpendHistory.user_id == current_user.id,
-            SpendHistory.action == body.action.value,
-            SpendHistory.package_id == normalised_package_id,
-            SpendHistory.difficulty == body.difficulty,
-            SpendHistory.success == True,  # noqa: E712
-        )
-    ).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="Already unlocked")
-
-    cost = (
-        settings.spend_economy.costs.increase_difficulty_cap
-        if body.action == SpendAction.difficulty_unlock
-        else settings.spend_economy.costs.unlock_hidden_package
-    )
-    if current_user.xp < cost:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Insufficient XP: need {cost}, have {current_user.xp}",
-        )
-
-    try:
-        current_user.xp -= cost
-        session.add(current_user)
-        history_entry = SpendHistory(
-            user_id=current_user.id,
-            action=body.action.value,
-            package_id=normalised_package_id,
-            difficulty=body.difficulty,
-            cost=cost,
-            success=True,
-        )
-        session.add(history_entry)
-        session.commit()
-        session.refresh(current_user)
-    except Exception:
-        session.rollback()
-        # Best-effort audit log for failed attempts where no XP was deducted.
-        try:
-            fail_entry = SpendHistory(
-                user_id=current_user.id,
-                action=body.action.value,
-                package_id=normalised_package_id,
-                difficulty=body.difficulty,
-                cost=0,
-                success=False,
-            )
-            with Session(engine) as fail_session:
-                fail_session.add(fail_entry)
-                fail_session.commit()
-        except Exception:
-            pass
-        raise HTTPException(status_code=500, detail="Spend failed; XP not deducted")
-
-    return XPSpendResponse(
-        xp_remaining=current_user.xp,
-        action=body.action.value,
-        package_id=normalised_package_id,
-        difficulty=body.difficulty,
-        cost=cost,
-        success=True,
-    )
 
 
 @router.get("/me/unlocked-difficulties/{package_id}")
