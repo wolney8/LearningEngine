@@ -7,7 +7,13 @@ from httpx import ASGITransport, AsyncClient
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.main import app
-from app.models.user import AdminAuditLog, User
+from app.models.user import (
+    AdminAuditLog,
+    SpendHistory,
+    User,
+    UserLibraryItem,
+    UserTestResult,
+)
 from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
 
@@ -85,6 +91,11 @@ def _read_admin_audit_logs(engine) -> list[AdminAuditLog]:
         return session.exec(
             select(AdminAuditLog).order_by(AdminAuditLog.id)
         ).all()
+
+
+def _count_rows_for_user(engine, model, user_id: int) -> int:
+    with Session(engine) as session:
+        return len(session.exec(select(model).where(model.user_id == user_id)).all())
 
 
 async def test_admin_can_list_users(admin_users_client) -> None:
@@ -560,3 +571,129 @@ async def test_admin_audit_logs_support_action_actor_and_date_filters(
         },
     )
     assert invalid_range_response.status_code == 422
+
+
+async def test_admin_can_delete_user_and_related_records(admin_users_client) -> None:
+    client, engine = admin_users_client
+    admin_token, admin_id = await _register_user_and_get_identity(
+        client,
+        username="admin-delete-user",
+        email="admin-delete-user@example.com",
+    )
+    _set_role(engine, admin_id, "admin")
+
+    student_token, student_id = await _register_user_and_get_identity(
+        client,
+        username="student-delete-user",
+        email="student-delete-user@example.com",
+    )
+
+    progress_response = await client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {student_token}"},
+        json={"latest_weighted_score": 0.8, "completed": True},
+    )
+    assert progress_response.status_code == 200
+
+    with Session(engine) as session:
+        session.add(
+            UserLibraryItem(
+                user_id=student_id,
+                package_id="sample-demo",
+                status="selected",
+            )
+        )
+        session.add(
+            SpendHistory(
+                user_id=student_id,
+                action="package_unlock",
+                package_id="sample-demo",
+                difficulty=None,
+                cost=100,
+                success=True,
+            )
+        )
+        session.add(
+            AdminAuditLog(
+                actor_user_id=admin_id,
+                action="user.reviewed",
+                target_user_id=student_id,
+                details_json='{"note":"before delete"}',
+            )
+        )
+        session.commit()
+
+    delete_response = await client.delete(
+        f"/admin/users/{student_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {
+        "id": student_id,
+        "username": "student-delete-user",
+        "deleted_progress_count": 1,
+        "deleted_library_count": 1,
+        "deleted_spend_history_count": 1,
+        "deleted_audit_log_count": 1,
+    }
+
+    with Session(engine) as session:
+        deleted_user = session.exec(select(User).where(User.id == student_id)).first()
+        assert deleted_user is None
+
+    assert _count_rows_for_user(engine, UserTestResult, student_id) == 0
+    assert _count_rows_for_user(engine, UserLibraryItem, student_id) == 0
+    assert _count_rows_for_user(engine, SpendHistory, student_id) == 0
+
+    persisted_logs = _read_admin_audit_logs(engine)
+    assert [entry.action for entry in persisted_logs] == ["user.deleted"]
+    assert persisted_logs[0].actor_user_id == admin_id
+    assert persisted_logs[0].target_user_id is None
+
+
+async def test_admin_cannot_delete_currently_signed_in_admin(
+    admin_users_client,
+) -> None:
+    client, engine = admin_users_client
+    admin_token, admin_id = await _register_user_and_get_identity(
+        client,
+        username="admin-self-delete",
+        email="admin-self-delete@example.com",
+    )
+    _set_role(engine, admin_id, "admin")
+
+    _, second_admin_id = await _register_user_and_get_identity(
+        client,
+        username="admin-second-delete",
+        email="admin-second-delete@example.com",
+    )
+    _set_role(engine, second_admin_id, "admin")
+
+    response = await client.delete(
+        f"/admin/users/{admin_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Cannot delete the currently signed-in admin user"
+    }
+    assert _get_role(engine, admin_id) == "admin"
+
+
+async def test_non_admin_cannot_delete_user(admin_users_client) -> None:
+    client, _ = admin_users_client
+    student_token, student_id = await _register_user_and_get_identity(
+        client,
+        username="student-delete-no-admin",
+        email="student-delete-no-admin@example.com",
+    )
+
+    response = await client.delete(
+        f"/admin/users/{student_id}",
+        headers={"Authorization": f"Bearer {student_token}"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Admin access required"}

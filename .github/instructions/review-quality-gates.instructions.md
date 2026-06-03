@@ -131,13 +131,13 @@ The handoff experience depends on whether the phase produces visible UI:
 2. Report to the user: "Running at **http://localhost:5173** — please [specific scenario: e.g. 'open the package list and click a card']."
 3. The user tests by interacting with the running app — not by reading files.
 4. When the user says it works (or flags an issue), that is the approval signal.
-5. The Orchestrator then commits, pushes, opens a PR, and merges it. The user does not need to manually merge.
+5. The Orchestrator then commits, pushes, and opens a PR after user approval.
 
 ### Phases with no UI changes (backend models, schemas, tests, config)
 
-1. After all gates pass, commit and merge automatically — no user review required.
-2. Report to the user only: phase name, files added, test count passed. One sentence.
-3. Do not ask the user to read code, inspect files, or approve the commit.
+1. After all gates pass, present the change summary to the user.
+2. Commit and push only after the user approves the change set.
+3. Do not merge on the user's behalf unless the active toolchain explicitly provides that capability and the user has asked for it.
 
 ---
 

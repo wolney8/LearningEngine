@@ -143,6 +143,16 @@ const AdminManagedUserProgressResetSchema = z
     reset_xp: z.boolean(),
   })
   .strict();
+const AdminManagedUserDeleteSchema = z
+  .object({
+    id: z.number().int().positive(),
+    username: z.string().min(1),
+    deleted_progress_count: z.number().int().nonnegative(),
+    deleted_library_count: z.number().int().nonnegative(),
+    deleted_spend_history_count: z.number().int().nonnegative(),
+    deleted_audit_log_count: z.number().int().nonnegative(),
+  })
+  .strict();
 const AdminPackageDeleteResponseSchema = z
   .object({
     package_id: z.string().min(1),
@@ -173,6 +183,7 @@ export type AdminManagedUserXP = z.infer<typeof AdminManagedUserXPSchema>;
 export type AdminManagedUserProgressReset = z.infer<
   typeof AdminManagedUserProgressResetSchema
 >;
+export type AdminManagedUserDelete = z.infer<typeof AdminManagedUserDeleteSchema>;
 export type AdminPackageDeleteResponse = z.infer<
   typeof AdminPackageDeleteResponseSchema
 >;
@@ -1495,6 +1506,24 @@ export async function resetAdminUserProgress(
 
   const data: unknown = await response.json();
   return AdminManagedUserProgressResetSchema.parse(data);
+}
+
+export async function deleteAdminUser(
+  token: string,
+  userId: number,
+): Promise<AdminManagedUserDelete> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: getAdminHeaders(token),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to delete user (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return AdminManagedUserDeleteSchema.parse(data);
 }
 
 export async function deleteAdminPackage(
