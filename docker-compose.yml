@@ -1,0 +1,30 @@
+services:
+  learning-engine-backend:
+    image: local-learning-engine-backend:0.1.0-k3s
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      JWT_SECRET_KEY: change-me-for-local-compose
+      LLE_BOOTSTRAP_ADMIN_USERNAME: admin
+      LLE_BOOTSTRAP_ADMIN_EMAIL: admin@example.local
+      LLE_BOOTSTRAP_ADMIN_PASSWORD: change-me-now
+    ports:
+      - "8000:8000"
+    volumes:
+      - learning-engine-runtime:/app/runtime
+
+  learning-engine-frontend:
+    image: local-learning-engine-frontend:0.1.0-k3s
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    depends_on:
+      - learning-engine-backend
+    ports:
+      - "8080:8080"
+
+volumes:
+  learning-engine-runtime:

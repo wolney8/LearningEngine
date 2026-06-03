@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learning-engine-frontend
+  namespace: learning-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learning-engine-frontend
+  template:
+    metadata:
+      labels:
+        app: learning-engine-frontend
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: minipc
+      containers:
+        - name: frontend
+          image: local-learning-engine-frontend:0.1.0-k3s
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20

@@ -130,3 +130,65 @@ LocalLearningEngine/
 ## Contributing
 
 See `docs/BRANCHING_AND_RELEASE_PROCESS.md` for branch naming, commit format, PR flow, and review gate expectations.
+
+## Deployment to local k3s
+
+The repository includes container and Kubernetes manifests for a simple LAN deployment on k3s.
+
+- Frontend NodePort URL: `http://<minipc-or-node-ip>:30180`
+- Backend exposure: internal-only ClusterIP, reached by the frontend through nginx `/api` proxying
+- Node pinning: both frontend and backend are pinned to `kubernetes.io/hostname=minipc`
+- Storage: backend state is persisted through a local-path PVC, including SQLite and admin-written YAML/config files
+
+Image tags:
+
+- `local-learning-engine-backend:0.1.0-k3s`
+- `local-learning-engine-frontend:0.1.0-k3s`
+
+Build commands from the repo root:
+
+```bash
+docker build -t local-learning-engine-backend:0.1.0-k3s -f backend/Dockerfile .
+docker build -t local-learning-engine-frontend:0.1.0-k3s -f frontend/Dockerfile --build-arg VITE_API_BASE_URL=/api .
+```
+
+Push to Docker Hub or another registry if needed:
+
+```bash
+docker tag local-learning-engine-backend:0.1.0-k3s <registry>/local-learning-engine-backend:0.1.0-k3s
+docker tag local-learning-engine-frontend:0.1.0-k3s <registry>/local-learning-engine-frontend:0.1.0-k3s
+docker push <registry>/local-learning-engine-backend:0.1.0-k3s
+docker push <registry>/local-learning-engine-frontend:0.1.0-k3s
+```
+
+Create the JWT secret without committing it:
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl -n learning-engine create secret generic learning-engine-secrets \
+  --from-literal=JWT_SECRET_KEY='replace-with-a-long-random-secret'
+```
+
+Apply manifests:
+
+```bash
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/pvc.yaml
+kubectl apply -f k8s/backend-service.yaml
+kubectl apply -f k8s/backend-deployment.yaml
+kubectl apply -f k8s/frontend-deployment.yaml
+kubectl apply -f k8s/frontend-service.yaml
+```
+
+Verify rollout and access:
+
+```bash
+kubectl -n learning-engine get pods
+kubectl -n learning-engine get svc
+kubectl -n learning-engine rollout status deploy/learning-engine-backend
+kubectl -n learning-engine rollout status deploy/learning-engine-frontend
+kubectl -n learning-engine logs deploy/learning-engine-backend
+kubectl -n learning-engine logs deploy/learning-engine-frontend
+```
+
+For more detail, see `k8s/README.md`.

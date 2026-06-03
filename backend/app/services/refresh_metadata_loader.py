@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +15,15 @@ from app.models.refresh import PackageAdminMetadataRecord, RefreshMetadataDocume
 log = logging.getLogger(__name__)
 
 REFRESH_METADATA_FILE = (
-    Path(__file__).resolve().parent.parent.parent / "package-refresh-metadata.yaml"
+    Path(
+        os.getenv(
+            "REFRESH_METADATA_FILE",
+            str(
+                Path(__file__).resolve().parent.parent.parent
+                / "package-refresh-metadata.yaml"
+            ),
+        )
+    )
 )
 
 

@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -23,6 +24,15 @@ from app.services.settings_loader import load_settings
 load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
+
+
+def _get_allowed_origins() -> list[str]:
+    raw_origins = os.getenv("BACKEND_CORS_ORIGINS")
+    if raw_origins is None:
+        return ["http://localhost:5173"]
+
+    origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+    return origins or ["http://localhost:5173"]
 
 
 @asynccontextmanager
@@ -50,7 +60,7 @@ app = FastAPI(title="Local Learning Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learning-engine-backend
+  namespace: learning-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learning-engine-backend
+  template:
+    metadata:
+      labels:
+        app: learning-engine-backend
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: minipc
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: backend
+          image: local-learning-engine-backend:0.1.0-k3s
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: learning-engine-backend-config
+          env:
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: learning-engine-secrets
+                  key: JWT_SECRET_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: runtime-data
+              mountPath: /app/runtime
+      volumes:
+        - name: runtime-data
+          persistentVolumeClaim:
+            claimName: learning-engine-backend-data

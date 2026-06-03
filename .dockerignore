@@ -1,0 +1,22 @@
+.git
+.github
+.pytest_cache
+.ruff_cache
+.venv
+backend/.pytest_cache
+backend/.ruff_cache
+backend/.venv
+backend/app/__pycache__
+backend/tests/__pycache__
+backend/data
+frontend/node_modules
+frontend/dist
+frontend/playwright-report
+frontend/test-results
+frontend/.vite
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.log
+ k8s/*.secret.yaml

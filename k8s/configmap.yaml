@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learning-engine-backend-config
+  namespace: learning-engine
+data:
+  PORT: "8000"
+  APP_RUNTIME_DIR: /app/runtime
+  PACKAGES_DIR: /app/runtime/packages
+  SETTINGS_FILE: /app/runtime/settings.yaml
+  PACKAGE_OVERRIDES_FILE: /app/runtime/package-overrides.yaml
+  REFRESH_METADATA_FILE: /app/runtime/package-refresh-metadata.yaml
+  DATABASE_URL: sqlite:////app/runtime/data/lle.db
