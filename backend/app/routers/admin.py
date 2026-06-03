@@ -17,7 +17,13 @@ from app.models.refresh import (
     StalePackageInfo,
 )
 from app.models.settings import GameSettings
-from app.models.user import AdminAuditLog, User, UserTestResult
+from app.models.user import (
+    AdminAuditLog,
+    SpendHistory,
+    User,
+    UserLibraryItem,
+    UserTestResult,
+)
 from app.routers.users import require_admin_user
 from app.services.ai_generator import (
     AI_ERROR_CODE_MISSING_API_KEY,
@@ -187,6 +193,17 @@ class AdminUserProgressResetResponse(BaseModel):
     reset_xp: bool
 
 
+class AdminUserDeleteResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    username: str
+    deleted_progress_count: int
+    deleted_library_count: int
+    deleted_spend_history_count: int
+    deleted_audit_log_count: int
+
+
 class AdminPackageDeleteResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -246,6 +263,25 @@ def to_admin_user_progress_reset_response(
         pending_bonus_reason=user.pending_bonus_reason,
         cleared_progress_count=cleared_progress_count,
         reset_xp=reset_xp,
+    )
+
+
+def to_admin_user_delete_response(
+    *,
+    user_id: int,
+    username: str,
+    deleted_progress_count: int,
+    deleted_library_count: int,
+    deleted_spend_history_count: int,
+    deleted_audit_log_count: int,
+) -> AdminUserDeleteResponse:
+    return AdminUserDeleteResponse(
+        id=user_id,
+        username=username,
+        deleted_progress_count=deleted_progress_count,
+        deleted_library_count=deleted_library_count,
+        deleted_spend_history_count=deleted_spend_history_count,
+        deleted_audit_log_count=deleted_audit_log_count,
     )
 
 
@@ -813,6 +849,85 @@ async def post_admin_user_progress_reset(
         user,
         cleared_progress_count=len(user_results),
         reset_xp=reset_xp,
+    )
+
+
+@router.delete(
+    "/users/{user_id}",
+    response_model=AdminUserDeleteResponse,
+)
+async def delete_admin_user(
+    user_id: int,
+    current_admin: User = Depends(require_admin_user),
+    session: Session = Depends(get_session),
+) -> AdminUserDeleteResponse:
+    current_admin_id = current_admin.id or 0
+    if user_id == current_admin_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete the currently signed-in admin user",
+        )
+
+    user = _get_user_or_404(session, user_id)
+
+    if user.role == "admin":
+        admin_count = len(session.exec(select(User).where(User.role == "admin")).all())
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete the last remaining admin user",
+            )
+
+    deleted_username = user.username
+
+    user_results = session.exec(
+        select(UserTestResult).where(UserTestResult.user_id == user_id)
+    ).all()
+    user_library_items = session.exec(
+        select(UserLibraryItem).where(UserLibraryItem.user_id == user_id)
+    ).all()
+    spend_history_rows = session.exec(
+        select(SpendHistory).where(SpendHistory.user_id == user_id)
+    ).all()
+    audit_rows = session.exec(
+        select(AdminAuditLog).where(
+            (AdminAuditLog.actor_user_id == user_id)
+            | (AdminAuditLog.target_user_id == user_id)
+        )
+    ).all()
+
+    for row in user_results:
+        session.delete(row)
+    for row in user_library_items:
+        session.delete(row)
+    for row in spend_history_rows:
+        session.delete(row)
+    for row in audit_rows:
+        session.delete(row)
+
+    session.delete(user)
+    _log_admin_action(
+        session,
+        actor_user_id=current_admin_id,
+        action="user.deleted",
+        details={
+            "deleted_user_id": user_id,
+            "deleted_username": deleted_username,
+            "deleted_progress_count": len(user_results),
+            "deleted_library_count": len(user_library_items),
+            "deleted_spend_history_count": len(spend_history_rows),
+            "deleted_audit_log_count": len(audit_rows),
+        },
+    )
+    session.commit()
+
+    return to_admin_user_delete_response(
+        user_id=user_id,
+        username=deleted_username,
+        deleted_progress_count=len(user_results),
+        deleted_library_count=len(user_library_items),
+        deleted_spend_history_count=len(spend_history_rows),
+        deleted_audit_log_count=len(audit_rows),
     )
 
 

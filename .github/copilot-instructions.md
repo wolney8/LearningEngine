@@ -31,10 +31,11 @@ lint:    cd backend && ruff check .                    |   cd frontend && pnpm e
 
 - Browser → React 18 + TypeScript frontend (port 5173, Vite dev server)
 - Frontend ↔ FastAPI backend (port 8000, uvicorn)
-- Backend reads YAML content packages from the packages/ directory
-- Packages validated via Pydantic models on load
-- In-process cache only (no database in Phase 1–7); SQLite deferred
-- Full architecture detail: docs/ARCHITECTURE.md
+- Backend reads YAML content packages from the `packages/` directory
+- Packages are validated via Pydantic models on load
+- SQLite is the active persistence layer for users, progress, XP, spend history, and audit data
+- Admin-only AI package generation and refresh flows are supported when provider configuration is present
+- Full architecture detail: `docs/ARCHITECTURE.md`
 
 ---
 

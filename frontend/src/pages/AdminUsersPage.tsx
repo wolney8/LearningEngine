@@ -4,9 +4,11 @@ import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
   type AdminManagedUser,
+  type AdminManagedUserDelete,
   type AdminManagedUserProgressReset,
   type AdminManagedUserRole,
   type AdminManagedUserXP,
+  deleteAdminUser,
   fetchAdminUsers,
   grantAdminUserXPBonus,
   resetAdminUserProgress,
@@ -24,6 +26,9 @@ function toAdminErrorMessage(error: unknown, fallback: string): string {
   if (error.message.includes("(409)")) {
     if (error.message.toLowerCase().includes("last remaining admin")) {
       return "Cannot remove the last remaining admin.";
+    }
+    if (error.message.toLowerCase().includes("currently signed-in admin")) {
+      return "You cannot delete the admin account currently in use.";
     }
     if (error.message.toLowerCase().includes("last remaining package")) {
       return "Cannot permanently delete the last remaining package.";
@@ -176,6 +181,35 @@ export function AdminUsersPage() {
         [updated.id]: "",
       }));
     }
+  }
+
+  function applyUserDeleteUpdate(deletedUser: AdminManagedUserDelete) {
+    setUsers((current) => current.filter((item) => item.id !== deletedUser.id));
+    setPendingRoles((current) => {
+      const next = { ...current };
+      delete next[deletedUser.id];
+      return next;
+    });
+    setXPInputByUserId((current) => {
+      const next = { ...current };
+      delete next[deletedUser.id];
+      return next;
+    });
+    setBonusXPInputByUserId((current) => {
+      const next = { ...current };
+      delete next[deletedUser.id];
+      return next;
+    });
+    setBonusReasonByUserId((current) => {
+      const next = { ...current };
+      delete next[deletedUser.id];
+      return next;
+    });
+    setErrorByUserId((current) => {
+      const next = { ...current };
+      delete next[deletedUser.id];
+      return next;
+    });
   }
 
   async function handleRoleSave(targetUser: AdminManagedUser) {
@@ -405,6 +439,38 @@ export function AdminUsersPage() {
     }
   }
 
+  async function handleDeleteUser(targetUser: AdminManagedUser) {
+    const confirmed = window.confirm(
+      `This will permanently delete ${targetUser.username}, remove their saved progress, library entries, XP spend history, and related audit references. This action cannot be undone. Continue?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingUserId(targetUser.id);
+    setMessageByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+    setErrorByUserId((current) => ({ ...current, [targetUser.id]: "" }));
+
+    try {
+      const deleted = await deleteAdminUser(adminToken, targetUser.id);
+      applyUserDeleteUpdate(deleted);
+      setMessageByUserId((current) => ({
+        ...current,
+        [0]: `Deleted ${deleted.username}. Removed ${deleted.deleted_progress_count} progress records, ${deleted.deleted_library_count} library records, ${deleted.deleted_spend_history_count} spend records, and ${deleted.deleted_audit_log_count} related audit records.`,
+      }));
+    } catch (error) {
+      setErrorByUserId((current) => ({
+        ...current,
+        [targetUser.id]: toAdminErrorMessage(
+          error,
+          "Could not delete user. Please try again.",
+        ),
+      }));
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
   return (
     <main className="admin-page">
       <header className="admin-page__header">
@@ -429,6 +495,7 @@ export function AdminUsersPage() {
       {loadingState === "error" && (
         <p role="alert">Could not load users. Please try again.</p>
       )}
+      {messageByUserId[0] && <p>{messageByUserId[0]}</p>}
 
       {loadingState === "ready" && (
         <section className="admin-page__panel" aria-label="User role management">
@@ -517,6 +584,13 @@ export function AdminUsersPage() {
                     disabled={updatingUserId === row.id}
                   >
                     {updatingUserId === row.id ? "Saving…" : "Reset XP"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteUser(row)}
+                    disabled={updatingUserId === row.id}
+                  >
+                    {updatingUserId === row.id ? "Saving…" : "Delete user"}
                   </button>
                   <label htmlFor={`bonus-xp-${row.id}`}>
                     Bonus XP
