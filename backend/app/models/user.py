@@ -13,6 +13,8 @@ class User(SQLModel, table=True):
     hashed_password: str
     role: str = Field(default="student", min_length=3, max_length=20)
     xp: int = Field(default=0, ge=0)
+    pending_bonus_xp: int = Field(default=0, ge=0)
+    pending_bonus_reason: str | None = Field(default=None, min_length=1, max_length=500)
     streak_count: int = Field(default=0, ge=0)
     last_practised_date: date | None = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -32,6 +34,8 @@ class UserTestResult(SQLModel, table=True):
     package_id: str = Field(index=True, min_length=1, max_length=200)
     latest_weighted_score: float = Field(ge=0.0, le=1.0)
     completed: bool = Field(default=False)
+    best_xp_earned: int = Field(default=0, ge=0)
+    difficulty_results_json: str | None = Field(default=None)
     attempt_count: int = Field(default=1, ge=1)
     first_completed_at: datetime | None = Field(default=None)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -76,3 +80,48 @@ class UserXPSpendHistory(SQLModel, table=True):
     failure_reason: str | None = Field(default=None, max_length=500)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AdminAuditLog(SQLModel, table=True):
+    __tablename__ = "admin_audit_log"
+
+    id: int | None = Field(default=None, primary_key=True)
+    actor_user_id: int = Field(foreign_key="user.id", index=True)
+    action: str = Field(min_length=1, max_length=100, index=True)
+    target_user_id: int | None = Field(
+        default=None,
+        foreign_key="user.id",
+        index=True,
+    )
+    package_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        index=True,
+    )
+    details_json: str = Field(default="{}")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+
+
+class SpendHistory(SQLModel, table=True):
+    __tablename__ = "spend_history"
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    action: str = Field(min_length=1, max_length=50, index=True)
+    package_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        index=True,
+    )
+    difficulty: str | None = Field(default=None, max_length=20)
+    cost: int = Field(ge=0)
+    success: bool
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        index=True,
+    )

@@ -9,7 +9,7 @@
   font-family: "Nunito", sans-serif;
   font-size: 2rem;
   font-weight: 800;
-  color: #1e1b4b;
+  color: var(--colour-brand-strong);
   margin: 0 0 0.75rem;
   /* focus-visible ring for keyboard users; suppressed for mouse via :focus-visible */
 }
@@ -19,7 +19,7 @@
 }
 
 .completion-screen__heading:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid var(--colour-focus);
   outline-offset: 4px;
   border-radius: 4px;
 }
@@ -28,7 +28,7 @@
   font-family: "Nunito", sans-serif;
   font-size: 3rem;
   font-weight: 800;
-  color: #4f46e5;
+  color: var(--colour-primary);
   margin: 0 0 0.5rem;
   line-height: 1;
 }
@@ -36,15 +36,15 @@
 .completion-screen__message {
   font-family: "Inter", system-ui, sans-serif;
   font-size: 1.1rem;
-  color: #6b7280;
+  color: var(--colour-text-secondary);
   margin: 0 0 1rem;
 }
 
 .completion-screen__xp {
   display: inline-block;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: var(--colour-streak-zap-bg);
+  color: var(--colour-streak-zap-text);
+  border: 1px solid var(--colour-streak-zap-border);
   border-radius: 999px;
   padding: 0.25rem 0.875rem;
   font-family: "Nunito", sans-serif;
@@ -73,28 +73,28 @@
 }
 
 .completion-screen__btn--primary {
-  background: #4f46e5;
-  color: #ffffff;
-  border-color: #4f46e5;
+  background: var(--colour-primary);
+  color: var(--colour-on-primary);
+  border-color: var(--colour-primary);
 }
 
 .completion-screen__btn--primary:hover {
-  background: #4338ca;
-  border-color: #4338ca;
+  background: var(--colour-primary-hover);
+  border-color: var(--colour-primary-hover);
 }
 
 .completion-screen__btn--ghost {
   background: transparent;
-  color: #374151;
-  border-color: #d1d5db;
+  color: var(--colour-text);
+  border-color: var(--colour-border);
 }
 
 .completion-screen__btn--ghost:hover {
-  border-color: #9ca3af;
+  border-color: var(--colour-border-strong);
 }
 
 .completion-screen__btn:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid var(--colour-focus);
   outline-offset: 2px;
 }
 
@@ -114,18 +114,18 @@
 }
 
 .completion-screen__badge--first {
-  background: #ede9fe;
-  color: #4f46e5;
+  background: var(--colour-badge-first-bg);
+  color: var(--colour-primary);
 }
 
 .completion-screen__badge--reduced {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--colour-badge-reduced-bg);
+  color: var(--colour-text);
 }
 
 .completion-screen__xp-note {
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--colour-text);
   font-style: italic;
   margin-top: 0.5rem;
 }

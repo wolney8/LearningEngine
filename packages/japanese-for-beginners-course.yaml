@@ -1,0 +1,445 @@
+id: japanese-for-beginners-course
+title: 'Japanese for Beginners: A Foundational Course'
+description: An introductory training package for absolute beginners to learn basic
+  Japanese grammar, writing systems, and common phrases.
+version: 1.0.0
+tags:
+- japanese-for-beginners
+- language
+- japanese
+passing_score: 0.8
+pages:
+- id: introduction-to-japanese
+  title: Welcome to Japanese for Beginners!
+  content: 'Welcome to your first step in learning Japanese! This course is designed
+    for absolute beginners, providing you with a foundational understanding of the
+    language.
+
+
+    ## Why Learn Japanese?
+
+    Learning Japanese opens up a world of opportunities:
+
+    *   **Culture:** Dive deep into Japan''s rich history, art, manga, anime, and
+    traditional crafts.
+
+    *   **Travel:** Enhance your experience when visiting Japan, allowing you to connect
+    with locals.
+
+    *   **Career:** Opportunities in international business, translation, and more.
+
+
+    Japanese might seem daunting at first due to its unique writing systems and grammar,
+    but with consistent effort, you''ll be speaking and understanding in no time.
+    Let''s begin our journey!'
+- id: hiragana-introduction
+  title: 'Hiragana: The Foundation'
+  content: 'Japanese has three primary writing systems: Hiragana, Katakana, and Kanji.
+    We''ll start with **Hiragana**, which is the fundamental phonetic alphabet for
+    native Japanese words.
+
+
+    ## What is Hiragana?
+
+    *   **Phonetic:** Each Hiragana character represents a specific sound (usually
+    a consonant-vowel pair, like *ka*, *ki*, *ku*, *ke*, *ko*).
+
+    *   **Native Words:** Primarily used for words of Japanese origin, grammatical
+    particles, and verb/adjective endings.
+
+    *   **First to Learn:** It''s often the first writing system beginners learn because
+    it forms the basis for pronunciation and reading many common words.
+
+
+    Mastering Hiragana is crucial for building a strong foundation in Japanese.'
+- id: hiragana-chart-pronunciation
+  title: Hiragana Chart & Sounds
+  content: 'Here''s a basic Hiragana chart. Each character has a distinct sound.
+
+
+    | a | i | u | e | o |
+
+    |---|---|---|---|---|
+
+    | あ | い | う | え | お |
+
+    | ka | ki | ku | ke | ko |
+
+    | か | き | く | け | こ |
+
+    | sa | shi | su | se | so |
+
+    | さ | し | す | せ | そ |
+
+    | ta | chi | tsu | te | to |
+
+    | た | ち | つ | て | と |
+
+    | na | ni | nu | ne | no |
+
+    | な | に | ぬ | ね | の |
+
+    | ha | hi | fu | he | ho |
+
+    | は | ひ | ふ | へ | ほ |
+
+    | ma | mi | mu | me | mo |
+
+    | ま | み | む | め | も |
+
+    | ya | yu | yo |
+
+    | や | ゆ | よ |
+
+    | ra | ri | ru | re | ro |
+
+    | ら | り | る | れ | ろ |
+
+    | wa | wo |
+
+    | わ | を |
+
+    | n |
+
+    | ん |
+
+
+    ### Basic Pronunciation Tips:
+
+    *   Vowels are generally pronounced clearly and distinctly, similar to Spanish
+    or Italian.
+
+    *   ''A'' is like "ah" in "father".
+
+    *   ''I'' is like "ee" in "meet".
+
+    *   ''U'' is like "oo" in "moon".
+
+    *   ''E'' is like "eh" in "bed".
+
+    *   ''O'' is like "oh" in "boat".
+
+    *   Many sounds are consistent. Practice saying them aloud!'
+- id: katakana-introduction
+  title: 'Katakana: Foreign Words'
+  content: 'The second phonetic script we''ll introduce is **Katakana**. While Hiragana
+    handles native Japanese words, Katakana is primarily used for foreign loanwords.
+
+
+    ## What is Katakana?
+
+    *   **Phonetic:** Like Hiragana, each Katakana character represents a sound.
+
+    *   **Foreign Words:** Used for words borrowed from other languages (e.g., "computer"
+    -> コンピュータ *konpyuuta*).
+
+    *   **Emphasis/Onomatopoeia:** Also used for emphasis, onomatopoeia (sound effects),
+    and sometimes for proper nouns like foreign names or company names.
+
+    *   **Similar Sounds:** The sounds produced by Katakana characters are identical
+    to their Hiragana counterparts. The difference lies in their appearance and usage.
+
+
+    Recognizing Katakana is essential for reading modern Japanese texts and understanding
+    many common terms.'
+- id: katakana-chart-pronunciation
+  title: Katakana Chart & Sounds
+  content: 'Here''s a basic Katakana chart. Notice how the shapes are often more angular
+    compared to the curvier Hiragana.
+
+
+    | a | i | u | e | o |
+
+    |---|---|---|---|---|
+
+    | ア | イ | ウ | エ | オ |
+
+    | ka | ki | ku | ke | ko |
+
+    | カ | キ | ク | ケ | コ |
+
+    | sa | shi | su | se | so |
+
+    | サ | シ | ス | セ | ソ |
+
+    | ta | chi | tsu | te | to |
+
+    | タ | チ | ツ | テ | ト |
+
+    | na | ni | nu | ne | no |
+
+    | ナ | ニ | ヌ | ネ | ノ |
+
+    | ha | hi | fu | he | ho |
+
+    | ハ | ヒ | フ | ヘ | ホ |
+
+    | ma | mi | mu | me | mo |
+
+    | マ | ミ | ム | メ | モ |
+
+    | ya | yu | yo |
+
+    | ヤ | ユ | ヨ |
+
+    | ra | ri | ru | re | ro |
+
+    | ラ | リ | ル | レ | ロ |
+
+    | wa | wo |
+
+    | ワ | ヲ |
+
+    | n |
+
+    | ン |
+
+
+    ### Katakana Usage Example:
+
+    *   "Coffee" in Japanese is コーヒー (*koohii*).
+
+    *   "America" is アメリカ (*amerika*).
+
+    *   "My name is Maria" would be マリアです (*Maria desu*).'
+- id: kanji-introduction
+  title: 'Kanji: Ideas and Meanings'
+  content: 'The third major writing system is **Kanji**, which are logographic characters
+    borrowed from Chinese. Unlike Hiragana and Katakana (which represent sounds),
+    Kanji represent concepts or ideas.
+
+
+    ## What is Kanji?
+
+    *   **Logographic:** Each Kanji character has a meaning, and often multiple readings
+    depending on context.
+
+    *   **Vocabulary:** Used for nouns, verb stems, and adjective stems.
+
+    *   **Complexity:** There are thousands of Kanji, and learning them is a continuous
+    process for Japanese learners.
+
+    *   **Efficiency:** Kanji helps to condense meaning and differentiate homophones
+    in written Japanese.
+
+
+    For beginners, recognizing common Kanji is a good starting point, but don''t feel
+    overwhelmed. You will learn them gradually alongside vocabulary.'
+- id: basic-greetings
+  title: Essential Japanese Greetings
+  content: 'Let''s learn some fundamental greetings to start your conversations in
+    Japanese.
+
+
+    ### Common Greetings:
+
+    *   **こんにちは (Konnichiwa):** "Hello" or "Good afternoon." This is a versatile greeting
+    used broadly during the daytime.
+
+    *   **おはようございます (Ohayō gozaimasu):** "Good morning." Used until around noon, or
+    for the first time you meet someone that day (even in the afternoon).
+
+    *   **こんばんは (Konbanwa):** "Good evening." Used after dusk.
+
+    *   **さようなら (Sayounara):** "Goodbye." This can feel a bit final, so other phrases
+    are often used for temporary goodbyes.
+
+    *   **ありがとう (Arigatou):** "Thank you." (Less formal)
+
+    *   **ありがとうございます (Arigatou gozaimasu):** "Thank you very much." (More formal)
+
+    *   **すみません (Sumimasen):** "Excuse me" or "I''m sorry." Also used to get someone''s
+    attention.
+
+
+    Practice these phrases to make them second nature!'
+- id: self-introduction
+  title: Introducing Yourself
+  content: 'After greetings, the next step is often introducing yourself. Here are
+    some basic phrases.
+
+
+    ### Self-Introduction (Jikoshoukai):
+
+    *   **はじめまして (Hajimemashite):** "Nice to meet you (for the first time)." This
+    is crucial when meeting someone new.
+
+    *   **[Your Name] です ([Your Name] desu):** "I am [Your Name]." (e.g., マリアです -
+    *Maria desu*)
+
+    *   **どうぞよろしくおねがいします (Doumo yoroshiku onegaishimasu):** "Pleased to make your
+    acquaintance." (Very common and polite closing for self-introductions). This conveys
+    a sense of wishing for a good relationship with the person.
+
+
+    **Example:**
+
+    "Hajimemashite. Maria desu. Doumo yoroshiku onegaishimasu."
+
+    (Nice to meet you. I am Maria. Pleased to make your acquaintance.)'
+- id: basic-sentence-structure
+  title: Understanding Japanese Sentence Structure
+  content: "Unlike English (Subject-Verb-Object or SVO), Japanese typically follows\
+    \ a **Subject-Object-Verb (SOV)** structure.\n\n## SOV Structure:\n*   **Subject:**\
+    \ Who or what is performing the action.\n*   **Object:** Who or what is receiving\
+    \ the action.\n*   **Verb:** The action itself.\n\nParticles are small words that\
+    \ follow nouns to indicate their grammatical function (subject, object, location,\
+    \ etc.).\n\n### Key Particles:\n*   **は (wa):** Marks the topic of the sentence\
+    \ (often the subject).\n*   **を (o):** Marks the direct object.\n*   **が (ga):**\
+    \ Marks the grammatical subject (when not the topic).\n\n### Examples:\n*   **わたし\
+    \ は りんご を たべます。**\n        *   Watashi **wa** ringo **o** tabemasu.\n        *\
+    \   (I) (topic) (apple) (object) (eat)\n        *   *Meaning: I eat an apple.*\n\
+    \n*   **マリア さん は コーヒー を のみます。**\n        *   Maria-san **wa** koohii **o** nomimasu.\n\
+    \        *   (Maria-san) (topic) (coffee) (object) (drink)\n        *   *Meaning:\
+    \ Maria drinks coffee.*\n\nUnderstanding SOV is fundamental to forming correct\
+    \ Japanese sentences."
+- id: common-phrases-travel
+  title: Useful Phrases for Travel and Daily Life
+  content: 'Here are a few more practical phrases for everyday situations.
+
+
+    ### Useful Phrases:
+
+    *   **すみません (Sumimasen):** "Excuse me" (to get attention, apologize), "I''m sorry."
+
+    *   **ごめんなさい (Gomen nasai):** "I''m sorry." (More direct apology than *sumimasen*).
+
+    *   **お願いします (Onegai shimasu):** "Please" or "I request." Used when asking for
+    a favor or ordering something. (e.g., コーヒーをお願いします - *Koohii o onegai shimasu*
+    - "Coffee, please.")
+
+    *   **はい (Hai):** "Yes."
+
+    *   **いいえ (Iie):** "No."
+
+    *   **これ は いくら です か (Kore wa ikura desu ka?):** "How much is this?" (Literally:
+    This is how much is it?)
+
+
+    These phrases, combined with your greetings and self-introduction, will greatly
+    help you navigate basic interactions.'
+questions:
+- id: q1-writing-systems-count
+  difficulty: easy
+  text: How many primary writing systems does the Japanese language use?
+  answers:
+  - id: q1-a1
+    text: One
+  - id: q1-a2
+    text: Two
+  - id: q1-a3
+    text: Three
+  - id: q1-a4
+    text: Four
+  correct_answer: q1-a3
+  weight: 50.0
+  feedback: Japanese uses Hiragana, Katakana, and Kanji.
+  revision_page_ids:
+  - hiragana-introduction
+  - katakana-introduction
+  - kanji-introduction
+- id: q2-hiragana-purpose
+  difficulty: easy
+  text: Which Japanese writing system is primarily used for native Japanese words
+    and grammatical particles?
+  answers:
+  - id: q2-a1
+    text: Katakana
+  - id: q2-a2
+    text: Kanji
+  - id: q2-a3
+    text: Hiragana
+  - id: q2-a4
+    text: Romaji
+  correct_answer: q2-a3
+  weight: 50.0
+  feedback: Hiragana is the phonetic script for native Japanese words and grammar.
+  revision_page_ids:
+  - hiragana-introduction
+  - hiragana-chart-pronunciation
+- id: q3-hiragana-katakana-importance
+  difficulty: normal
+  text: Why is it important for a beginner to learn both Hiragana and Katakana?
+  answers:
+  - id: q3-a1
+    text: Because they have completely different pronunciations.
+  - id: q3-a2
+    text: Because Hiragana is for formal writing and Katakana is for informal writing.
+  - id: q3-a3
+    text: Because Hiragana is for native Japanese words and particles, while Katakana
+      is for foreign loanwords and emphasis.
+  - id: q3-a4
+    text: Because Kanji characters are optional and can be replaced by either Hiragana
+      or Katakana.
+  correct_answer: q3-a3
+  weight: 100.0
+  feedback: While their sounds are the same, their functions are distinct and essential
+    for reading different types of words.
+  revision_page_ids:
+  - hiragana-introduction
+  - katakana-introduction
+- id: q4-sentence-structure
+  difficulty: hard
+  text: Choose the correct Japanese sentence structure for "I drink water."
+  answers:
+  - id: q4-a1
+    text: わたし を みず は のみます。 (Watashi o mizu wa nomimasu.)
+  - id: q4-a2
+    text: みず は わたし を のみます。 (Mizu wa watashi o nomimasu.)
+  - id: q4-a3
+    text: わたし は みず を のみます。 (Watashi wa mizu o nomimasu.)
+  - id: q4-a4
+    text: のみます わたし は みず を。 (Nomimasu watashi wa mizu o.)
+  correct_answer: q4-a3
+  weight: 100.0
+  feedback: Japanese follows a Subject-Object-Verb (SOV) structure with particles
+    marking roles. "Watashi (I) WA (topic) mizu (water) O (object) nomimasu (drink)."
+  revision_page_ids:
+  - basic-sentence-structure
+- id: q5-gratitude-nuance
+  difficulty: expert
+  text: While "arigatou" is a common way to say thank you, describe a situation where
+    a more formal or specific expression of gratitude would be appropriate, and provide
+    an example.
+  answers:
+  - id: q5-a1
+    text: '"Arigatou" is always appropriate. There''s no need for more formal expressions.'
+  - id: q5-a2
+    text: When receiving a small favor from a close friend, you'd use "doumo arigatou."
+  - id: q5-a3
+    text: When receiving significant help or a gift from a superior, "arigatou gozaimasu"
+      or "hontouni arigatou gozaimasu" (thank you very much) is more appropriate to
+      convey deeper respect and appreciation.
+  - id: q5-a4
+    text: Only professional settings require formal gratitude; casual "arigatou" is
+      fine elsewhere.
+  correct_answer: q5-a3
+  weight: 50.0
+  feedback: Japanese culture emphasizes formality and respect, especially towards
+    superiors or when receiving significant gestures. "Arigatou gozaimasu" shows greater
+    deference.
+  revision_page_ids:
+  - basic-greetings
+  - common-phrases-travel
+- id: q6-hajimemashite-response
+  difficulty: expert
+  text: If you hear someone say "はじめまして (Hajimemashite)" to you, what is the most
+    appropriate and common response to reciprocate, and why?
+  answers:
+  - id: q6-a1
+    text: Simply smile and nod; no verbal response is needed.
+  - id: q6-a2
+    text: You should say "Konbanwa" (Good evening) regardless of the time of day.
+  - id: q6-a3
+    text: You should also say "Hajimemashite" back, potentially followed by your name
+      and "doumo yoroshiku onegaishimasu," as it initiates a polite introduction and
+      expresses a wish for a good relationship.
+  - id: q6-a4
+    text: Ask them "O-genki desu ka?" (How are you?) immediately.
+  correct_answer: q6-a3
+  weight: 50.0
+  feedback: Reciprocating "Hajimemashite" is polite, and adding "doumo yoroshiku onegaishimasu"
+    expresses goodwill and the desire for a positive interaction, which is customary
+    in Japanese introductions.
+  revision_page_ids:
+  - self-introduction

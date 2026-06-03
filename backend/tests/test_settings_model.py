@@ -45,6 +45,11 @@ def test_game_settings_model_parses_valid_payload() -> None:
     assert settings.xp.attempt_multipliers == {1: 1.0, 2: 0.5, 3: 0.25}
     assert settings.xp.base_xp_per_level == 500
     assert settings.difficulty.seconds_per_question.expert == 10
+    assert settings.celebration_effects.enabled is False
+    assert settings.celebration_effects.confetti_on_pass is True
+    assert settings.celebration_effects.confetti_on_bonus_xp_gain is True
+    assert settings.celebration_effects.lightning_on_streak_milestones is True
+    assert settings.celebration_effects.respect_reduced_motion is True
 
 
 def test_game_settings_rejects_unknown_fields() -> None:
@@ -174,6 +179,40 @@ def test_game_settings_spend_economy_rejects_negative_cost() -> None:
             "increase_difficulty_cap": 200,
             "unlock_hidden_package": 250,
         },
+    }
+
+    with pytest.raises(ValidationError):
+        GameSettings.model_validate(payload)
+
+
+def test_game_settings_celebration_effects_accepts_override_values() -> None:
+    payload = _valid_settings_dict()
+    payload["celebration_effects"] = {
+        "enabled": True,
+        "confetti_on_pass": False,
+        "confetti_on_bonus_xp_gain": True,
+        "lightning_on_streak_milestones": False,
+        "respect_reduced_motion": True,
+    }
+
+    settings = GameSettings.model_validate(payload)
+
+    assert settings.celebration_effects.enabled is True
+    assert settings.celebration_effects.confetti_on_pass is False
+    assert settings.celebration_effects.confetti_on_bonus_xp_gain is True
+    assert settings.celebration_effects.lightning_on_streak_milestones is False
+    assert settings.celebration_effects.respect_reduced_motion is True
+
+
+def test_game_settings_celebration_effects_rejects_unknown_fields() -> None:
+    payload = _valid_settings_dict()
+    payload["celebration_effects"] = {
+        "enabled": True,
+        "confetti_on_pass": True,
+        "confetti_on_bonus_xp_gain": True,
+        "lightning_on_streak_milestones": True,
+        "respect_reduced_motion": True,
+        "sparkle_mode": True,
     }
 
     with pytest.raises(ValidationError):

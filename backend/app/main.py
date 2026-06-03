@@ -13,8 +13,11 @@ from app.routers.settings import router as settings_router
 from app.routers.users import router as users_router
 from app.services.db import init_db
 from app.services.overrides_loader import load_package_overrides
-from app.services.package_loader import load_packages
-from app.services.refresh_metadata_loader import load_refresh_metadata
+from app.services.package_loader import PACKAGES_DIR, load_packages
+from app.services.refresh_metadata_loader import (
+    ensure_package_metadata_records,
+    load_refresh_metadata,
+)
 from app.services.settings_loader import load_settings
 
 load_dotenv(override=True)
@@ -34,7 +37,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.settings = load_settings()
     app.state.packages = load_packages()
     app.state.package_overrides = load_package_overrides()
-    app.state.refresh_metadata = load_refresh_metadata()
+    app.state.refresh_metadata = ensure_package_metadata_records(
+        app.state.packages,
+        load_refresh_metadata(),
+        PACKAGES_DIR,
+    )
     yield
     logger.info("shutdown")
 

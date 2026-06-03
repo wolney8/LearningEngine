@@ -10,17 +10,17 @@
 .level-up-overlay__scrim {
   position: absolute;
   inset: 0;
-  background: rgb(15 23 42 / 0.56);
+  background: var(--colour-overlay-scrim);
 }
 
 .level-up-overlay__dialog {
   position: relative;
   width: min(32rem, 100%);
   margin: 0;
-  border: 1px solid #c7d2fe;
+  border: 1px solid var(--colour-levelup-border);
   border-radius: 1rem;
-  background: radial-gradient(circle at top, #eef2ff 0%, #ffffff 70%);
-  box-shadow: 0 24px 50px rgb(15 23 42 / 0.25);
+  background: var(--colour-levelup-bg);
+  box-shadow: var(--colour-shadow-strong);
   padding: 1.4rem 1.3rem;
   display: grid;
   gap: 0.75rem;
@@ -30,7 +30,7 @@
 
 .level-up-overlay__eyebrow {
   margin: 0;
-  color: #0284c7;
+  color: var(--colour-levelup-eyebrow);
   font-family: "Inter", sans-serif;
   font-size: 0.8rem;
   font-weight: 700;
@@ -40,7 +40,7 @@
 
 .level-up-overlay__dialog h2 {
   margin: 0;
-  color: #1e1b4b;
+  color: var(--colour-brand-strong);
   font-family: "Nunito", sans-serif;
   font-size: 1.6rem;
   font-weight: 800;
@@ -49,7 +49,7 @@
 
 .level-up-overlay__dialog p {
   margin: 0;
-  color: #334155;
+  color: var(--colour-text-secondary);
   font-family: "Inter", sans-serif;
   font-size: 0.98rem;
 }
@@ -60,8 +60,8 @@
   justify-self: start;
   border: none;
   border-radius: 9999px;
-  background: #312e81;
-  color: #ffffff;
+  background: var(--colour-brand);
+  color: var(--colour-on-primary);
   font-family: "Nunito", sans-serif;
   font-size: 1rem;
   font-weight: 800;
@@ -69,7 +69,7 @@
 }
 
 .level-up-overlay__cta:focus-visible {
-  outline: 3px solid #38bdf8;
+  outline: 3px solid var(--colour-focus-strong);
   outline-offset: 2px;
 }
 

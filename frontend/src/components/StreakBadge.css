@@ -1,4 +1,6 @@
 .streak-badge {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -10,17 +12,60 @@
 }
 
 .streak-badge--zap {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
+  background: var(--colour-streak-zap-bg);
+  color: var(--colour-streak-zap-text);
+  border: 1px solid var(--colour-streak-zap-border);
 }
 
 .streak-badge--flame {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
+  background: var(--colour-streak-flame-bg);
+  color: var(--colour-streak-flame-text);
+  border: 1px solid var(--colour-streak-flame-border);
+}
+
+.streak-badge__lightning {
+  position: absolute;
+  inset: -30% -12%;
+  opacity: 0;
+  pointer-events: none;
+  background: var(--colour-streak-lightning-sheen), var(--colour-streak-lightning-glow);
+}
+
+.streak-badge--lightning {
+  box-shadow: var(--colour-streak-lightning-ring);
+}
+
+.streak-badge--lightning .streak-badge__lightning {
+  animation: streak-lightning 640ms ease-out;
 }
 
 .streak-badge__count {
   font-variant-numeric: tabular-nums;
+}
+
+@keyframes streak-lightning {
+  0% {
+    opacity: 0;
+    transform: translateX(-40%) skewX(-16deg);
+  }
+
+  30% {
+    opacity: 0.96;
+    transform: translateX(-8%) skewX(-14deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(42%) skewX(-10deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streak-badge--lightning {
+    box-shadow: none;
+  }
+
+  .streak-badge--lightning .streak-badge__lightning {
+    animation: none;
+  }
 }

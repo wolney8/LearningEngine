@@ -43,6 +43,23 @@ export const DEFAULT_SETTINGS: Settings = {
     provider: "gemini",
     model: "gemini-2.0-flash-exp",
   },
+  spend_economy: {
+    enabled: false,
+    allow_non_admin_ai_generation_spend: false,
+    costs: {
+      generate_ai_course: 500,
+      refresh_stale_course: 300,
+      increase_difficulty_cap: 200,
+      unlock_hidden_package: 250,
+    },
+  },
+  celebration_effects: {
+    enabled: false,
+    confetti_on_pass: true,
+    confetti_on_bonus_xp_gain: true,
+    lightning_on_streak_milestones: true,
+    respect_reduced_motion: true,
+  },
 };
 
 let cachedSettings: Settings | null = null;

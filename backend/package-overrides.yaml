@@ -1,8 +1,18 @@
 version: 1
 packages:
   phishing-and-email-security:
+    availability: null
     enabled: true
     xp_threshold: null
   sample-demo:
-    enabled: false
+    availability: available
+    enabled: null
+    xp_threshold: null
+  music-theory-fundamentals-training:
+    availability: null
+    enabled: null
+    xp_threshold: 0
+  italian-language-basics:
+    availability: null
+    enabled: null
     xp_threshold: null

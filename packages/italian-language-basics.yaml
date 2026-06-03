@@ -1,0 +1,369 @@
+id: italian-language-basics
+title: Italian Language Basics
+description: This training package provides an introduction to the Italian language
+  for general learners, covering essential greetings, numbers, basic vocabulary, and
+  simple sentence structures.
+version: 1.0.0
+tags:
+- italian
+passing_score: 0.8
+pages:
+- id: benvenuto-in-italiano
+  title: Benvenuto in Italiano! (Welcome to Italian!)
+  content: '# Benvenuto in Italiano! 👋
+
+
+    Italian is a beautiful Romance language spoken by millions worldwide. Let''s start
+    with some fundamental greetings and polite phrases.
+
+
+    ## Basic Greetings
+
+
+    *   **Ciao** (chee-ow): Hello/Hi (informal, used for both greeting and farewell)
+
+    *   **Buongiorno** (bwohn-jor-noh): Good morning/Good day
+
+    *   **Buonasera** (bwohn-ah-seh-rah): Good evening
+
+    *   **Buonanotte** (bwohn-ah-not-teh): Good night (used when going to bed or leaving
+    late at night)
+
+    *   **Arrivederci** (ah-ree-veh-der-chee): Goodbye (formal/standard)
+
+
+    ## Polite Phrases
+
+
+    *   **Per favore** (pehr fah-voh-reh): Please
+
+    *   **Grazie** (grah-tsee-eh): Thank you
+
+    *   **Prego** (preh-goh): You''re welcome (also means ''please come in'' or ''I
+    beg you'')
+
+    *   **Scusa** (skoo-zah): Excuse me/Sorry (informal)
+
+    *   **Scusi** (skoo-zee): Excuse me/Sorry (formal)
+
+
+    ## Simple Questions and Responses
+
+
+    *   **Come stai?** (koh-meh sty): How are you? (informal)
+
+    *   **Come sta?** (koh-meh stah): How are you? (formal)
+
+    *   **Sto bene, grazie.** (stoh beh-neh, grah-tsee-eh): I''m fine, thank you.
+
+    *   **E tu?** (eh too): And you? (informal)
+
+    *   **E Lei?** (eh ley): And you? (formal)
+
+
+    ### Example Dialogue:
+
+
+    **Anna:** Ciao, Marco! Come stai?
+
+    **Marco:** Sto bene, grazie! E tu?
+
+    **Anna:** Sto bene anch''io (me too). Arrivederci!
+
+    **Marco:** Ciao!
+
+    '
+- id: numeri-e-colori
+  title: Numeri e Colori (Numbers and Colors)
+  content: '# Numeri e Colori 🔢🌈
+
+
+    Learning numbers and colors is crucial for basic descriptions and transactions.
+    Here are the first ten numbers and some common colors.
+
+
+    ## Numbers 1-10
+
+
+    *   **1 - uno** (oo-noh)
+
+    *   **2 - due** (doo-eh)
+
+    *   **3 - tre** (treh)
+
+    *   **4 - quattro** (kwah-troh)
+
+    *   **5 - cinque** (cheen-kweh)
+
+    *   **6 - sei** (seh-ee)
+
+    *   **7 - sette** (set-teh)
+
+    *   **8 - otto** (ot-toh)
+
+    *   **9 - nove** (noh-veh)
+
+    *   **10 - dieci** (dee-eh-chee)
+
+
+    ### Tip:
+
+    Notice that ''uno'' changes to ''un'' before a masculine noun starting with a
+    consonant, and ''una'' before a feminine noun. E.g., _un libro_ (a book), _una
+    mela_ (an apple).
+
+
+    ## Basic Colors
+
+
+    *   **Rosso** (ross-soh): Red
+
+    *   **Blu** (bloo): Blue
+
+    *   **Verde** (ver-deh): Green
+
+    *   **Giallo** (jahl-loh): Yellow
+
+    *   **Nero** (neh-roh): Black
+
+    *   **Bianco** (bee-ahn-koh): White
+
+
+    ### Example:
+
+
+    *   *La mela è rossa.* (The apple is red.)
+
+    *   *Il cielo è blu.* (The sky is blue.)
+
+    *   *Ho due libri.* (I have two books.)
+
+    '
+- id: nomi-e-verbi-base
+  title: Nomi e Verbi Base (Basic Nouns and Verbs)
+  content: '# Nomi e Verbi Base 📚🗣️
+
+
+    Let''s learn some common nouns and the conjugations of two of the most important
+    Italian verbs: *essere* (to be) and *avere* (to have).
+
+
+    ## Common Nouns
+
+
+    Italian nouns have gender (masculine or feminine) and number (singular or plural).
+    Generally, nouns ending in -o are masculine, and nouns ending in -a are feminine.
+
+
+    *   **Uomo** (woh-moh): Man
+
+    *   **Donna** (don-nah): Woman
+
+    *   **Ragazzo** (rah-gah-tsoh): Boy
+
+    *   **Ragazza** (rah-gah-tsah): Girl
+
+    *   **Casa** (kah-zah): House
+
+    *   **Libro** (lee-broh): Book
+
+
+    ### Example:
+
+
+    *   *Un ragazzo e una ragazza.* (A boy and a girl.)
+
+    *   *Una casa grande.* (A big house.)
+
+
+    ## The Verb ''Essere'' (To Be)
+
+
+    | Pronoun | Essere (To Be) |
+
+    | :------ | :------------- |
+
+    | Io      | sono (I am)    |
+
+    | Tu      | sei (You are)  |
+
+    | Lui/Lei | è (He/She is)  |
+
+    | Noi     | siamo (We are) |
+
+    | Voi     | siete (You are)|
+
+    | Loro    | sono (They are)|
+
+
+    ### Example:
+
+
+    *   *Io sono uno studente.* (I am a student.)
+
+    *   *Lei è italiana.* (She is Italian.)
+
+
+    ## The Verb ''Avere'' (To Have)
+
+
+    | Pronoun | Avere (To Have) |
+
+    | :------ | :-------------- |
+
+    | Io      | ho (I have)     |
+
+    | Tu      | hai (You have)  |
+
+    | Lui/Lei | ha (He/She has) |
+
+    | Noi     | abbiamo (We have)|
+
+    | Voi     | avete (You have)|
+
+    | Loro    | hanno (They have)|
+
+
+    ### Example:
+
+
+    *   *Io ho un libro.* (I have a book.)
+
+    *   *Lui ha fame.* (He is hungry - literally ''he has hunger'').
+
+    '
+- id: frasi-semplici-e-domande
+  title: Frasi Semplici e Domande (Simple Sentences and Questions)
+  content: "# Frasi Semplici e Domande \U0001F4AC❓\n\nNow let's put words together\
+    \ to form simple sentences and ask questions.\n\n## Basic Sentence Structure\n\
+    \nThe most common Italian sentence structure is Subject + Verb + Object, similar\
+    \ to English.\n\n*   **Io mangio una mela.** (I eat an apple.)\n    *   *Io* (Subject)\
+    \ - *mangio* (Verb) - *una mela* (Object)\n*   **Tu leggi un libro.** (You read\
+    \ a book.)\n\n## Negation\n\nTo make a sentence negative, place **non** directly\
+    \ before the conjugated verb.\n\n*   **Io non sono italiano.** (I am not Italian.)\n\
+    *   **Lui non ha una macchina.** (He does not have a car.)\n\n## Asking Questions\n\
+    \nYou can often turn a statement into a question by simply raising your voice\
+    \ at the end. For specific information, use interrogative words:\n\n*   **Dove?**\
+    \ (doh-veh): Where?\n    *   *Dove sei?* (Where are you?)\n*   **Cosa?** (koh-zah):\
+    \ What?\n    *   *Cosa mangi?* (What are you eating?)\n*   **Chi?** (kee): Who?\n\
+    \    *   *Chi è?* (Who is it?)\n*   **Come?** (koh-meh): How?\n    *   *Come ti\
+    \ chiami?* (What is your name? - literally 'How do you call yourself?')\n\n###\
+    \ Example Dialogue:\n\n**Paolo:** Dove vai? (Where are you going?)\n**Laura:**\
+    \ Vado a casa. (I'm going home.)\n**Paolo:** Cosa fai stasera? (What are you doing\
+    \ tonight?)\n**Laura:** Non faccio niente. (I'm not doing anything.)\n"
+questions:
+- id: q-hello-informal
+  difficulty: easy
+  text: How do you say 'Hello' in informal Italian, which can also be used for 'Goodbye'?
+  answers:
+  - id: a-q1-ciao
+    text: Ciao
+  - id: a-q1-buongiorno
+    text: Buongiorno
+  - id: a-q1-arrivederci
+    text: Arrivederci
+  - id: a-q1-grazie
+    text: Grazie
+  correct_answer: a-q1-ciao
+  weight: 100.0
+  feedback: ' ''Ciao'' is the versatile informal greeting and farewell. ''Buongiorno''
+    means ''good day'' and ''Arrivederci'' is a formal goodbye.'
+  revision_page_ids:
+  - benvenuto-in-italiano
+- id: q-number-three
+  difficulty: normal
+  text: What is the correct Italian word for the number 'three'?
+  answers:
+  - id: a-q2-uno
+    text: uno
+  - id: a-q2-due
+    text: due
+  - id: a-q2-tre
+    text: tre
+  - id: a-q2-quattro
+    text: quattro
+  correct_answer: a-q2-tre
+  weight: 100.0
+  feedback: ' ''Tre'' is the Italian word for the number three. ''Uno'' is one, ''due''
+    is two, and ''quattro'' is four.'
+  revision_page_ids:
+  - numeri-e-colori
+- id: q-essere-lui
+  difficulty: hard
+  text: Choose the correct conjugation of the verb 'essere' (to be) for the pronoun
+    'Lui' (He).
+  answers:
+  - id: a-q3-sono
+    text: sono
+  - id: a-q3-sei
+    text: sei
+  - id: a-q3-e
+    text: è
+  - id: a-q3-siamo
+    text: siamo
+  correct_answer: a-q3-e
+  weight: 100.0
+  feedback: The correct conjugation for 'Lui' (He) or 'Lei' (She) with 'essere' is
+    'è'. 'Sono' is for 'Io' or 'Loro', 'sei' is for 'Tu', and 'siamo' is for 'Noi'.
+  revision_page_ids:
+  - nomi-e-verbi-base
+- id: q-where-is-book
+  difficulty: expert
+  text: Translate the sentence 'Where is the book?' into Italian.
+  answers:
+  - id: a-q4-dove-e-il-libro
+    text: Dove è il libro?
+  - id: a-q4-cosa-e-il-libro
+    text: Cosa è il libro?
+  - id: a-q4-chi-e-il-libro
+    text: Chi è il libro?
+  - id: a-q4-il-libro-dove-e
+    text: Il libro dove è?
+  correct_answer: a-q4-dove-e-il-libro
+  weight: 33.33
+  feedback: ' ''Dove'' means ''where''. The standard structure for questions often
+    places the interrogative word first, followed by the verb and then the subject/object.
+    ''Dove è il libro?'' (or Dov''è il libro?) is correct.'
+  revision_page_ids:
+  - frasi-semplici-e-domande
+- id: q-negate-io-sono-felice
+  difficulty: expert
+  text: Which of the following sentences correctly negates 'Io sono felice' (I am
+    happy)?
+  answers:
+  - id: a-q5-io-non-sono-felice
+    text: Io non sono felice.
+  - id: a-q5-io-sono-non-felice
+    text: Io sono non felice.
+  - id: a-q5-non-io-sono-felice
+    text: Non io sono felice.
+  - id: a-q5-felice-non-sono-io
+    text: Felice non sono io.
+  correct_answer: a-q5-io-non-sono-felice
+  weight: 33.33
+  feedback: To negate a sentence in Italian, the word 'non' is placed directly before
+    the conjugated verb. Therefore, 'Io non sono felice' is the correct negation.
+  revision_page_ids:
+  - frasi-semplici-e-domande
+- id: q-what-is-your-name
+  difficulty: expert
+  text: You meet someone new and want to ask 'What is your name?' (informal). Which
+    is the most appropriate phrase?
+  answers:
+  - id: a-q6-come-stai
+    text: Come stai?
+  - id: a-q6-come-ti-chiami
+    text: Come ti chiami?
+  - id: a-q6-chi-sei
+    text: Chi sei?
+  - id: a-q6-cosa-fai
+    text: Cosa fai?
+  correct_answer: a-q6-come-ti-chiami
+  weight: 33.34
+  feedback: ' ''Come ti chiami?'' literally translates to ''How do you call yourself?''
+    and is the standard informal way to ask ''What is your name?'' ''Come stai?''
+    means ''How are you?'', ''Chi sei?'' means ''Who are you?'', and ''Cosa fai?''
+    means ''What are you doing?''.'
+  revision_page_ids:
+  - benvenuto-in-italiano
+  - frasi-semplici-e-domande

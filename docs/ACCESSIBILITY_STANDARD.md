@@ -1,54 +1,56 @@
-This document defines the accessibility standard for the Local Learning Engine. All frontend work must meet this standard before a phase is closed.
+This document defines the accessibility standard for the Local Learning Engine. All frontend work should meet this standard before review is treated as complete.
 
 # Accessibility Standard
 
 ## 1. Compliance Target
 
-The mandatory baseline for the Local Learning Engine is **WCAG 2.2 Level AA**. As a study application, particular emphasis must be placed on cognitive accessibility, form operability, clear navigation, and focus management to ensure a distraction-free and inclusive learning experience.
+The mandatory baseline for the Local Learning Engine is **WCAG 2.2 Level AA**. As a study application, particular emphasis should be placed on cognitive accessibility, form operability, clear navigation, and focus management.
 
 ## 2. POUR Implementation Notes
 
-- **Perceivable**: All learning materials (images, diagrams, code blocks) must have text alternatives or descriptive captions.
-- **Operable**: Test forms and question navigation must be completely keyboard accessible without requiring a mouse. No strict time limits on tests unless explicitly configured by the user.
-- **Understandable**: Consistent placement of the "Next Question" and "Submit Test" buttons. Clear error identification if a question is skipped or invalid.
-- **Robust**: Custom quiz components (e.g. drag-and-drop ordering, select-all-that-apply) must use appropriate ARIA roles and maintain correct state properties.
+- **Perceivable**: Learning materials such as images, diagrams, and code blocks should have text alternatives or descriptive captions.
+- **Operable**: Lesson and test flows should be keyboard accessible without requiring a mouse.
+- **Understandable**: Navigation, state changes, and errors should be clear and consistent.
+- **Robust**: Custom interactive components should use appropriate semantics and maintain correct state.
 
 ## 3. WCAG 2.2 Application
 
-- **SC 2.4.11 Focus Not Obscured (Minimum)**: Sticky headers or fixed test-progress bars must not visually hide the currently focused answer or question text.
-- **SC 2.5.7 Dragging Movements**: Any drag-and-drop matching interfaces must include a single-pointer alternative (e.g. tap to select, tap to assign).
-- **SC 2.5.8 Target Size (Minimum)**: All interactive targets (answer checkboxes, progression buttons) must have a footprint of at least 24×24 CSS pixels.
-- **SC 3.3.7 Redundant Entry**: Users must not be asked to re-enter information (e.g. student name or test settings) during a single learning session.
-- **SC 3.3.8 Accessible Authentication**: If a login is ever required, it must support password managers and must not rely on cognitive function tests.
+- **SC 2.4.11 Focus Not Obscured (Minimum)**: Sticky headers or fixed progress UI must not hide the currently focused content.
+- **SC 2.5.7 Dragging Movements**: Any drag-and-drop interaction should include a single-pointer alternative.
+- **SC 2.5.8 Target Size (Minimum)**: Interactive targets should be at least 24×24 CSS pixels.
+- **SC 3.3.7 Redundant Entry**: Users should not have to re-enter information unnecessarily during a flow.
+- **SC 3.3.8 Accessible Authentication**: Authentication should support password managers and avoid cognitive challenge patterns.
 
 ## 4. Focus Management Rules
 
-- **View Transitions**: When transitioning from Learning Mode to Test Mode, or when proceeding to the next question, keyboard focus must reset to the top of the new content area (e.g. the `<h1>` of the question).
-- Focus indicators must be highly visible and exceed the default browser styling (e.g. a 2px solid ring with a 2px offset).
+- When changing views or major content regions, focus should move predictably to the new primary content.
+- Focus indicators should be clearly visible.
 
 ## 5. Colour Contrast Requirements
 
-- **Normal Text (≤ 18pt or 14pt bold)**: Minimum 4.5:1 ratio against the background.
-- **Large Text (≥ 18pt or 14pt bold) and Essential UI (form inputs, focus rings)**: Minimum 3:1 ratio.
-- Answer states (correct/incorrect) must not rely solely on colour; always pair colour changes with an icon or explicit text label.
+- **Normal text**: minimum 4.5:1 contrast ratio
+- **Large text and essential UI**: minimum 3:1 contrast ratio
+- Correct and incorrect states must not rely only on colour
 
 ## 6. Keyboard Navigation
 
-- The question navigator must function logically using `Tab` (forward) and `Shift + Tab` (backward).
-- Answer selection (multiple choice) must support `Arrow` keys for radio button groups and `Space` to toggle checkboxes.
-- Global shortcuts (e.g. `Cmd/Ctrl + Enter` to submit) should be provided but must be documented clearly in the UI.
+- Primary actions should be reachable and operable with the keyboard.
+- Question and answer interactions should remain navigable without pointer-only behaviour.
+- Keyboard shortcuts, if present, should be documented in the UI.
 
 ## 7. Screen Reader Support
 
-- Minimum tested targets: **VoiceOver** (macOS/iOS) and **NVDA** (Windows).
-- Live regions (`aria-live="polite"`) must announce test feedback, score changes, or timer warnings without stealing focus.
+- Minimum intended targets: **VoiceOver** and **NVDA**
+- Live regions should announce important state changes without stealing focus
 
-## 8. Review Gate
+## 8. Review Expectations
 
-- An accessibility review is required before merging any PR that introduces or modifies interactive UI components, test forms, or layout structures.
-- Both an automated pass (e.g. axe-core) and a manual keyboard/screen reader check are required to pass.
+- Any change that affects interactive UI, navigation, or layout should receive an accessibility review.
+- Automated checks such as axe-core help, but they do not replace manual keyboard review.
 
 ## Design Tokens
+
+The legacy token tables below remain useful as a reference set. Treat them as guidance unless superseded by active frontend styles or newer design-token work.
 
 ### Colour Palette
 
@@ -92,15 +94,6 @@ The mandatory baseline for the Local Learning Engine is **WCAG 2.2 Level AA**. A
 | Error          | `--col-error`          | `#FF5630` | 5.5:1 on #1E1E1E ✓      |
 | Info           | `--col-info`           | `#4C9AFF` | 5.6:1 on #1E1E1E ✓      |
 
-#### Answer States
-
-| State      | Token                | Behaviour                                                       |
-| ---------- | -------------------- | --------------------------------------------------------------- |
-| Unanswered | `--state-unanswered` | Standard border, standard background                            |
-| Selected   | `--state-selected`   | Border: `--col-primary`; background: 8% opacity tint of primary |
-| Correct    | `--state-correct`    | Border and text: `--col-success`; requires checkmark icon       |
-| Incorrect  | `--state-incorrect`  | Border and text: `--col-error`; requires cross icon             |
-
 ### Typography
 
 | Role             | Font family               | Size       | Weight | Line height |
@@ -112,58 +105,12 @@ The mandatory baseline for the Local Learning Engine is **WCAG 2.2 Level AA**. A
 | Small / Caption  | `system-ui, sans-serif`   | `0.875rem` | `400`  | `1.4`       |
 | Code / Monospace | `ui-monospace, monospace` | `0.875rem` | `400`  | `1.5`       |
 
-### Spacing Scale (8 pt grid)
-
-`--space-xs: 4px` · `--space-sm: 8px` · `--space-md: 16px` · `--space-lg: 24px` · `--space-xl: 32px` · `--space-2xl: 48px` · `--space-3xl: 64px` · `--space-4xl: 96px`
-
-### Border Radius
-
-| Scale                      | Token           | Value    |
-| -------------------------- | --------------- | -------- |
-| Small (inputs, checkboxes) | `--radius-sm`   | `4px`    |
-| Medium (cards, modals)     | `--radius-md`   | `8px`    |
-| Full (pills, badges)       | `--radius-full` | `9999px` |
-
-### Interactive Targets
-
-- Minimum: 24×24 CSS pixels (WCAG 2.5.8 AA)
-- Recommended for buttons: 44px height for touch support
-
 ### Motion
 
-All animations must respect `prefers-reduced-motion`:
-
-```css
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-```
+All animations should respect `prefers-reduced-motion`.
 
 ## Voice and Tone
 
-### UI Copy
-
-- Professional, clear, and encouraging. Use British English spelling throughout.
-- CTAs use explicit verbs: "Submit answer", "Next question", "End test" — not "Proceed" or "OK".
-- Favour short, declarative sentences.
-
-### Error Messages
-
-- State what happened, why, and how to resolve it. Never blame the user.
-- ✗ "You forgot to answer question 3."
-- ✓ "Question 3 requires an answer before you can submit the test."
-
-### Test Feedback
-
-- Formulate feedback that validates the learning journey, not just a score.
-- Distinguish informative evaluation ("Your answer is incorrect") from corrective tutorial ("Incorrect. The correct protocol is X because of Y.").
-
-### Loading and Progress States
-
-- Use context-aware microcopy: "Preparing your test…", "Analysing answers…", "Saving progress…"
-- Communicate position clearly: "Question 4 of 20" — do not rely solely on visual progress bars.
+- Use British English.
+- Keep action labels explicit.
+- Error messages should say what happened and what the user can do next.

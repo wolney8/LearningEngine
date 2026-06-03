@@ -1,13 +1,15 @@
 # Changelog
 
-All notable changes to this project will be documented here. Format follows [Keep a Changelog](https://keepachangelog.com).
+All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com).
 
 ---
 
 ## [Unreleased]
 
+### Changed
+
+- Aligned repository documentation with the actual implemented application, architecture, and workflow state.
+
 ### Added
 
-- Initial project documentation suite: README, PROJECT_REQUIREMENTS, PROJECT_PLAN, ARCHITECTURE, CONTENT_PACKAGE_TEMPLATE, ENGINEERING_STANDARDS, ACCESSIBILITY_STANDARD, BRANCHING_AND_RELEASE_PROCESS, CHANGELOG.
-- `project-initialisation` branch created.
-- No application code yet.
+- Admin user deletion flow planning and implementation updates will be tracked here once completed in this branch.

@@ -9,6 +9,7 @@ import type { FilterKey, FilterOption } from "../components/PackageFilterBar";
 import { PackageSearchBar } from "../components/PackageSearchBar";
 import { useAuth } from "../hooks/useAuth";
 import { usePackageProgress } from "../hooks/usePackageProgress";
+import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
 import { removeCachedProgressForPackage } from "../hooks/useTestResults";
 import type { PackageSummary } from "../schemas/package";
@@ -52,6 +53,7 @@ function parseFilter(value: string | null): FilterKey {
 
 export function PackageListPage() {
   const { status: authStatus, token, user } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const { dailyStreak } = useStreak();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
@@ -63,6 +65,8 @@ export function PackageListPage() {
   const overflowMenuRef = useRef<HTMLDivElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const isAuthenticated = authStatus === "authenticated" && Boolean(token);
+  const spendEconomyEnabled = settings.spend_economy.enabled;
+  const unlockCost = settings.spend_economy.costs.unlock_hidden_package ?? 250;
   const effectiveScope: PackageScope = isAuthenticated
     ? authenticatedScope
     : "catalogue";
@@ -377,6 +381,10 @@ export function PackageListPage() {
     [isAuthenticated, navigate],
   );
 
+  const handlePackageUnlocked = useCallback((): void => {
+    void loadPackages();
+  }, [loadPackages]);
+
   function getEmptyMessage(): string {
     if (query) return `No packages match '${query}'`;
     if (isFullCatalogue && activeCatalogueTag === UNAVAILABLE_TAG_KEY) {
@@ -390,16 +398,10 @@ export function PackageListPage() {
 
   return (
     <main className="package-list-page">
-      <p className="package-list-page__subtitle">
-        {isAuthenticated && effectiveScope === "library"
-          ? "Your selected courses"
-          : "Pick a package to start learning"}
-      </p>
-      {(authStatus === "authenticated" || dailyStreak > 0) && (
+      {isAuthenticated && (
         <div className="package-list-page__status-strip">
-          {authStatus === "authenticated" && user && (
+          {user && (
             <p className="package-list-page__auth-status" aria-live="polite">
-              <span className="package-list-page__status-label">Signed in as</span>
               <span className="package-list-page__auth-user">{user.username}</span>
             </p>
           )}
@@ -645,6 +647,9 @@ export function PackageListPage() {
                         isReattempt,
                       })
                     }
+                    spendEconomyEnabled={spendEconomyEnabled}
+                    unlockCost={unlockCost}
+                    onPackageUnlocked={handlePackageUnlocked}
                   />
                 );
               })}

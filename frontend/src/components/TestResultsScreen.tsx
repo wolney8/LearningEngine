@@ -21,6 +21,7 @@ interface TestResultsScreenProps {
   timedOut: boolean;
   onRetry: () => void;
   onBack: () => void;
+  onRevise: (revisionPageIds: string[]) => void;
 }
 
 function getAnswerText(question: Question, answerId: string | null): string {
@@ -43,6 +44,7 @@ export function TestResultsScreen({
   timedOut,
   onRetry,
   onBack,
+  onRevise,
 }: TestResultsScreenProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -157,7 +159,17 @@ export function TestResultsScreen({
                     Correct answer: {correctText}
                   </p>
                 )}
-                {/* TODO Phase 7: link to revision pages */}
+                {!isCorrect && (
+                  <button
+                    type="button"
+                    className="test-results__revise-action"
+                    onClick={() => onRevise(question.revision_page_ids)}
+                  >
+                    {question.revision_page_ids.length > 0
+                      ? "Revise linked lesson pages"
+                      : "Revise this package"}
+                  </button>
+                )}
               </li>
             );
           })}

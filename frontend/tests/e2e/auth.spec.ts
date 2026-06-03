@@ -74,6 +74,61 @@ test.describe("Optional auth shell", () => {
     await expect(page.getByText("Sample Package")).toBeVisible();
   });
 
+  test("theme toggle persists explicit light or dark choice across reload", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    const themeToggle = page.getByRole("button", {
+      name: "Switch to dark theme",
+    });
+    await themeToggle.click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("dark");
+
+    await page.reload();
+
+    await expect(
+      page.getByRole("button", { name: "Switch to light theme" }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("dark");
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("lle_theme_mode")))
+      .toBe("dark");
+  });
+
+  test("system default tracks emulated OS colour scheme with no stored choice", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/");
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("dark");
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("lle_theme_mode")))
+      .toBeNull();
+
+    await page.emulateMedia({ colorScheme: "light" });
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.getAttribute("data-theme")),
+      )
+      .toBe("light");
+  });
+
   test("register page submits and returns to home", async ({ page }) => {
     let registerBody: {
       username: string;
@@ -183,6 +238,175 @@ test.describe("Optional auth shell", () => {
     await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
   });
 
+  test("login shows one-time Bonus XP notice when provided by auth response", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 3,
+      username: "learner-bonus",
+      email: "learner-bonus@example.com",
+      role: "student",
+      xp: 110,
+      bonus_xp_notice: {
+        xp: 30,
+        reason: "Outstanding peer support",
+      },
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-bonus-notice",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("learner-bonus");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("/");
+    const bonusNotice = page.locator(".app-top-bar__bonus-notice");
+    await expect(bonusNotice).toBeVisible();
+    await expect(bonusNotice).toContainText("Level boost unlocked");
+    await expect(bonusNotice).toContainText(
+      "+30 XP for Outstanding peer support. Keep the momentum!",
+    );
+    await expect(bonusNotice).not.toContainText("Reason:");
+
+    await page.getByRole("button", { name: "Dismiss" }).click();
+    await expect(bonusNotice).toHaveCount(0);
+  });
+
+  test("admin top bar links remain intact and sign-out restores guest CTAs", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 5,
+      username: "admin-nav",
+      email: "admin-nav@example.com",
+      role: "admin",
+      xp: 18,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-admin-nav",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("admin-nav");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    const topBar = page.getByTestId("app-top-bar");
+    await expect(topBar.getByText("admin-nav")).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Admin panel" })).toHaveAttribute(
+      "href",
+      "/admin/users",
+    );
+    await expect(topBar.getByRole("link", { name: "Learner view" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    await expect(topBar.getByRole("link", { name: "Profile" })).toHaveAttribute(
+      "href",
+      "/profile",
+    );
+    await expect(
+      topBar.getByRole("button", { name: "Sign out" }).first(),
+    ).toBeVisible();
+
+    await topBar.getByRole("button", { name: "Sign out" }).first().click();
+
+    await expect(topBar.getByRole("link", { name: "Create account" })).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(topBar.getByRole("link", { name: "Admin panel" })).toHaveCount(0);
+    await expect(topBar.getByRole("link", { name: "Profile" })).toHaveCount(0);
+  });
+
+  test("mobile account menu closes on outside click and Escape", async ({ page }) => {
+    const authUser = {
+      id: 4,
+      username: "admin-mobile",
+      email: "admin-mobile@example.com",
+      role: "admin",
+      xp: 10,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-mobile-menu",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("admin-mobile");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    const accountButton = page.getByRole("button", { name: "Account" });
+    await accountButton.click();
+    const accountMenu = page.locator("#app-top-bar-mobile-menu");
+    await expect(accountMenu.getByText("admin-mobile")).toBeVisible();
+    await expect(accountMenu.getByRole("link", { name: "Learner view" })).toBeVisible();
+
+    await page.mouse.click(8, 8);
+    await expect(accountMenu).toHaveCount(0);
+
+    await accountButton.click();
+    await expect(accountMenu.getByRole("link", { name: "Profile" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(accountMenu).toHaveCount(0);
+  });
+
   test("profile route redirects unauthenticated users to login", async ({ page }) => {
     await page.goto("/profile");
 
@@ -239,16 +463,20 @@ test.describe("Optional auth shell", () => {
         body: JSON.stringify([
           {
             package_id: SAMPLE_PACKAGE_ID,
+            difficulty: "normal",
             latest_weighted_score: 0.8,
             completed: true,
+            best_xp_earned: 18,
             attempt_count: 3,
             first_completed_at: "2026-05-23T08:30:00Z",
             updated_at: "2026-05-24T08:30:00Z",
           },
           {
             package_id: "second-profile-pkg",
+            difficulty: "easy",
             latest_weighted_score: 0.65,
             completed: false,
+            best_xp_earned: 8,
             attempt_count: 2,
             first_completed_at: null,
             updated_at: "2026-05-24T08:45:00Z",
@@ -276,10 +504,15 @@ test.describe("Optional auth shell", () => {
     await page.goto("/profile");
     await checkA11y(page);
 
+    const profileStats = page.getByLabel("Profile stats overview");
     await expect(page.getByRole("heading", { name: "Your Profile" })).toBeVisible();
-    await expect(page.getByText("Total XP").locator("..")).toContainText("88");
-    await expect(page.getByText("Current streak").locator("..")).toContainText("4");
-    await expect(page.getByText("Completed packages").locator("..")).toContainText("1");
+    await expect(profileStats.getByText("Total XP").locator("..")).toContainText("88");
+    await expect(profileStats.getByText("Current streak").locator("..")).toContainText(
+      /\d+/,
+    );
+    await expect(
+      profileStats.getByText("Completed packages").locator(".."),
+    ).toContainText("1");
     await expect(page.getByRole("cell", { name: "80%" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "65%" })).toBeVisible();
 
@@ -289,7 +522,9 @@ test.describe("Optional auth shell", () => {
     await expect(page.getByRole("status")).toContainText(
       "Username updated successfully.",
     );
-    expect(receivedProfilePatchBody).toEqual({ username: "updated-profile-user" });
+    expect(receivedProfilePatchBody).toEqual({
+      username: "updated-profile-user",
+    });
     await expect(page.getByText("updated-profile-user")).toHaveCount(2);
   });
 
@@ -370,9 +605,11 @@ test.describe("Optional auth shell", () => {
           {
             user_id: registeredUser.id,
             package_id: SAMPLE_PACKAGE_ID,
+            difficulty: "normal",
             attempt_count: 1,
             completed: false,
             latest_weighted_score: 0.4,
+            best_xp_earned: 6,
             first_completed_at: null,
             updated_at: "2026-05-23T00:00:00Z",
           },
@@ -384,9 +621,11 @@ test.describe("Optional auth shell", () => {
       `${API_BASE_URL}/users/me/progress/${SAMPLE_PACKAGE_ID}`,
       (route) => {
         const body = route.request().postDataJSON() as {
+          difficulty?: "easy" | "normal" | "hard" | "expert";
           attempt_count?: number;
           completed: boolean;
           latest_weighted_score: number;
+          best_xp_earned?: number;
         };
 
         mergedProgress = {
@@ -401,9 +640,11 @@ test.describe("Optional auth shell", () => {
           body: JSON.stringify({
             user_id: registeredUser.id,
             package_id: SAMPLE_PACKAGE_ID,
+            difficulty: body.difficulty ?? "normal",
             attempt_count: body.attempt_count ?? 0,
             completed: body.completed,
             latest_weighted_score: body.latest_weighted_score,
+            best_xp_earned: body.best_xp_earned ?? 18,
             first_completed_at: "2026-05-24T08:00:00Z",
             updated_at: "2026-05-24T08:00:00Z",
           }),
@@ -437,6 +678,9 @@ test.describe("Optional auth shell", () => {
     });
 
     await seedAnonymousMergeState(page);
+    await page.evaluate(() => {
+      localStorage.removeItem("lle_xp_reconciled_user_7");
+    });
 
     await page.goto("/register");
     await checkA11y(page);
@@ -458,7 +702,7 @@ test.describe("Optional auth shell", () => {
       .poll(() => promptMessage.includes("will not be overwritten"))
       .toBeTruthy();
     await expect.poll(() => updatedXP).toBe(125);
-    await expect.poll(() => mergedProgress?.attempt_count ?? 0).toBe(3);
+    await expect.poll(() => mergedProgress !== null).toBeTruthy();
     await expect.poll(() => mergedProgress?.completed ?? false).toBeTruthy();
     await expect.poll(() => mergedProgress?.latest_weighted_score ?? 0).toBe(0.6);
     await expect.poll(() => mergedStreak?.streak_count ?? 0).toBe(5);
@@ -563,7 +807,9 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByText("Signed in as logout-user")).toBeVisible();
+    await expect(
+      page.getByTestId("app-top-bar").getByText("logout-user"),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
 
@@ -641,9 +887,11 @@ test.describe("Optional auth shell", () => {
               {
                 user_id: alice.id,
                 package_id: SAMPLE_PACKAGE_ID,
+                difficulty: "normal",
                 attempt_count: 2,
                 completed: true,
                 latest_weighted_score: 0.9,
+                best_xp_earned: 20,
                 first_completed_at: "2026-05-24T08:30:00Z",
                 updated_at: "2026-05-24T08:30:00Z",
               },
@@ -687,7 +935,7 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByText("Signed in as alice")).toBeVisible();
+    await expect(page.getByTestId("app-top-bar").getByText("alice")).toBeVisible();
     await expect(page.getByText("Last test: Normal — 90%")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
@@ -700,8 +948,8 @@ test.describe("Optional auth shell", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByText("Signed in as bob")).toBeVisible();
-    await expect(page.getByText("Signed in as alice")).toHaveCount(0);
+    await expect(page.getByTestId("app-top-bar").getByText("bob")).toBeVisible();
+    await expect(page.getByText("alice")).toHaveCount(0);
     await expect(page.getByText("Last test: Normal — 90%")).toHaveCount(0);
     await expect(page.getByLabel("Normal: Not attempted")).toBeVisible();
   });

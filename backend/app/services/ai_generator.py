@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Literal
 
 import yaml
@@ -49,13 +50,151 @@ QUESTION DIFFICULTY TAGGING:
         large ones?"
 """
 
+AI_ERROR_CODE_MISSING_API_KEY = "ai_missing_api_key"
+AI_ERROR_CODE_PROVIDER_OVERLOADED = "ai_provider_overloaded"
+AI_ERROR_CODE_PROVIDER_UNAVAILABLE = "ai_provider_unavailable"
+AI_ERROR_CODE_UPSTREAM_FAILURE = "ai_upstream_failure"
+
 
 class AIGenerationError(Exception):
     """Raised when the AI generator fails to produce a valid package."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = AI_ERROR_CODE_UPSTREAM_FAILURE,
+    ):
+        super().__init__(message)
+        self.error_code = error_code
+
 
 DEFAULT_AI_PROVIDER: Literal["gemini"] = "gemini"
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
+REFRESH_MAX_ATTEMPTS = 3
+MIN_CHANGED_PAGE_RATIO = 0.5
+MIN_CHANGED_QUESTION_RATIO = 0.5
+
+
+def _normalise_text(value: str) -> str:
+    return " ".join(value.lower().split())
+
+
+def _refresh_quality_issues(existing: Package, candidate: Package) -> list[str]:
+    issues: list[str] = []
+
+    if len(candidate.pages) != len(existing.pages):
+        issues.append(
+            "page count changed; refreshed package must keep the same number of pages"
+        )
+
+    if len(candidate.questions) != len(existing.questions):
+        issues.append(
+            "question count changed; refreshed package must keep the same "
+            "number of questions"
+        )
+
+    comparable_pages = min(len(existing.pages), len(candidate.pages))
+    if comparable_pages > 0:
+        changed_pages = sum(
+            1
+            for idx in range(comparable_pages)
+            if _normalise_text(
+                f"{existing.pages[idx].title}\n{existing.pages[idx].content}"
+            )
+            != _normalise_text(
+                f"{candidate.pages[idx].title}\n{candidate.pages[idx].content}"
+            )
+        )
+        changed_page_ratio = changed_pages / comparable_pages
+        if changed_page_ratio < MIN_CHANGED_PAGE_RATIO:
+            issues.append(
+                "insufficient page variation; at least 50% of pages must change"
+            )
+
+    comparable_questions = min(len(existing.questions), len(candidate.questions))
+    if comparable_questions > 0:
+        changed_questions = sum(
+            1
+            for idx in range(comparable_questions)
+            if _normalise_text(existing.questions[idx].text)
+            != _normalise_text(candidate.questions[idx].text)
+        )
+        changed_question_ratio = changed_questions / comparable_questions
+        if changed_question_ratio < MIN_CHANGED_QUESTION_RATIO:
+            issues.append(
+                "insufficient question variation; at least 50% of question "
+                "text must change"
+            )
+
+    normalised_question_texts = [
+        _normalise_text(question.text) for question in candidate.questions
+    ]
+    if len(set(normalised_question_texts)) != len(normalised_question_texts):
+        issues.append("duplicate questions detected in refreshed package")
+
+    tagged_questions = [
+        question for question in candidate.questions if question.difficulty is not None
+    ]
+    if tagged_questions:
+        represented_difficulties = {
+            question.difficulty for question in tagged_questions if question.difficulty
+        }
+        required_difficulties = {"easy", "normal", "hard", "expert"}
+        missing_difficulties = sorted(required_difficulties - represented_difficulties)
+        if missing_difficulties:
+            issues.append(
+                "missing difficulty coverage in tagged questions: "
+                + ", ".join(missing_difficulties)
+            )
+
+    return issues
+
+
+def _normalise_tags(raw_tags: object) -> list[str]:
+    if not isinstance(raw_tags, list):
+        return []
+
+    normalised: list[str] = []
+    seen: set[str] = set()
+    for raw_tag in raw_tags:
+        if not isinstance(raw_tag, str):
+            continue
+        tag = raw_tag.strip()
+        if not tag:
+            continue
+        dedupe_key = tag.casefold()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        normalised.append(tag)
+    return normalised
+
+
+def _slugify_tag(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+    return slug
+
+
+def _fallback_generation_tags(topic: str, audience: str) -> list[str]:
+    candidates: list[str] = []
+    topic_tag = _slugify_tag(topic)
+    audience_tag = _slugify_tag(audience)
+
+    if topic_tag:
+        candidates.append(topic_tag)
+    if audience_tag:
+        candidates.append(f"audience-{audience_tag}")
+    candidates.append("ai-generated")
+
+    fallback = _normalise_tags(candidates)
+    if fallback:
+        return fallback
+    return ["ai-generated", "general-learning"]
+
+
+def _with_tags(pkg: Package, tags: list[str]) -> Package:
+    return pkg.model_copy(update={"tags": tags})
 
 
 def _resolve_provider_and_model(
@@ -81,6 +220,54 @@ def _resolve_provider_and_model(
     return provider, model_name
 
 
+def _extract_status_code(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+
+    response = getattr(exc, "response", None)
+    response_status = getattr(response, "status_code", None)
+    if isinstance(response_status, int):
+        return response_status
+
+    return None
+
+
+def _classify_provider_failure(exc: Exception) -> str:
+    status_code = _extract_status_code(exc)
+    if status_code == 429:
+        return AI_ERROR_CODE_PROVIDER_OVERLOADED
+    if status_code in {502, 503, 504}:
+        return AI_ERROR_CODE_PROVIDER_UNAVAILABLE
+
+    text = f"{type(exc).__name__} {exc}".casefold()
+    overloaded_markers = (
+        "overload",
+        "overloaded",
+        "high demand",
+        "too many requests",
+        "rate limit",
+        "quota",
+        "capacity",
+        "busy",
+    )
+    unavailable_markers = (
+        "unavailable",
+        "service unavailable",
+        "temporarily unavailable",
+        "timeout",
+        "timed out",
+        "bad gateway",
+        "gateway timeout",
+    )
+
+    if any(marker in text for marker in overloaded_markers):
+        return AI_ERROR_CODE_PROVIDER_OVERLOADED
+    if any(marker in text for marker in unavailable_markers):
+        return AI_ERROR_CODE_PROVIDER_UNAVAILABLE
+    return AI_ERROR_CODE_UPSTREAM_FAILURE
+
+
 def _get_agent(
     *,
     settings: GameSettings | None = None,
@@ -96,7 +283,10 @@ def _get_agent(
 
     api_key = api_key_override or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise AIGenerationError("GEMINI_API_KEY is not set. Add it to backend/.env")
+        raise AIGenerationError(
+            "AI service is not configured.",
+            error_code=AI_ERROR_CODE_MISSING_API_KEY,
+        )
 
     provider = GoogleGLAProvider(api_key=api_key)
     model = GeminiModel(model_name, provider=provider)
@@ -133,9 +323,18 @@ async def generate_package(
     try:
         result = await agent.run(prompt)
     except Exception as exc:
-        raise AIGenerationError(f"Gemini API call failed: {exc}") from exc
+        raise AIGenerationError(
+            "AI provider request failed.",
+            error_code=_classify_provider_failure(exc),
+        ) from exc
 
     pkg: Package = result.output
+    generated_tags = _normalise_tags(pkg.tags)
+    if generated_tags:
+        pkg = _with_tags(pkg, generated_tags)
+    else:
+        pkg = _with_tags(pkg, _fallback_generation_tags(topic, audience))
+
     pkg_dict = pkg.model_dump(mode="python")
     return yaml.dump(
         pkg_dict,
@@ -151,7 +350,7 @@ async def refresh_package(
 ) -> str:
     """Re-generate content for an existing package, preserving its id and identity."""
     agent = _get_agent(settings=settings)
-    prompt = (
+    base_prompt = (
         f"Refresh the training package titled: {existing.title}\n"
         f"Original description: {existing.description}\n"
         f"Include exactly {len(existing.pages)} pages and "
@@ -162,12 +361,55 @@ async def refresh_package(
         "Within each difficulty group, weights must sum to exactly 100."
     )
 
-    try:
-        result = await agent.run(prompt)
-    except Exception as exc:
-        raise AIGenerationError(f"Gemini API call failed: {exc}") from exc
+    quality_issues: list[str] = []
+    pkg: Package | None = None
 
-    pkg: Package = result.output
+    for attempt in range(1, REFRESH_MAX_ATTEMPTS + 1):
+        prompt = base_prompt
+        if quality_issues:
+            remediation_notes = "\n".join(f"- {issue}" for issue in quality_issues)
+            prompt += (
+                "\n\nPrevious refresh attempt did not meet quality requirements. "
+                "Correct all issues below whilst preserving topic and constraints:\n"
+                f"{remediation_notes}"
+            )
+
+        try:
+            result = await agent.run(prompt)
+        except Exception as exc:
+            raise AIGenerationError(
+                "AI provider request failed.",
+                error_code=_classify_provider_failure(exc),
+            ) from exc
+
+        candidate: Package = result.output
+        quality_issues = _refresh_quality_issues(existing, candidate)
+        if not quality_issues:
+            pkg = candidate
+            break
+
+        if attempt == REFRESH_MAX_ATTEMPTS:
+            break
+
+    if pkg is None:
+        raise AIGenerationError(
+            "AI refresh output did not meet quality requirements: "
+            + "; ".join(quality_issues)
+        )
+
+    generated_tags = _normalise_tags(pkg.tags)
+    if generated_tags:
+        pkg = _with_tags(pkg, generated_tags)
+    else:
+        existing_tags = _normalise_tags(existing.tags)
+        if existing_tags:
+            pkg = _with_tags(pkg, existing_tags)
+        else:
+            pkg = _with_tags(
+                pkg,
+                _fallback_generation_tags(existing.title, "existing-audience"),
+            )
+
     pkg_dict = pkg.model_dump(mode="python")
     return yaml.dump(
         pkg_dict,
@@ -183,7 +425,13 @@ async def test_connection(
     api_key: str,
     provider_override: Literal["gemini"] | None = None,
     model_override: str | None = None,
-) -> None:
+) -> str:
+    _, model_name = _resolve_provider_and_model(
+        settings=settings,
+        provider_override=provider_override,
+        model_override=model_override,
+    )
+
     agent = _get_agent(
         settings=settings,
         provider_override=provider_override,
@@ -194,5 +442,8 @@ async def test_connection(
         await agent.run("Reply with exactly: ok")
     except Exception as exc:
         raise AIGenerationError(
-            "Connection test failed. Check provider, model, and API key."
+            "Connection test failed. Check provider, model, and API key.",
+            error_code=_classify_provider_failure(exc),
         ) from exc
+
+    return model_name

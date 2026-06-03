@@ -22,6 +22,7 @@ interface XPContextValue {
   xp: number;
   addXP: (amount: number) => void;
   subtractXP: (amount: number) => void;
+  syncXP: (value: number) => void;
   levelProgress: LevelProgress;
   changeVersion: number;
   lastChangeKind: "add" | "subtract" | "sync" | null;
@@ -139,6 +140,21 @@ export function XPProvider({ children }: { children: ReactNode }) {
     writeXP(next);
   }
 
+  function syncXP(value: number): void {
+    const next = Math.max(0, Math.trunc(value));
+    xpRef.current = next;
+    setXP(next);
+    setLastChangeKind("sync");
+    setChangeVersion((current) => current + 1);
+
+    if (token && status === "authenticated") {
+      persistAuthenticatedXP(next);
+      return;
+    }
+
+    writeXP(next);
+  }
+
   const levelProgress = useMemo(
     () => deriveLevelProgress(xp, settings.xp.base_xp_per_level),
     [xp, settings.xp.base_xp_per_level],
@@ -148,6 +164,7 @@ export function XPProvider({ children }: { children: ReactNode }) {
     xp,
     addXP,
     subtractXP,
+    syncXP,
     levelProgress,
     changeVersion,
     lastChangeKind,

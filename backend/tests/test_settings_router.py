@@ -58,6 +58,11 @@ async def test_get_settings_returns_expected_shape() -> None:
     assert body["xp"]["base_xp_per_level"] == 500
     assert body["xp"]["attempt_multipliers"]["2"] == 0.5
     assert body["difficulty"]["seconds_per_question"]["expert"] == 10
+    assert body["celebration_effects"]["enabled"] is False
+    assert body["celebration_effects"]["confetti_on_pass"] is True
+    assert body["celebration_effects"]["confetti_on_bonus_xp_gain"] is True
+    assert body["celebration_effects"]["lightning_on_streak_milestones"] is True
+    assert body["celebration_effects"]["respect_reduced_motion"] is True
 
 
 async def test_get_settings_dependency_override_path() -> None:
