@@ -8,6 +8,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider, useToastContext } from "./context/ToastContext";
 import { XPProvider } from "./context/XPContext";
 import { useAuth } from "./hooks/useAuth";
+import { useInactivityLogout } from "./hooks/useInactivityLogout";
 import { useTheme } from "./hooks/useTheme";
 import { useXP } from "./hooks/useXP";
 import { AdminAuditLogsPage } from "./pages/AdminAuditLogsPage";
@@ -29,7 +30,7 @@ function GlobalToastRegion() {
 }
 
 function AppRoutes() {
-  const { status, user } = useAuth();
+  const { status, user, logout } = useAuth();
   const { xp, levelProgress, lastChangeKind } = useXP();
   const { resolvedTheme, setMode: setThemeMode } = useTheme();
   const [levelUpState, setLevelUpState] = useState<{
@@ -40,6 +41,8 @@ function AppRoutes() {
   const announcedLevelRef = useRef<number>(0);
   const authBoundaryKey =
     status === "authenticated" && user ? `auth-${user.id}` : "anonymous";
+
+  useInactivityLogout(status === "authenticated", logout);
 
   useEffect(() => {
     if (previousLevelRef.current == null) {
