@@ -1,6 +1,6 @@
 id: pet-tet-it-beginners
-title: Cracking the PET and TET: A Guide for First-Time IT Candidates
-description: A comprehensive orientation package covering Pre-Employment Tests (PET) and Technical Evaluation Tests (TET) tailored specifically for first-time exam takers in the tech sector.
+title: "Cracking the PET and TET: A Guide for First-Time IT Candidates"
+description: "A comprehensive orientation package covering Pre-Employment Tests (PET) and Technical Evaluation Tests (TET) tailored specifically for first-time exam takers in the tech sector."
 version: 1.0.0
 tags:
 - pre-employment-testing
@@ -12,7 +12,7 @@ tags:
 passing_score: 0.8
 pages:
 - id: page-1-welcome-demystified
-  title: Demystifying the PET and TET Architecture
+  title: "Demystifying the PET and TET Architecture"
   content: |
     # Demystifying the PET and TET Architecture
 
@@ -35,7 +35,7 @@ pages:
     > **First-Time Taker Anchor Rule:** A PET does not have a single hidden "correct" answers schema—it maps your real behavioral profile. A TET, however, evaluates hard technical execution. Let's look at how to tackle both.
 
 - id: page-2-pet-anatomy
-  title: Inside the PET: Behavioral & Situational Judgment
+  title: "Inside the PET: Behavioral & Situational Judgment"
   content: |
     # Inside the PET: Behavioral & Situational Judgment
 
@@ -53,7 +53,7 @@ pages:
     3. **Triage Prioritization:** Your capacity to address high-severity service outages methodically rather than hacking fixes under pressure.
 
 - id: page-3-tet-anatomy
-  title: Inside the TET: Code Logic & Systems Design
+  title: "Inside the TET: Code Logic & Systems Design"
   content: |
     # Inside the TET: Code Logic & Systems Design
 
@@ -74,7 +74,7 @@ pages:
     * **The Persistence Layer:** How the results are safely committed to a database.
 
 - id: page-4-anxiety-management
-  title: Tactical Test Psychology for First-Time Takers
+  title: "Tactical Test Psychology for First-Time Takers"
   content: |
     # Tactical Test Psychology for First-Time Takers
 
@@ -94,7 +94,7 @@ pages:
     In the behavioral PET section, do not try to guess what the HR department wants to hear. Interactive algorithms flag inconsistent answers if you try to game the profile. Authenticity remains your safest path to a predictable score.
 
 - id: page-5-environment-prep
-  title: Technical Readiness & Environment Setup
+  title: "Technical Readiness & Environment Setup"
   content: |
     # Technical Readiness & Environment Setup
 
@@ -108,7 +108,7 @@ pages:
     > **Critical Reminder:** Keep a clean, physical piece of scratch paper on your desk to trace data mutations and system variables manually. Let's practice with some real sample challenges.
 
 - id: page-6-sample-pet-situations
-  title: Practicing the PET: Behavioral Breakdown
+  title: "Practicing the PET: Behavioral Breakdown"
   content: |
     # Practicing the PET: Behavioral Breakdown
 
@@ -125,7 +125,7 @@ pages:
     *Effective IT professionals choose Option B. They balance engineering quality with operational goals while maintaining complete system transparency.*
 
 - id: page-7-sample-tet-logic
-  title: Practicing the TET: Code & Logic Analysis
+  title: "Practicing the TET: Code & Logic Analysis"
   content: |
     # Practicing the TET: Code & Logic Analysis
 
