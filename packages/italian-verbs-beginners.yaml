@@ -1,0 +1,474 @@
+id: italian-verbs-beginners
+title: Italian Verbs and Sentence Structure for Beginners
+description: Learn essential Italian verbs, master the Subject-Verb-Object (SVO) layout, and understand how Italian sentences differ from English.
+version: 1.1.0
+tags:
+- italian-language
+- italian-verbs
+- conjugation
+- beginner-italian
+- sentence-structure
+- romance-languages
+passing_score: 0.8
+pages:
+- id: page-1-intro-verbs
+  title: Understanding Italian Verbs
+  content: |
+    # Understanding Italian Verbs
+
+    Welcome to the world of Italian! Verbs are the structural anchor of this language. In Italian, verbs change their endings based on who is performing the action (the subject) and when it happens (the tense). This process is called **conjugation**.
+
+    Unlike English, where verb changes are small (e.g., "I eat", "he eats"), Italian verbs use unique endings for almost every subject pronoun. 
+
+    ### Key Concepts:
+    * **Infinitive:** The basic, unchanged dictionary form of the verb (e.g., *parlare* - to speak).
+    * **Conjugation:** Changing a verb's ending to match the person acting.
+    * **Subject Pronouns:** Words like *io* (I), *tu* (you, informal), *lui/lei* (he/she), *noi* (we), *voi* (you all), and *loro* (they).
+
+- id: page-1b-svo-structure
+  title: Sentence Structure: Italian vs. English SVO
+  content: |
+    # Sentence Structure: The SVO Blueprint
+
+    Both English and Italian primarily use the **SVO** structure: **Subject + Verb + Object**. 
+
+    * **English:** Marco (Subject) eats (Verb) an apple (Object).
+    * **Italian:** Marco (Subject) mangia (Verb) una mela (Object).
+
+    ### The Big Difference: Dropping the Subject
+    In English, you *must* state the subject ("**I** speak English"). If you just say "Speak English," it sounds like a command. 
+    
+    In Italian, because every conjugation has a unique ending, **the subject pronoun is usually dropped** unless you want to add immense emphasis.
+
+    * *Standard Italian:* **Parlo inglese.** (Literally: "Speak English.")
+    * The "-o" ending on *parlo* already tells the listener explicitly that the subject is "io" (I). Adding "Io" (*Io parlo inglese*) is redundant and used only if you mean "As for *me*, I speak English!"
+
+- id: page-2-are-verbs
+  title: Regular -ARE Verbs
+  content: |
+    # Regular -ARE Verbs
+
+    The largest family of Italian verbs ends in **-ARE** in their infinitive form. To conjugate them, drop the **-ARE** and add the specific ending matching your subject.
+
+    Let's look at **parlare** (to speak):
+
+    | Subject Pronoun | Ending | Sentence Example (SVO) | English Translation |
+    | :--- | :--- | :--- | :--- |
+    | **io** (I) | -o | **Parlo italiano.** | I speak Italian. |
+    | **tu** (you, inf.) | -i | **Parli inglese.** | You speak English. |
+    | **lui/lei** (he/she) | -a | **Lei parla italiano.** | She speaks Italian. |
+    | **noi** (we) | -iamo | **Parliamo inglese.** | We speak English. |
+    | **voi** (you all) | -ate | **Parlate italiano.** | You all speak Italian. |
+    | **loro** (they) | -ano | **Parlano inglese.** | They speak English. |
+
+    *Notice that in the examples above, we dropped the subject pronouns entirely for a natural rhythm!*
+
+- id: page-3-ere-verbs
+  title: Regular -ERE Verbs
+  content: |
+    # Regular -ERE Verbs
+
+    The second group ends in **-ERE**. Let's apply our SVO structure to the verb **leggere** (to read - pronounced *LED-jeh-reh*).
+
+    | Subject | Ending | Sentence Example (SVO) | English Translation |
+    | :--- | :--- | :--- | :--- |
+    | **io** | -o | **Leggo un libro.** | I read a book. |
+    | **tu** | -i | **Leggi un libro.** | You read a book. |
+    | **lui/lei** | -e | **Lui legge un libro.** | He reads a book. |
+    | **noi** | -iamo | **Leggiamo un libro.** | We read a book. |
+    | **voi** | -ete | **Leggete un libro.** | You all read a book. |
+    | **loro** | -ono | **Leggono un libro.** | They read a book. |
+
+    **Vocabulary Note:** *Un libro* acts as our direct object in these sentences.
+
+- id: page-4-ire-verbs
+  title: Regular -IRE Verbs
+  content: |
+    # Regular -IRE Verbs
+
+    The final regular group ends in **-IRE**. Let's use **dormire** (to sleep) and **aprire** (to open).
+
+    ### Conjugation Pattern (Present Tense):
+    * **io** drops -ire $\rightarrow$ add **-o** (*dormo*)
+    * **tu** drops -ire $\rightarrow$ add **-i** (*dormi*)
+    * **lui/lei** drops -ire $\rightarrow$ add **-e** (*dorme*)
+    * **noi** drops -ire $\rightarrow$ add **-iamo** (*dormiamo*)
+    * **voi** drops -ire $\rightarrow$ add **-ite** (*dormite*)
+    * **loro** drops -ire $\rightarrow$ add **-ono** (*dormono*)
+
+    ### Putting it into Action (SVO):
+    * **Apro la porta.** (I open the door.) 
+    * *La porta* is the object. The subject "I" is built right into the verb *Apro*.
+
+- id: page-5-essere
+  title: 'Irregular Verb: Essere (to be)'
+  content: |
+    # Irregular Verb: Essere (to be)
+
+    **Essere** is irregular; it doesn't follow standard patterns. You must memorize its forms:
+
+    * **io sono** (I am) | **noi siamo** (we are)
+    * **tu sei** (you are) | **voi siete** (you all are)
+    * **lui/lei è** (he/she is) | **loro sono** (they are)
+
+    ### SVO with Identity and Qualities:
+    When using *essere*, the object is often a descriptive adjective rather than an item.
+    * **Sono di Roma.** (I am from Rome.)
+    * **Lei è felice.** (She is happy.)
+
+    *Note:* The form **è** (is) always has an accent mark to distinguish it from the word **e** (and).
+
+- id: page-6-avere
+  title: 'Irregular Verb: Avere (to have)'
+  content: |
+    # Irregular Verb: Avere (to have)
+
+    **Avere** is another pillar of basic Italian sentence construction. Note that the "h" is completely silent.
+
+    * **io ho** (I have) | **noi abbiamo** (we have)
+    * **tu hai** (you have) | **voi avete** (you all have)
+    * **lui/lei ha** (he/she has) | **loro hanno** (they have)
+
+    ### Idiomatic SVO Shifts:
+    This is where English and Italian structures conceptualize physical states differently. In English, you *are* hungry (Adjective). In Italian, you *have* hunger (Noun Object).
+
+    * **Ho fame.** (Literally: "I have hunger" $\rightarrow$ I am hungry.)
+    * **Hanno freddo.** (Literally: "They have cold" $\rightarrow$ They are cold.)
+    * **Quanti anni hai?** (Literally: "How many years do you have?" $\rightarrow$ How old are you?)
+
+- id: page-7-basic-phrases
+  title: Greetings and Structural Application
+  content: |
+    # Greetings & The Logic of "Mi Chiamo"
+
+    Now let's apply our structural knowledge to everyday expressions. 
+
+    ### Greetings:
+    * **Ciao!** (Hi / Bye - Informal)
+    * **Buongiorno!** (Good morning / Good day - Formal)
+    * **Buonasera!** (Good evening - Formal)
+
+    ### The Hidden SVO in Introductions:
+    When you say your name in English, you use Subject-Verb-Object: "My name (S) is (V) Marco (O)". 
+    In Italian, you use a reflexive structure:
+    * **Mi chiamo Marco.** (Literally: "Myself I call Marco.")
+    * **Come ti chiami?** (Literally: "How yourself do you call?" $\rightarrow$ What is your name?)
+
+- id: page-8-more-phrases
+  title: Questions & Requests
+  content: |
+    # Navigating Simple Interactions
+
+    Here are vital conversational formulas. Observe how the verb changes depending on whether you are speaking informally (*tu*) or formally (*Lei*):
+
+    * **Come stai?** (How are you? - Informal to a friend)
+    * **Come sta?** (How are you? - Formal to a stranger/elder)
+    * **Parli inglese?** (Do you speak English? - Informal, targeting *tu*)
+    * **Parla inglese?** (Do you speak English? - Formal, targeting *Lei*)
+
+    ### Politeness Markers:
+    * **Per favore** (Please)
+    * **Grazie** (Thank you)
+    * **Prego** (You're welcome)
+    * **Non capisco** (I don't understand - notice the dropped *io*)
+
+- id: page-9-conjugation-summary
+  title: Present Tense Reference Guide
+  content: |
+    # Quick Reference Guide
+
+    Use this summary matrix to review how regular endings track against key irregular forms.
+
+    | Subject | -ARE (*parlare*) | -ERE (*leggere*) | -IRE (*dormire*) | Essere | Avere |
+    | :--- | :--- | :--- | :--- | :--- | :--- |
+    | **io** | parlo | leggo | dormo | sono | ho |
+    | **tu** | parli | leggi | dormi | sei | hai |
+    | **lui/lei** | parla | legge | dorme | è | ha |
+    | **noi** | parliamo | leggiamo | dormiamo | siamo | abbiamo |
+    | **voi** | parlate | leggete | dormite | siete | avete |
+    | **loro** | parlano | leggono | dormono | sono | hanno |
+
+- id: page-10-practice-tips
+  title: Practice Strategies
+  content: |
+    # Retaining What You've Learned
+
+    To build immediate muscle memory for Italian sentence structures, follow these two golden guidelines:
+    1. **Always default to dropping the pronoun:** Say *Apro il libro*, not *Io apro il libro*. It sounds cleaner and more authentic.
+    2. **Map the objects:** Identify your verbs and match them explicitly with items around you. Look at a door and say *Apro la porta*. Look at juice and say *Bevo il succo*. 
+
+    Good luck! **In bocca al lupo!**
+
+questions:
+- id: q-easy-1
+  difficulty: easy
+  text: Which of the following is an infinitive ending for a regular Italian verb family?
+  answers:
+  - id: a-easy-1-1
+    text: -ando
+  - id: a-easy-1-2
+    text: -are
+  - id: a-easy-1-3
+    text: -ato
+  - id: a-easy-1-4
+    text: -icco
+  correct_answer: a-easy-1-2
+  weight: 10.0
+  feedback: Regular Italian infinitives end in either -are, -ere, or -ire.
+  revision_page_ids:
+  - page-1-intro-verbs
+
+- id: q-easy-2
+  difficulty: easy
+  text: What structural element do standard Italian sentences regularly drop that English sentences must keep?
+  answers:
+  - id: a-easy-2-1
+    text: The Verb
+  - id: a-easy-2-2
+    text: The Direct Object
+  - id: a-easy-2-3
+    text: The Subject Pronoun
+  - id: a-easy-2-4
+    text: The Adjective
+  correct_answer: a-easy-2-3
+  weight: 10.0
+  feedback: Because unique Italian verb conjugations clearly pinpoint who is acting, subject pronouns like 'io' or 'tu' are usually dropped.
+  revision_page_ids:
+  - page-1b-svo-structure
+
+- id: q-easy-3
+  difficulty: easy
+  text: How do you say "I speak" using the regular verb "parlare" without using a redundant pronoun?
+  answers:
+  - id: a-easy-3-1
+    text: parla
+  - id: a-easy-3-2
+    text: parli
+  - id: a-easy-3-3
+    text: parlo
+  - id: a-easy-3-4
+    text: parlate
+  correct_answer: a-easy-3-3
+  weight: 10.0
+  feedback: Dropping 'io' leaves you with 'parlo', which clearly signifies "I speak".
+  revision_page_ids:
+  - page-2-are-verbs
+
+- id: q-easy-4
+  difficulty: easy
+  text: Which word translates to the irregular verb "to be"?
+  answers:
+  - id: a-easy-4-1
+    text: Avere
+  - id: a-easy-4-2
+    text: Essere
+  - id: a-easy-4-3
+    text: Aprire
+  - id: a-easy-4-4
+    text: Parlare
+  correct_answer: a-easy-4-2
+  weight: 10.0
+  feedback: 'Essere' translates to 'to be'.
+  revision_page_ids:
+  - page-5-essere
+
+- id: q-easy-5
+  difficulty: easy
+  text: What is the correct present tense ending for "voi" (you all) when conjugating regular -ERE verbs?
+  answers:
+  - id: a-easy-5-1
+    text: -amo
+  - id: a-easy-5-2
+    text: -ate
+  - id: a-easy-5-3
+    text: -ete
+  - id: a-easy-5-4
+    text: -ite
+  correct_answer: a-easy-5-3
+  weight: 10.0
+  feedback: The 'voi' form of an -ere verb takes the -ete ending (e.g., leggete).
+  revision_page_ids:
+  - page-3-ere-verbs
+
+- id: q-normal-1
+  difficulty: normal
+  text: "If you want to state \"We read a book\", what is the natural SVO phrase configuration?"
+  answers:
+  - id: a-normal-1-1
+    text: Leggiamo un libro.
+  - id: a-normal-1-2
+    text: Noi leggono un libro.
+  - id: a-normal-1-3
+    text: Un libro leggiamo.
+  - id: a-normal-1-4
+    text: Leggete un libro.
+  correct_answer: a-normal-1-1
+  weight: 10.0
+  feedback: 'Leggiamo' handles the subject (we) and verb (read) together, followed directly by the object 'un libro'.
+  revision_page_ids:
+  - page-1b-svo-structure
+  - page-3-ere-verbs
+
+- id: q-normal-2
+  difficulty: normal
+  text: What is the correct present tense conjugation of "dormire" for "noi"?
+  answers:
+  - id: a-normal-2-1
+    text: dormo
+  - id: a-normal-2-2
+    text: dormono
+  - id: a-normal-2-3
+    text: dormiamo
+  - id: a-normal-2-4
+    text: dormite
+  correct_answer: a-normal-2-3
+  weight: 10.0
+  feedback: Regular -IRE verbs use the -iamo ending for 'noi'.
+  revision_page_ids:
+  - page-4-ire-verbs
+
+- id: q-normal-3
+  difficulty: normal
+  text: Which formal question should you use to ask a stranger if they speak English?
+  answers:
+  - id: a-normal-3-1
+    text: Parli inglese?
+  - id: a-normal-3-2
+    text: Parla inglese?
+  - id: a-normal-3-3
+    text: Parlate inglese?
+  - id: a-normal-3-4
+    text: Parlano inglese?
+  correct_answer: a-normal-3-2
+  weight: 10.0
+  feedback: 'Parla inglese?' uses the formal third-person variant required for polite interactions with strangers.
+  revision_page_ids:
+  - page-8-more-phrases
+
+- id: q-normal-4
+  difficulty: normal
+  text: How do you conjugate the verb "avere" for the subject pronoun "loro"?
+  answers:
+  - id: a-normal-4-1
+    text: ho
+  - id: a-normal-4-2
+    text: ha
+  - id: a-normal-4-3
+    text: abbiamo
+  - id: a-normal-4-4
+    text: hanno
+  correct_answer: a-normal-4-4
+  weight: 10.0
+  feedback: The correct form for 'loro' is 'hanno'.
+  revision_page_ids:
+  - page-6-avere
+
+- id: q-normal-5
+  difficulty: normal
+  text: When saying "Mi chiamo Marco", what is the underlying sentence logic?
+  answers:
+  - id: a-normal-5-1
+    text: My name belongs to Marco.
+  - id: a-normal-5-2
+    text: Myself I call Marco.
+  - id: a-normal-5-3
+    text: Marco is my identification.
+  - id: a-normal-5-4
+    text: I am called by Marco.
+  correct_answer: a-normal-5-2
+  weight: 10.0
+  feedback: 'Mi chiamo' literally interprets to "Myself I call", modifying standard English SVO expectations.
+  revision_page_ids:
+  - page-7-basic-phrases
+
+- id: q-hard-1
+  difficulty: hard
+  text: Why do bodily sensations like hunger (fame) change the choice of verb when converting from English to Italian?
+  answers:
+  - id: a-hard-1-1
+    text: Italian uses 'essere' for hunger, unlike English.
+  - id: a-hard-1-2
+    text: Italian conceptualizes sensations as objects you "have" (avere) rather than states you "are" (essere).
+  - id: a-hard-1-3
+    text: The sentence layout changes to Object-Subject-Verb.
+  - id: a-hard-1-4
+    text: Hunger is considered a permanent trait in Italian culture.
+  correct_answer: a-hard-1-2
+  weight: 10.0
+  feedback: In Italian, you possess conditions like hunger or cold, demanding 'avere' plus a noun object (e.g., Ho fame).
+  revision_page_ids:
+  - page-6-avere
+
+- id: q-hard-2
+  difficulty: hard
+  text: Identify the phrase that properly constructs an SVO sentence meaning "They have a car" and "She is happy".
+  answers:
+  - id: a-hard-2-1
+    text: Sono una macchina; Ha felice.
+  - id: a-hard-2-2
+    text: Hanno una macchina; È felice.
+  - id: a-hard-2-3
+    text: Abbiamo una macchina; Sono felice.
+  - id: a-hard-2-4
+    text: Avete una macchina; Sei felice.
+  correct_answer: a-hard-2-2
+  weight: 10.0
+  feedback: 'Hanno' translates to 'they have' (possession), while 'È' means 'she is' (state/attribute).
+  revision_page_ids:
+  - page-5-essere
+  - page-6-avere
+
+- id: q-hard-3
+  difficulty: hard
+  text: Translate "They are cold" using correct Italian SVO architecture rules.
+  answers:
+  - id: a-hard-3-1
+    text: Sono freddi.
+  - id: a-hard-3-2
+    text: Loro sono freddo.
+  - id: a-hard-3-3
+    text: Hanno freddo.
+  - id: a-hard-3-4
+    text: Abbiamo freddo.
+  correct_answer: a-hard-3-3
+  weight: 10.0
+  feedback: "They are cold" uses 'avere' -> 'Hanno freddo', dropping the pronoun naturally.
+  revision_page_ids:
+  - page-6-avere
+
+- id: q-hard-4
+  difficulty: hard
+  text: Which structural modification turns the statement "Parli inglese" into an informal question?
+  answers:
+  - id: a-hard-4-1
+    text: You must move the verb to the front of the sentence.
+  - id: a-hard-4-2
+    text: You simply change your vocal intonation or add a question mark; word order stays identical.
+  - id: a-hard-4-3
+    text: You must add an auxiliary helping verb like "do".
+  - id: a-hard-4-4
+    text: You must include the pronoun 'tu' explicitly.
+  correct_answer: a-hard-4-2
+  weight: 10.0
+  feedback: Italian doesn't use auxiliary words like "do" to form questions. The SVO sequence remains unchanged; intonation shifts it to a question.
+  revision_page_ids:
+  - page-1b-svo-structure
+  - page-8-more-phrases
+
+- id: q-hard-5
+  difficulty: hard
+  text: What is the direct object in the sentence "Apro la porta"?
+  answers:
+  - id: a-hard-5-1
+    text: io (implied)
+  - id: a-hard-5-2
+    text: Apro
+  - id: a-hard-5-3
+    text: la porta
+  - id: a-hard-5-4
+    text: There is no direct object.
+  correct_answer: a-hard-5-3
+  weight: 10.0
+  feedback: 'La porta' (the door) is the object receiving the action of the verb 'Apro'.
+  revision_page_ids:
+  - page-4-ire-verbs

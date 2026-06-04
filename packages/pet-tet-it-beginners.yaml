@@ -1,0 +1,134 @@
+id: pet-tet-it-beginners
+title: Cracking the PET and TET: A Guide for First-Time IT Candidates
+description: A comprehensive orientation package covering Pre-Employment Tests (PET) and Technical Evaluation Tests (TET) tailored specifically for first-time exam takers in the tech sector.
+version: 1.0.0
+tags:
+- pre-employment-testing
+- technical-evaluation
+- it-careers
+- test-strategy
+- behavioral-assessment
+- software-engineering
+passing_score: 0.8
+pages:
+- id: page-1-welcome-demystified
+  title: Demystifying the PET and TET Architecture
+  content: |
+    # Demystifying the PET and TET Architecture
+
+    Welcome to your foundational guide. If this is your first time facing a formal corporate assessment process in the IT domain, it is completely natural to feel overwhelmed. Knowing the landscape transforms anxiety into a distinct strategic advantage.
+
+    Companies hiring information technology professionals usually evaluate you across two totally separate dimensions using two core assessment families:
+
+    ---
+
+    ### 1. The PET (Pre-Employment Test)
+    * **The Focus:** Cognitive ability, behavioral traits, workplace culture fit, and situational judgment.
+    * **The Objective:** To discover how you solve abstract problems, collaborate with engineering teams, handle project pressure, and align with company values. 
+
+    ### 2. The TET (Technology Exam / Technical Evaluation Test)
+    * **The Focus:** Hard engineering skills, algorithmic efficiency, syntax, architecture, and tech-stack domain competency.
+    * **The Objective:** To verify that your code works safely, scales cleanly, and solves business requirements efficiently.
+
+    ---
+
+    > **First-Time Taker Anchor Rule:** A PET does not have a single hidden "correct" answers schema—it maps your real behavioral profile. A TET, however, evaluates hard technical execution. Let's look at how to tackle both.
+
+- id: page-2-pet-anatomy
+  title: Inside the PET: Behavioral & Situational Judgment
+  content: |
+    # Inside the PET: Behavioral & Situational Judgment
+
+    The PET handles **Situational Judgment Tests (SJTs)**. For IT professionals, these are contextual scenarios simulating typical workplace environments (e.g., missed sprint deadlines, scope creep, or production bugs).
+
+    ### SVO Action Mapping in PET Scenarios:
+    When reading a behavioral prompt, train your brain to isolate the core problem using structural tracking:
+    * **The Trigger (Situation):** A critical code deployment fails on a Friday afternoon.
+    * **The Complication:** The team lead is out of the office, and the client is actively complaining.
+    * **Your Action Options:** How do you act? Do you roll back the build unilaterally, panic-patch it live, or establish a triage channel?
+
+    ### Core Evaluation Verticals:
+    1. **Collaboration & Psychological Safety:** How you treat junior developers and cross-functional teams (QA, Product Managers).
+    2. **Ownership & Accountability:** Whether you own structural errors or shift blame to legacy systems or environment drift.
+    3. **Triage Prioritization:** Your capacity to address high-severity service outages methodically rather than hacking fixes under pressure.
+
+- id: page-3-tet-anatomy
+  title: Inside the TET: Code Logic & Systems Design
+  content: |
+    # Inside the TET: Code Logic & Systems Design
+
+    The TET is your platform to prove concrete technical capacity. For early-career engineering pros and first-time takers, this test usually breaks down into three distinct areas:
+
+    ---
+
+    ### 1. Code Tracing & Logic Drills
+    You will look at raw code blocks and execute them line-by-line mentally. The exam will ask you to identify structural bugs, determine final variable values, or predict precise console outputs.
+
+    ### 2. Algorithmic Efficiency
+    You need to demonstrate an awareness of resources. Writing code that works is only half the battle; it must run without consuming excessive CPU time or memory. You'll be tested on your ability to optimize basic data loops and operations.
+
+    ### 3. Basic Systems Layout
+    Understanding how data travels between systems:
+    * **The Request Side:** How a user interaction triggers an application command.
+    * **The Processing Layer:** How your software components process that logic.
+    * **The Persistence Layer:** How the results are safely committed to a database.
+
+- id: page-4-anxiety-management
+  title: Tactical Test Psychology for First-Time Takers
+  content: |
+    # Tactical Test Psychology for First-Time Takers
+
+    Test anxiety is a genuine performance killer in IT assessments. When your stress levels spike, your working memory shrinks, making it difficult to debug code blocks or evaluate complex logic patterns calmly.
+
+    Implement these three operational rules to maintain mental clarity:
+
+    ---
+
+    ### 🛡️ Rule 1: The 60-Second Triage Rule
+    When you open a complex code question or a long situational prompt, spend the first 60 seconds reading it entirely without clicking an answer. Identify the core variable or constraint first before checking the multiple-choice options.
+
+    ### ⏱️ Rule 2: The Budgeted Time Allocator
+    TET exams are designed with intentional time pressure. If a technical challenge or bug hunt takes longer than 3 minutes without clear progress, flag it for review, move on, and protect your remaining time budget. Secure the easier points first.
+
+    ### 🧠 Rule 3: Avoid the "Perfect Candidate" Fallacy
+    In the behavioral PET section, do not try to guess what the HR department wants to hear. Interactive algorithms flag inconsistent answers if you try to game the profile. Authenticity remains your safest path to a predictable score.
+
+- id: page-5-environment-prep
+  title: Technical Readiness & Environment Setup
+  content: |
+    # Technical Readiness & Environment Setup
+
+    Many first-time takers fail tests before the timer even starts because of environmental errors or system configuration issues. Modern IT assessments are highly regulated and use automated proctoring software.
+
+    ### Pre-Exam Checklist:
+    * **The Proctoring Software Layer:** Most platforms require a dedicated background extension or browser app that blocks extra open tabs and external displays. Install this 24 hours in advance.
+    * **The Hardware Sandbox:** Verify your webcam, microphone, and internet stability. A sudden drop in network connectivity can invalidate your session.
+    * **The Development Environment Sandbox:** If the TET includes a live coding IDE sandbox, check whether it has auto-complete enabled or if you are required to type out pure syntax manually.
+
+    > **Critical Reminder:** Keep a clean, physical piece of scratch paper on your desk to trace data mutations and system variables manually. Let's practice with some real sample challenges.
+
+- id: page-6-sample-pet-situations
+  title: Practicing the PET: Behavioral Breakdown
+  content: |
+    # Practicing the PET: Behavioral Breakdown
+
+    Let's walk through an actual behavioral scenario that you might face in an IT recruitment process.
+
+    ### The Scenario:
+    Your product team is working toward a hard release date. A QA engineer flags an edge-case bug in your component that happens only occasionally. Fixing it perfectly will delay the deployment cycle by 48 hours. The business lead is pushing to deploy immediately anyway.
+
+    ### Evaluating Your Strategic Options:
+    * **Option A (Aggressive/Risky):** Ignore the QA flag, push the code, and hope the user base never triggers the edge-case error path.
+    * **Option B (Collaborative Triage):** Document the bug immediately, assess the real blast radius of the error, and sync up with the Product Manager to schedule a hotfix right after launch.
+    * **Option C (Rigid/Uncompromising):** Refuse to sign off on the build deployment entirely, creating a standoff with business operations.
+
+    *Effective IT professionals choose Option B. They balance engineering quality with operational goals while maintaining complete system transparency.*
+
+- id: page-7-sample-tet-logic
+  title: Practicing the TET: Code & Logic Analysis
+  content: |
+    # Practicing the TET: Code & Logic Analysis
+
+    Now let's switch to a technical evaluation test pattern. You will regularly encounter logic tracing puzzles designed to test your attention to state mutations and data flow.
+
+    ### Consider this generic pseudo-code block:
