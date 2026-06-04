@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useBlocker } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
@@ -6,12 +6,15 @@ import { useToast } from "../hooks/useToast";
 import type { AdminPackageSummary } from "../schemas/package";
 import {
   AdminAIPackageError,
+  type AdminPackageValidationResult,
   deleteAdminPackage,
   fetchAdminPackages,
   generateAdminPackage,
   publishAdminPackage,
   refreshAdminPackage,
   updateAdminPackage,
+  validateAdminPackage,
+  validateAdminPackageUpload,
 } from "../services/api";
 import {
   ADMIN_TASK_NOTICE_EVENT,
@@ -49,8 +52,10 @@ export function AdminPackagesPage() {
   const [packages, setPackages] = useState<AdminPackageSummary[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [publishYAML, setPublishYAML] = useState("");
+  const [publishValidationMessage, setPublishValidationMessage] = useState("");
+  const [publishValidationErrors, setPublishValidationErrors] = useState<string[]>([]);
   const [publishStatus, setPublishStatus] = useState<
-    "idle" | "publishing" | "success" | "error"
+    "idle" | "validating" | "uploading" | "publishing" | "success" | "error"
   >("idle");
   const [generateTopic, setGenerateTopic] = useState("");
   const [generateAudience, setGenerateAudience] = useState("general learners");
@@ -74,6 +79,8 @@ export function AdminPackagesPage() {
   const isActionInFlight =
     generateStatus === "generating" ||
     publishStatus === "publishing" ||
+    publishStatus === "validating" ||
+    publishStatus === "uploading" ||
     refreshingPackageId !== null ||
     deletingPackageId !== null ||
     savingTagsPackageId !== null;
@@ -188,6 +195,28 @@ export function AdminPackagesPage() {
     enqueueAdminTaskNotice(level, message);
   }
 
+  function applyPackageValidationResult(
+    result: AdminPackageValidationResult,
+    includeYamlContent: boolean,
+  ) {
+    if (includeYamlContent && result.yaml_content) {
+      setPublishYAML(result.yaml_content);
+    }
+
+    if (result.valid && result.preview) {
+      setPublishStatus("success");
+      setPublishValidationErrors([]);
+      setPublishValidationMessage(
+        `Validated package '${result.preview.id}' (${result.preview.page_count} pages, ${result.preview.question_count} questions).`,
+      );
+      return;
+    }
+
+    setPublishStatus("error");
+    setPublishValidationErrors(result.formatted_errors);
+    setPublishValidationMessage("Package YAML validation failed.");
+  }
+
   async function setAvailability(pkg: AdminPackageSummary, availability: Availability) {
     try {
       const updated = await updateAdminPackage(adminToken, pkg.id, {
@@ -222,22 +251,80 @@ export function AdminPackagesPage() {
   async function handlePublishPackage() {
     if (!publishYAML.trim()) {
       setPublishStatus("error");
+      setPublishValidationMessage("Paste package YAML or upload a YAML file first.");
+      setPublishValidationErrors([]);
       return;
     }
 
     setPublishStatus("publishing");
+    setPublishValidationMessage("");
+    setPublishValidationErrors([]);
     try {
       const created = await publishAdminPackage(adminToken, publishYAML);
       setPackages((current) => [created, ...current]);
       setPublishYAML("");
       setPublishStatus("success");
+      setPublishValidationMessage("Package published.");
+      setPublishValidationErrors([]);
       persistCompletionNotice("success", `Package '${created.id}' published.`);
-    } catch {
+    } catch (error) {
       setPublishStatus("error");
+      setPublishValidationMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not publish package. Validate YAML and try again.",
+      );
+      setPublishValidationErrors([]);
       persistCompletionNotice(
         "error",
         "Could not publish package. Validate YAML and try again.",
       );
+    }
+  }
+
+  async function handleValidatePackage() {
+    if (!publishYAML.trim()) {
+      setPublishStatus("error");
+      setPublishValidationMessage("Paste package YAML before validating.");
+      setPublishValidationErrors([]);
+      return;
+    }
+
+    setPublishStatus("validating");
+    setPublishValidationMessage("");
+    setPublishValidationErrors([]);
+    try {
+      const result = await validateAdminPackage(adminToken, publishYAML);
+      applyPackageValidationResult(result, false);
+    } catch (error) {
+      setPublishStatus("error");
+      setPublishValidationMessage(
+        error instanceof Error ? error.message : "Could not validate package YAML.",
+      );
+      setPublishValidationErrors([]);
+    }
+  }
+
+  async function handleUploadPackageFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setPublishStatus("uploading");
+    setPublishValidationMessage("");
+    setPublishValidationErrors([]);
+    try {
+      const result = await validateAdminPackageUpload(adminToken, file);
+      applyPackageValidationResult(result, true);
+    } catch (error) {
+      setPublishStatus("error");
+      setPublishValidationMessage(
+        error instanceof Error ? error.message : "Could not validate uploaded YAML.",
+      );
+      setPublishValidationErrors([]);
+    } finally {
+      event.target.value = "";
     }
   }
 
@@ -512,11 +599,41 @@ export function AdminPackagesPage() {
             rows={10}
           />
         </label>
+        <label className="admin-page__field" htmlFor="publish-package-upload">
+          <span>Upload YAML file</span>
+          <input
+            id="publish-package-upload"
+            type="file"
+            accept=".yaml,.yml"
+            onChange={(event) => void handleUploadPackageFile(event)}
+          />
+        </label>
         <div className="admin-page__actions">
           <button
             type="button"
+            onClick={() => void handleValidatePackage()}
+            disabled={
+              publishStatus === "publishing" ||
+              publishStatus === "validating" ||
+              publishStatus === "uploading"
+            }
+            aria-busy={publishStatus === "validating"}
+          >
+            <span className="admin-page__button-content">
+              {publishStatus === "validating" && (
+                <span className="admin-page__button-spinner" aria-hidden="true" />
+              )}
+              <span>Validate YAML</span>
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => void handlePublishPackage()}
-            disabled={publishStatus === "publishing"}
+            disabled={
+              publishStatus === "publishing" ||
+              publishStatus === "validating" ||
+              publishStatus === "uploading"
+            }
             aria-busy={publishStatus === "publishing"}
           >
             <span className="admin-page__button-content">
@@ -526,11 +643,22 @@ export function AdminPackagesPage() {
               <span>Publish package</span>
             </span>
           </button>
-          {publishStatus === "success" && <p aria-live="polite">Package published.</p>}
-          {publishStatus === "error" && (
-            <p role="alert">Could not publish package. Validate YAML and try again.</p>
+          {publishValidationMessage && (
+            <p
+              aria-live={publishStatus === "error" ? "assertive" : "polite"}
+              role={publishStatus === "error" ? "alert" : undefined}
+            >
+              {publishValidationMessage}
+            </p>
           )}
         </div>
+        {publishValidationErrors.length > 0 && (
+          <ul role="alert" className="admin-page__list">
+            {publishValidationErrors.map((errorMessage) => (
+              <li key={errorMessage}>{errorMessage}</li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {status === "loading" && <p aria-busy="true">Loading packages…</p>}

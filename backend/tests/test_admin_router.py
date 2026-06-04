@@ -769,6 +769,115 @@ async def test_admin_publish_package_requires_authentication() -> None:
     _install_admin_override()
 
 
+async def test_admin_validate_package_reports_yaml_line_and_column() -> None:
+    _install_admin_override()
+
+    packages_cache: dict[str, Package] = {}
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages/validate",
+            json={"yaml_content": "id:\n  - bad: yaml: value"},
+        )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert body["preview"] is None
+    assert body["errors"][0]["line"] is not None
+    assert body["errors"][0]["column"] is not None
+    assert "YAML parse error" in body["formatted_errors"][0]
+
+
+async def test_admin_validate_package_reports_duplicate_package_id() -> None:
+    _install_admin_override()
+
+    existing = _sample_package()
+    packages_cache = {existing.id: existing}
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/packages/validate",
+            json={"yaml_content": _publish_yaml_content(existing.id)},
+        )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert body["errors"][0]["path"] == ["id"]
+    assert "already exists" in body["formatted_errors"][0]
+
+
+async def test_admin_validate_package_upload_returns_preview(tmp_path: Path) -> None:
+    _install_admin_override()
+
+    packages_cache: dict[str, Package] = {}
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+
+    upload_path = tmp_path / "candidate.yaml"
+    upload_path.write_text(_publish_yaml_content("upload-demo"), encoding="utf-8")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        with upload_path.open("rb") as upload_file:
+            response = await client.post(
+                "/admin/packages/validate-upload",
+                files={"file": ("candidate.yaml", upload_file, "application/x-yaml")},
+            )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is True
+    assert body["preview"]["id"] == "upload-demo"
+    assert body["preview"]["page_count"] == 1
+    assert body["yaml_content"] is not None
+
+
+async def test_admin_validate_package_upload_rejects_unsafe_filename(
+    tmp_path: Path,
+) -> None:
+    _install_admin_override()
+
+    packages_cache: dict[str, Package] = {}
+    app.dependency_overrides[get_packages_cache] = lambda: packages_cache
+
+    upload_path = tmp_path / "candidate.yaml"
+    upload_path.write_text(_publish_yaml_content("upload-demo"), encoding="utf-8")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        with upload_path.open("rb") as upload_file:
+            response = await client.post(
+                "/admin/packages/validate-upload",
+                files={
+                    "file": (
+                        "../candidate.yaml",
+                        upload_file,
+                        "application/x-yaml",
+                    )
+                },
+            )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Unsafe upload filename rejected"
+
+
 async def test_admin_publish_package_rejects_invalid_yaml(tmp_path: Path) -> None:
     _install_admin_override()
 
@@ -795,7 +904,8 @@ async def test_admin_publish_package_rejects_invalid_yaml(tmp_path: Path) -> Non
     admin_router.PACKAGES_DIR = original_packages_dir
 
     assert response.status_code == 422
-    assert "YAML parse error" in response.json()["detail"]
+    assert response.json()["detail"]["message"] == "Package validation failed"
+    assert "YAML parse error" in response.json()["detail"]["formatted_errors"][0]
 
 
 async def test_admin_publish_package_rejects_schema_validation_error(
@@ -826,7 +936,7 @@ async def test_admin_publish_package_rejects_schema_validation_error(
     admin_router.PACKAGES_DIR = original_packages_dir
 
     assert response.status_code == 422
-    assert response.json()["detail"]["message"] == "Package schema validation failed"
+    assert response.json()["detail"]["message"] == "Package validation failed"
     assert len(response.json()["detail"]["errors"]) > 0
 
 
@@ -856,8 +966,9 @@ async def test_admin_publish_package_rejects_duplicate_id(tmp_path: Path) -> Non
     app.dependency_overrides.clear()
     admin_router.PACKAGES_DIR = original_packages_dir
 
-    assert response.status_code == 409
-    assert response.json()["detail"] == "Package id already exists"
+    assert response.status_code == 422
+    assert response.json()["detail"]["message"] == "Package validation failed"
+    assert "already exists" in response.json()["detail"]["formatted_errors"][0]
 
 
 async def test_admin_publish_package_success_updates_cache_and_writes_file(

@@ -128,6 +128,33 @@ const AdminPackageGenerateResponseSchema = z
     yaml_content: z.string().min(1),
   })
   .strict();
+const AdminPackageValidationIssueSchema = z
+  .object({
+    message: z.string().min(1),
+    path: z.array(z.string()).default([]),
+    line: z.number().int().positive().nullable().optional(),
+    column: z.number().int().positive().nullable().optional(),
+  })
+  .strict();
+const AdminPackageValidationPreviewSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    version: z.string().min(1),
+    page_count: z.number().int().nonnegative(),
+    question_count: z.number().int().nonnegative(),
+  })
+  .strict();
+const AdminPackageValidationResponseSchema = z
+  .object({
+    valid: z.boolean(),
+    preview: AdminPackageValidationPreviewSchema.nullable().optional(),
+    errors: z.array(AdminPackageValidationIssueSchema).default([]),
+    formatted_errors: z.array(z.string()).default([]),
+    yaml_content: z.string().nullable().optional(),
+  })
+  .strict();
 const AdminManagedUserRoleSchema = z.enum(["student", "admin"]);
 const AdminManagedUserSchema = z
   .object({
@@ -195,6 +222,9 @@ const AdminAuditLogEntrySchema = z
 export type AdminAIConfig = z.infer<typeof AdminAIConfigSchema>;
 export type AdminAIConnectionTestResult = z.infer<typeof AdminAIConnectionTestSchema>;
 export type AdminAIKeyUpdateResult = z.infer<typeof AdminAIKeyUpdateResponseSchema>;
+export type AdminPackageValidationResult = z.infer<
+  typeof AdminPackageValidationResponseSchema
+>;
 export type AdminPackageGenerateResponse = z.infer<
   typeof AdminPackageGenerateResponseSchema
 >;
@@ -1226,6 +1256,16 @@ function extractBackendErrorDetail(payload: unknown): string | null {
     typeof asRecord.detail === "object" &&
     typeof (asRecord.detail as Record<string, unknown>).message === "string"
   ) {
+    const detailRecord = asRecord.detail as Record<string, unknown>;
+    const formattedErrors = detailRecord.formatted_errors;
+    if (Array.isArray(formattedErrors)) {
+      const parts = formattedErrors
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter((part) => part.length > 0);
+      if (parts.length > 0) {
+        return parts.join("; ");
+      }
+    }
     const trimmed = (
       (asRecord.detail as Record<string, unknown>).message as string
     ).trim();
@@ -1427,12 +1467,51 @@ export async function publishAdminPackage(
   });
 
   if (!response.ok) {
-    const detail = await response.text();
+    const detail = await readBackendErrorMessage(response);
     throw new Error(`Failed to publish package (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();
   return AdminPackageSummarySchema.parse(data);
+}
+
+export async function validateAdminPackage(
+  token: string,
+  yamlContent: string,
+): Promise<AdminPackageValidationResult> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/packages/validate`, {
+    method: "POST",
+    headers: getAdminHeaders(token),
+    body: JSON.stringify({ yaml_content: yamlContent }),
+  });
+  if (!response.ok) {
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(detail || "Failed to validate package YAML.");
+  }
+  const data: unknown = await response.json();
+  return AdminPackageValidationResponseSchema.parse(data);
+}
+
+export async function validateAdminPackageUpload(
+  token: string,
+  file: File,
+): Promise<AdminPackageValidationResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/packages/validate-upload`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    },
+  );
+  if (!response.ok) {
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(detail || "Failed to validate uploaded YAML.");
+  }
+  const data: unknown = await response.json();
+  return AdminPackageValidationResponseSchema.parse(data);
 }
 
 export async function generateAdminPackage(

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlmodel import Session, select
 
@@ -52,6 +52,11 @@ from app.services.overrides_loader import (
     resolve_effective_availability,
     save_package_overrides,
 )
+from app.services.package_import import (
+    format_package_import_issue,
+    summarise_package_preview,
+    validate_package_yaml_content,
+)
 from app.services.package_loader import PACKAGES_DIR
 from app.services.refresh_metadata_loader import (
     REFRESH_METADATA_FILE,
@@ -93,6 +98,36 @@ class PublishPackageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     yaml_content: str = Field(min_length=1)
+
+
+class AdminPackageValidationIssue(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str
+    path: list[str] = Field(default_factory=list)
+    line: int | None = None
+    column: int | None = None
+
+
+class AdminPackageValidationPreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    title: str
+    description: str
+    version: str
+    page_count: int
+    question_count: int
+
+
+class AdminPackageValidationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    valid: bool
+    preview: AdminPackageValidationPreview | None = None
+    errors: list[AdminPackageValidationIssue] = Field(default_factory=list)
+    formatted_errors: list[str] = Field(default_factory=list)
+    yaml_content: str | None = None
 
 
 class GenerateRequest(BaseModel):
@@ -556,6 +591,68 @@ def _write_package_yaml_file(pkg: Package, package_file: str) -> None:
     package_path = PACKAGES_DIR / package_file
     package_path.parent.mkdir(parents=True, exist_ok=True)
     package_path.write_text(content, encoding="utf-8")
+
+
+def _to_admin_package_validation_response(
+    yaml_content: str,
+    *,
+    package_ids: set[str],
+) -> AdminPackageValidationResponse:
+    result = validate_package_yaml_content(
+        yaml_content,
+        existing_package_ids=package_ids,
+    )
+    preview = None
+    if result.package is not None:
+        preview = AdminPackageValidationPreview.model_validate(
+            summarise_package_preview(result.package)
+        )
+    issues = [
+        AdminPackageValidationIssue(
+            message=issue.message,
+            path=issue.path,
+            line=issue.line,
+            column=issue.column,
+        )
+        for issue in result.issues
+    ]
+    return AdminPackageValidationResponse(
+        valid=result.valid,
+        preview=preview,
+        errors=issues,
+        formatted_errors=[
+            format_package_import_issue(issue) for issue in result.issues
+        ],
+        yaml_content=yaml_content,
+    )
+
+
+def _read_uploaded_yaml_file(upload: UploadFile) -> str:
+    filename = upload.filename or ""
+    if not filename:
+        raise HTTPException(status_code=422, detail="Upload a .yaml or .yml file")
+
+    lowered = filename.lower()
+    if not (lowered.endswith(".yaml") or lowered.endswith(".yml")):
+        raise HTTPException(
+            status_code=422,
+            detail="Only .yaml or .yml files are supported",
+        )
+
+    if any(separator in filename for separator in ("/", "\\")):
+        raise HTTPException(status_code=422, detail="Unsafe upload filename rejected")
+
+    raw_bytes = upload.file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=422, detail="Uploaded file is empty")
+
+    try:
+        return raw_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Uploaded YAML must be UTF-8 encoded",
+        ) from exc
 
 
 @router.get(
@@ -1237,6 +1334,35 @@ async def list_stale_packages(
 
 
 @router.post(
+    "/packages/validate",
+    response_model=AdminPackageValidationResponse,
+)
+async def validate_admin_package(
+    body: PublishPackageRequest,
+    packages: dict[str, Package] = Depends(get_packages_cache),
+) -> AdminPackageValidationResponse:
+    return _to_admin_package_validation_response(
+        body.yaml_content,
+        package_ids=set(packages.keys()),
+    )
+
+
+@router.post(
+    "/packages/validate-upload",
+    response_model=AdminPackageValidationResponse,
+)
+async def validate_admin_package_upload(
+    file: UploadFile = File(...),
+    packages: dict[str, Package] = Depends(get_packages_cache),
+) -> AdminPackageValidationResponse:
+    yaml_content = _read_uploaded_yaml_file(file)
+    return _to_admin_package_validation_response(
+        yaml_content,
+        package_ids=set(packages.keys()),
+    )
+
+
+@router.post(
     "/packages",
     response_model=AdminPackageSummary,
     status_code=201,
@@ -1250,33 +1376,35 @@ async def publish_admin_package(
         get_refresh_metadata_cache
     ),
 ) -> AdminPackageSummary:
-    try:
-        raw = yaml.safe_load(body.yaml_content)
-    except yaml.YAMLError as exc:
-        raise HTTPException(status_code=422, detail=f"YAML parse error: {exc}") from exc
-
-    try:
-        pkg = Package.model_validate(raw)
-    except ValidationError as exc:
-        errors = [
-            {
-                "path": [str(loc) for loc in error["loc"]],
-                "message": error["msg"],
-            }
-            for error in exc.errors()
-        ]
+    validation_result = validate_package_yaml_content(
+        body.yaml_content,
+        existing_package_ids=set(packages.keys()),
+    )
+    if not validation_result.valid or validation_result.package is None:
         raise HTTPException(
             status_code=422,
-            detail={"message": "Package schema validation failed", "errors": errors},
-        ) from exc
+            detail={
+                "message": "Package validation failed",
+                "errors": [
+                    AdminPackageValidationIssue(
+                        message=issue.message,
+                        path=issue.path,
+                        line=issue.line,
+                        column=issue.column,
+                    ).model_dump(mode="json")
+                    for issue in validation_result.issues
+                ],
+                "formatted_errors": [
+                    format_package_import_issue(issue)
+                    for issue in validation_result.issues
+                ],
+            },
+        )
 
-    if pkg.id in packages:
-        raise HTTPException(status_code=409, detail="Package id already exists")
+    pkg = validation_result.package
 
-    output_file = PACKAGES_DIR / f"{pkg.id}.yaml"
     try:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        output_file.write_text(body.yaml_content, encoding="utf-8")
+        _write_package_yaml_file(pkg, f"{pkg.id}.yaml")
     except OSError as exc:
         raise HTTPException(
             status_code=500,

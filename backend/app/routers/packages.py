@@ -1,12 +1,15 @@
-import yaml
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 from app.models.package import Package, PackageSummary
 from app.services.overrides_loader import (
     PackageOverride,
     derive_enabled_from_availability,
     resolve_effective_availability,
+)
+from app.services.package_import import (
+    format_package_import_issue,
+    validate_package_yaml_content,
 )
 
 router = APIRouter(prefix="/packages", tags=["packages"])
@@ -76,20 +79,13 @@ async def list_packages(
 
 @router.post("/validate", response_model=ValidateResponse)
 async def validate_package(body: ValidateRequest) -> ValidateResponse:
-    try:
-        raw = yaml.safe_load(body.yaml_content)
-    except yaml.YAMLError as exc:
-        return ValidateResponse(valid=False, errors=[f"YAML parse error: {exc}"])
-
-    try:
-        pkg = Package.model_validate(raw)
-        return ValidateResponse(valid=True, package_id=pkg.id)
-    except ValidationError as exc:
-        errors = [
-            f"{' -> '.join(str(loc) for loc in error['loc'])}: {error['msg']}"
-            for error in exc.errors()
-        ]
-        return ValidateResponse(valid=False, errors=errors)
+    result = validate_package_yaml_content(body.yaml_content)
+    if result.valid and result.package is not None:
+        return ValidateResponse(valid=True, package_id=result.package.id)
+    return ValidateResponse(
+        valid=False,
+        errors=[format_package_import_issue(issue) for issue in result.issues],
+    )
 
 
 @router.get("/{package_id}", response_model=Package)

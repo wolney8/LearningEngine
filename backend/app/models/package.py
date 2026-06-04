@@ -31,6 +31,8 @@ class Question(BaseModel):
     @model_validator(mode="after")
     def correct_answer_must_exist(self) -> "Question":
         answer_ids = {a.id for a in self.answers}
+        if len(answer_ids) != len(self.answers):
+            raise ValueError("answer ids must be unique within each question")
         if self.correct_answer not in answer_ids:
             raise ValueError(
                 f"correct_answer '{self.correct_answer}' does not match any answer id"
@@ -50,6 +52,14 @@ class Package(BaseModel):
 
     @model_validator(mode="after")
     def validate_package_integrity(self) -> "Package":
+        page_ids_list = [page.id for page in self.pages]
+        if len(set(page_ids_list)) != len(page_ids_list):
+            raise ValueError("page ids must be unique within a package")
+
+        question_ids_list = [question.id for question in self.questions]
+        if len(set(question_ids_list)) != len(question_ids_list):
+            raise ValueError("question ids must be unique within a package")
+
         page_ids = {p.id for p in self.pages}
         for question in self.questions:
             for rpid in question.revision_page_ids:

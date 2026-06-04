@@ -1,6 +1,7 @@
 id: italian-nouns-vocabulary-beginners
-title: "Italian Nouns, Gender Mechanics, and Foundational Vocabulary"
-description: "A companion module to Italian Verbs. Master masculine and feminine nouns, definite/indefinite articles, and core daily vocabulary words."
+title: Italian Nouns, Gender Mechanics, and Foundational Vocabulary
+description: A companion module to Italian Verbs. Master masculine and feminine nouns, definite/indefinite articles, and core
+  daily vocabulary words.
 version: 1.0.0
 tags:
 - italian-language
@@ -12,464 +13,513 @@ tags:
 passing_score: 0.8
 pages:
 - id: page-1-noun-gender-basics
-  title: "The Secret Code of Italian Nouns: Gender"
-  content: |
-    # The Secret Code of Italian Nouns: Gender
-
-    In English, nouns are gender-neutral. A table is just a table, and a book is just a book. In Italian, **every single noun has a grammatical gender**—it is either **masculine** or **feminine**. 
-
-    This has nothing to do with biological sex; it is purely a structural feature of the language. 
-
-    ### The Golden Rule of Word Endings:
-    Most regular Italian nouns reveal their gender and number through their final letter:
-
-    * **Masculine Singular nouns** usually end in **-o** (e.g., *ragazzo* - boy, *libro* - book).
-    * **Feminine Singular nouns** usually end in **-a** (e.g., *ragazza* - girl, *mela* - apple).
-
-    ### The Plural Shift:
-    When you make these nouns plural, their endings change predictably:
-    * Masculine singular nouns ending in **-o** change to **-i** (e.g., *libri* - books).
-    * Feminine singular nouns ending in **-a** change to **-e** (e.g., *mele* - apples).
-
+  title: 'The Secret Code of Italian Nouns: Gender'
+  content: "# The Secret Code of Italian Nouns: Gender\n\nIn English, nouns are gender-neutral. A table is just a table, and\
+    \ a book is just a book. In Italian, **every single noun has a grammatical gender**—it is either **masculine** or **feminine**.\
+    \ \n\nThis has nothing to do with biological sex; it is purely a structural feature of the language. \n\n### The Golden\
+    \ Rule of Word Endings:\nMost regular Italian nouns reveal their gender and number through their final letter:\n\n* **Masculine\
+    \ Singular nouns** usually end in **-o** (e.g., *ragazzo* - boy, *libro* - book).\n* **Feminine Singular nouns** usually\
+    \ end in **-a** (e.g., *ragazza* - girl, *mela* - apple).\n\n### The Plural Shift:\nWhen you make these nouns plural,\
+    \ their endings change predictably:\n* Masculine singular nouns ending in **-o** change to **-i** (e.g., *libri* - books).\n\
+    * Feminine singular nouns ending in **-a** change to **-e** (e.g., *mele* - apples).\n"
 - id: page-2-irregular-nouns-e
-  title: "The Tricky Group: Nouns Ending in -E"
-  content: |
-    # The Tricky Group: Nouns Ending in -E
-
-    While the **-o / -a** rule handles the majority of vocabulary, there is a substantial third group of nouns that end in **-e** in their singular form. 
-
-    These nouns can be **either masculine or feminine**, and you often have to memorize their gender alongside their meaning.
-
-    ### Examples of -E Nouns:
-    * **Masculine:** *il cane* (the dog), *il ristorante* (the restaurant).
-    * **Feminine:** *la notte* (the night), *la stazione* (the station).
-
-    ### The Universal Plural Rule for -E:
-    No matter whether an **-e** noun is masculine or feminine, its plural ending *always* changes to **-i**.
-
-    * Singular: *il cane* (masculine) $\rightarrow$ Plural: *i cani* (dogs)
-    * Singular: *la notte* (feminine) $\rightarrow$ Plural: *le notti* (nights)
-
+  title: 'The Tricky Group: Nouns Ending in -E'
+  content: "# The Tricky Group: Nouns Ending in -E\n\nWhile the **-o / -a** rule handles the majority of vocabulary, there\
+    \ is a substantial third group of nouns that end in **-e** in their singular form. \n\nThese nouns can be **either masculine\
+    \ or feminine**, and you often have to memorize their gender alongside their meaning.\n\n### Examples of -E Nouns:\n*\
+    \ **Masculine:** *il cane* (the dog), *il ristorante* (the restaurant).\n* **Feminine:** *la notte* (the night), *la stazione*\
+    \ (the station).\n\n### The Universal Plural Rule for -E:\nNo matter whether an **-e** noun is masculine or feminine,\
+    \ its plural ending *always* changes to **-i**.\n\n* Singular: *il cane* (masculine) $\\rightarrow$ Plural: *i cani* (dogs)\n\
+    * Singular: *la notte* (feminine) $\\rightarrow$ Plural: *le notti* (nights)\n"
 - id: page-3-indefinite-articles
-  title: "Indefinite Articles: Saying \"A\" or \"An\""
-  content: |
-    # Indefinite Articles: Saying "A" or "An"
+  title: 'Indefinite Articles: Saying "A" or "An"'
+  content: '# Indefinite Articles: Saying "A" or "An"
 
-    Before you hook a noun into your SVO verb layout (like *Leggo un libro*), you need an article. Let's look at the indefinite articles used to say **"a"** or **"an"**.
+
+    Before you hook a noun into your SVO verb layout (like *Leggo un libro*), you need an article. Let''s look at the indefinite
+    articles used to say **"a"** or **"an"**.
+
 
     The choice depends strictly on the gender and the starting letter of the noun:
 
+
     ### Masculine Nouns:
+
     * **un:** Used for most masculine words (*un libro* - a book, *un cane* - a dog).
-    * **uno:** Used for masculine words starting with **z** or a **s + consonant** cluster (*uno zaino* - a backpack, *uno studente* - a student).
+
+    * **uno:** Used for masculine words starting with **z** or a **s + consonant** cluster (*uno zaino* - a backpack, *uno
+    studente* - a student).
+
 
     ### Feminine Nouns:
+
     * **una:** Used for feminine words starting with a consonant (*una mela* - an apple, *una casa* - a house).
-    * **un':** Used for feminine words starting with a vowel. The ' replaces the "a" to smooth out pronunciation (*un'amica* - a female friend, *un'isola* - an island).
 
+    * **un'':** Used for feminine words starting with a vowel. The '' replaces the "a" to smooth out pronunciation (*un''amica*
+    - a female friend, *un''isola* - an island).
+
+    '
 - id: page-4-definite-articles
-  title: "Definite Articles: Saying \"The\""
-  content: |
-    # Definite Articles: Saying "The"
+  title: 'Definite Articles: Saying "The"'
+  content: '# Definite Articles: Saying "The"
 
-    English has exactly one word for this: **the**. Italian has **seven** distinct variations based on gender, number, and starting letters. Mastery of this table unlocks authentic sentence construction.
+
+    English has exactly one word for this: **the**. Italian has **seven** distinct variations based on gender, number, and
+    starting letters. Mastery of this table unlocks authentic sentence construction.
+
 
     ### Masculine Definite Articles:
+
     * **il** (Singular) / **i** (Plural): For words starting with normal consonants. (*il libro* $\rightarrow$ *i libri*)
-    * **lo** (Singular) / **gli** (Plural): For words starting with **z**, **s + consonant**, or a vowel. (*lo studente* $\rightarrow$ *gli studenti*)
-    * **l'** (Singular) / **gli** (Plural): When a masculine word starts with a vowel. (*l'anno* $\rightarrow$ *gli anni*)
+
+    * **lo** (Singular) / **gli** (Plural): For words starting with **z**, **s + consonant**, or a vowel. (*lo studente* $\rightarrow$
+    *gli studenti*)
+
+    * **l''** (Singular) / **gli** (Plural): When a masculine word starts with a vowel. (*l''anno* $\rightarrow$ *gli anni*)
+
 
     ### Feminine Definite Articles:
+
     * **la** (Singular) / **le** (Plural): For words starting with any consonant. (*la casa* $\rightarrow$ *le case*)
-    * **l'** (Singular) / **le** (Plural): For words starting with a vowel. (*l'ora* $\rightarrow$ *le ore*)
 
+    * **l''** (Singular) / **le** (Plural): For words starting with a vowel. (*l''ora* $\rightarrow$ *le ore*)
+
+    '
 - id: page-5-numbers-counting
-  title: "Core Vocabulary: Numbers 1 to 20"
-  content: |
-    # Core Vocabulary: Numbers 1 to 20
+  title: 'Core Vocabulary: Numbers 1 to 20'
+  content: '# Core Vocabulary: Numbers 1 to 20
 
-    Numbers are essential objects in SVO sentences (e.g., *Ho due gatti* - I have two cats). Practice memorizing this numerical set:
+
+    Numbers are essential objects in SVO sentences (e.g., *Ho due gatti* - I have two cats). Practice memorizing this numerical
+    set:
+
 
     | Digits | Italian Word | Digits | Italian Word |
+
     | :--- | :--- | :--- | :--- |
+
     | **1** | uno | **11** | undici |
+
     | **2** | due | **12** | dodici |
+
     | **3** | tre | **13** | tredici |
+
     | **4** | quattro | **14** | quattordici |
+
     | **5** | cinque | **15** | quindici |
+
     | **6** | sei | **16** | sedici |
+
     | **7** | sette | **17** | diciassette |
+
     | **8** | otto | **18** | diciotto |
+
     | **9** | nove | **19** | diciannove |
+
     | **10** | dieci | **20** | venti |
+
 
     *Pronunciation tip:* In words like *cinque*, the "ci-" sounds like the "ch" in "choose" (*cheen-kweh*).
 
+    '
 - id: page-6-telling-time
-  title: "Core Vocabulary: Telling Time"
-  content: |
-    # Essential Frameworks: Telling Time
+  title: 'Core Vocabulary: Telling Time'
+  content: '# Essential Frameworks: Telling Time
 
-    To ask what time it is, Italians say **"Che ore sono?"** (Literally: "What hours are they?"). Because "hours" is plural and feminine, our responses use the plural feminine definite article **le** coupled with our irregular verb **essere** (*sono*).
+
+    To ask what time it is, Italians say **"Che ore sono?"** (Literally: "What hours are they?"). Because "hours" is plural
+    and feminine, our responses use the plural feminine definite article **le** coupled with our irregular verb **essere**
+    (*sono*).
+
 
     ### Standard Formulations:
-    * **Sono le due.** (It is 2 o'clock.)
-    * **Sono le cinque.** (It is 5 o'clock.)
+
+    * **Sono le due.** (It is 2 o''clock.)
+
+    * **Sono le cinque.** (It is 5 o''clock.)
+
     * **Sono le dieci e trenta.** (It is 10:30.)
 
+
     ### The Three Singular Exceptions:
-    For 1 o'clock, midday, and midnight, the framework switches to singular architecture because you are dealing with a single point in time:
-    * **È l'una.** (It is 1 o'clock.)
+
+    For 1 o''clock, midday, and midnight, the framework switches to singular architecture because you are dealing with a single
+    point in time:
+
+    * **È l''una.** (It is 1 o''clock.)
+
     * **È mezzogiorno.** (It is midday / noon.)
+
     * **È mezzanotte.** (It is midnight.)
 
+    '
 - id: page-7-days-months
-  title: "Core Vocabulary: Days and Months"
-  content: |
-    # Tracking Time: Days and Months
+  title: 'Core Vocabulary: Days and Months'
+  content: '# Tracking Time: Days and Months
 
-    Note a key structural variance from English: **days of the week and months are not capitalized in Italian** unless they start a sentence.
+
+    Note a key structural variance from English: **days of the week and months are not capitalized in Italian** unless they
+    start a sentence.
+
 
     ### Days of the Week (I giorni della settimana):
+
     * **lunedì** (Monday)
+
     * **martedì** (Tuesday)
+
     * **mercoledì** (Wednesday)
+
     * **giovedì** (Thursday)
+
     * **venerdì** (Friday)
+
     * **sabato** (Saturday)
+
     * **domenica** (Sunday)
 
+
     ### Core Months (I mesi):
-    * *gennaio* (January), *febbraio* (February), *marzo* (March), *aprile* (April), *maggio* (May), *giugno* (June), *luglio* (July), *agosto* (August), *settembre* (September), *ottobre* (October), *novembre* (November), *dicembre* (December).
 
+    * *gennaio* (January), *febbraio* (February), *marzo* (March), *aprile* (April), *maggio* (May), *giugno* (June), *luglio*
+    (July), *agosto* (August), *settembre* (September), *ottobre* (October), *novembre* (November), *dicembre* (December).
+
+    '
 - id: page-8-spatial-directions
-  title: "Navigating Space: Essential Directions"
-  content: |
-    # Navigating Space: Essential Directions
+  title: 'Navigating Space: Essential Directions'
+  content: '# Navigating Space: Essential Directions
 
-    When you travel, you need to navigate spatial locations. Here is the foundational dictionary kit for moving through an Italian environment:
+
+    When you travel, you need to navigate spatial locations. Here is the foundational dictionary kit for moving through an
+    Italian environment:
+
 
     ### Key Verbs to Combine:
+
     Pair these with the commands you learned in the verbs pack (like *Gira* - Turn!):
+
     * **a destra** (to the right)
+
     * **a sinistra** (to the left)
+
     * **dritto** (straight ahead)
 
+
     ### Key Spatial Locations (Objects):
+
     * **il ristorante** (the restaurant)
-    * **l'albergo** (the hotel)
+
+    * **l''albergo** (the hotel)
+
     * **la stazione** (the station)
+
     * **il bagno** (the bathroom)
 
-    *Example Application:* **Dov'è il bagno?** (Where is the bathroom?)
 
+    *Example Application:* **Dov''è il bagno?** (Where is the bathroom?)
+
+    '
 - id: page-9-adjective-agreement
-  title: "The Harmony Rule: Adjective Agreement"
-  content: |
-    # The Harmony Rule: Adjective Agreement
-
-    Now let's connect nouns with descriptive adjectives. In Italian, **adjectives must match the gender and number of the noun they modify**. 
-
-    Furthermore, adjectives usually sit *after* the noun, not before it.
-
-    ### Look at the word "rossa" (red) shifting to match its noun:
-    * **Masculine Singular:** *il libro rosso* (the red book)
-    * **Feminine Singular:** *la mela rossa* (the red apple)
-    * **Masculine Plural:** *i libri rossi* (the red books)
-    * **Feminine Plural:** *le mele rosse* (the red apples)
-
-    > **Structural Insight:** Notice how every single word ending within the phrase harmonizes cleanly. *Le mele rosse* creates a rolling rhythm where the feminine plural structure matches across the article, the noun, and the adjective!
-
+  title: 'The Harmony Rule: Adjective Agreement'
+  content: "# The Harmony Rule: Adjective Agreement\n\nNow let's connect nouns with descriptive adjectives. In Italian, **adjectives\
+    \ must match the gender and number of the noun they modify**. \n\nFurthermore, adjectives usually sit *after* the noun,\
+    \ not before it.\n\n### Look at the word \"rossa\" (red) shifting to match its noun:\n* **Masculine Singular:** *il libro\
+    \ rosso* (the red book)\n* **Feminine Singular:** *la mela rossa* (the red apple)\n* **Masculine Plural:** *i libri rossi*\
+    \ (the red books)\n* **Feminine Plural:** *le mele rosse* (the red apples)\n\n> **Structural Insight:** Notice how every\
+    \ single word ending within the phrase harmonizes cleanly. *Le mele rosse* creates a rolling rhythm where the feminine\
+    \ plural structure matches across the article, the noun, and the adjective!\n"
 - id: page-10-comprehensive-building
-  title: "Complete Construction Practice"
-  content: |
-    # Putting It All Together
+  title: Complete Construction Practice
+  content: '# Putting It All Together
 
-    You now hold the keys to basic Italian structural literacy. Let's stack elements from your verbs training module onto this noun/vocabulary module to build complete expressions:
+
+    You now hold the keys to basic Italian structural literacy. Let''s stack elements from your verbs training module onto
+    this noun/vocabulary module to build complete expressions:
+
 
     ---
 
+
     ### Formula 1: [Dropped Pronoun Verb] + [Article] + [Noun] + [Adjective]
+
     * **Leggo un libro nuovo.**
+
     * *Translation:* I read a new book. (Verb: *Leggo* | Indefinite article: *un* | Noun: *libro* | Adjective: *nuovo*)
 
+
     ### Formula 2: [Dropped Pronoun Verb] + [Number Object] + [Plural Noun]
+
     * **Abbiamo due cani.**
+
     * *Translation:* We have two dogs. (Verb: *Abbiamo* | Number: *due* | Noun: *cani*)
+
 
     With these two modules unified, your language infrastructure is solid. Enjoy practicing!
 
+    '
 questions:
 - id: q-easy-1
   difficulty: easy
-  text: "What is the standard singular ending for a regular feminine Italian noun?"
+  text: What is the standard singular ending for a regular feminine Italian noun?
   answers:
   - id: a-easy-1-1
-    text: "-o"
+    text: -o
   - id: a-easy-1-2
-    text: "-a"
+    text: -a
   - id: a-easy-1-3
-    text: "-i"
+    text: -i
   - id: a-easy-1-4
-    text: "-e"
+    text: -e
   correct_answer: a-easy-1-2
-  weight: 10.0
-  feedback: "Regular feminine singular nouns naturally end with the letter -a (like 'mela')."
+  weight: 20.0
+  feedback: Regular feminine singular nouns naturally end with the letter -a (like 'mela').
   revision_page_ids:
   - page-1-noun-gender-basics
-
 - id: q-easy-2
   difficulty: easy
-  text: "Which indefinite article should you place before the word \"studente\" (masculine, starting with s+consonant)?"
+  text: Which indefinite article should you place before the word "studente" (masculine, starting with s+consonant)?
   answers:
   - id: a-easy-2-1
-    text: "un"
+    text: un
   - id: a-easy-2-2
-    text: "una"
+    text: una
   - id: a-easy-2-3
-    text: "uno"
+    text: uno
   - id: a-easy-2-4
-    text: "un'"
+    text: un'
   correct_answer: a-easy-2-3
-  weight: 10.0
-  feedback: "Masculine nouns beginning with 'z' or 's + consonant' demand the alternative 'uno' article structure."
+  weight: 20.0
+  feedback: Masculine nouns beginning with 'z' or 's + consonant' demand the alternative 'uno' article structure.
   revision_page_ids:
   - page-3-indefinite-articles
-
 - id: q-easy-3
   difficulty: easy
-  text: "How do you say the number \"15\" in Italian?"
+  text: How do you say the number "15" in Italian?
   answers:
   - id: a-easy-3-1
-    text: "dodici"
+    text: dodici
   - id: a-easy-3-2
-    text: "quattordici"
+    text: quattordici
   - id: a-easy-3-3
-    text: "quindici"
+    text: quindici
   - id: a-easy-3-4
-    text: "venti"
+    text: venti
   correct_answer: a-easy-3-3
-  weight: 10.0
-  feedback: "'Quindici' is the distinct numerical term representing 15."
+  weight: 20.0
+  feedback: '''Quindici'' is the distinct numerical term representing 15.'
   revision_page_ids:
   - page-5-numbers-counting
-
 - id: q-easy-4
   difficulty: easy
-  text: "What is the correct translation of \"to the left\"?"
+  text: What is the correct translation of "to the left"?
   answers:
   - id: a-easy-4-1
-    text: "a destra"
+    text: a destra
   - id: a-easy-4-2
-    text: "dritto"
+    text: dritto
   - id: a-easy-4-3
-    text: "a sinistra"
+    text: a sinistra
   - id: a-easy-4-4
-    text: "il bagno"
+    text: il bagno
   correct_answer: a-easy-4-3
-  weight: 10.0
-  feedback: "'A sinistra' means to the left, whereas 'a destra' means to the right."
+  weight: 20.0
+  feedback: '''A sinistra'' means to the left, whereas ''a destra'' means to the right.'
   revision_page_ids:
   - page-8-spatial-directions
-
 - id: q-easy-5
   difficulty: easy
-  text: "Where do descriptive adjectives usually sit in an Italian phrase?"
+  text: Where do descriptive adjectives usually sit in an Italian phrase?
   answers:
   - id: a-easy-5-1
-    text: "Always before the noun, exactly like English."
+    text: Always before the noun, exactly like English.
   - id: a-easy-5-2
-    text: "Usually after the noun they are modifying."
+    text: Usually after the noun they are modifying.
   - id: a-easy-5-3
-    text: "At the very beginning of the sentence before the verb."
+    text: At the very beginning of the sentence before the verb.
   - id: a-easy-5-4
-    text: "Italian does not use adjectives."
+    text: Italian does not use adjectives.
   correct_answer: a-easy-5-2
-  weight: 10.0
-  feedback: "Italian structures position descriptive modifiers directly after the noun block (e.g., il libro rosso)."
+  weight: 20.0
+  feedback: Italian structures position descriptive modifiers directly after the noun block (e.g., il libro rosso).
   revision_page_ids:
   - page-9-adjective-agreement
-
 - id: q-normal-1
   difficulty: normal
-  text: "If the masculine singular word \"libro\" changes to the plural \"libri\", what structural change happens to its companion definite article \"il\"?"
+  text: If the masculine singular word "libro" changes to the plural "libri", what structural change happens to its companion
+    definite article "il"?
   answers:
   - id: a-normal-1-1
-    text: "It stays 'il'."
+    text: It stays 'il'.
   - id: a-normal-1-2
-    text: "It becomes 'le'."
+    text: It becomes 'le'.
   - id: a-normal-1-3
-    text: "It changes to 'i'."
+    text: It changes to 'i'.
   - id: a-normal-1-4
-    text: "It changes to 'gli'."
+    text: It changes to 'gli'.
   correct_answer: a-normal-1-3
-  weight: 10.0
-  feedback: "The masculine plural pair matching standard consonant nouns is 'i' (e.g., i libri)."
+  weight: 20.0
+  feedback: The masculine plural pair matching standard consonant nouns is 'i' (e.g., i libri).
   revision_page_ids:
   - page-4-definite-articles
-
 - id: q-normal-2
   difficulty: normal
-  text: "What is the universal plural ending rule for nouns that end in the letter -e in their singular form?"
+  text: What is the universal plural ending rule for nouns that end in the letter -e in their singular form?
   answers:
   - id: a-normal-2-1
-    text: "They shift to -a if they are feminine."
+    text: They shift to -a if they are feminine.
   - id: a-normal-2-2
-    text: "They always shift to -i, regardless of their grammatical gender."
+    text: They always shift to -i, regardless of their grammatical gender.
   - id: a-normal-2-3
-    text: "They stay identical to their singular form."
+    text: They stay identical to their singular form.
   - id: a-normal-2-4
-    text: "They drop the final vowel completely."
+    text: They drop the final vowel completely.
   correct_answer: a-normal-2-2
-  weight: 10.0
-  feedback: "All singular -e nouns unify under an -i ending pattern when transitioning to plural form."
+  weight: 20.0
+  feedback: All singular -e nouns unify under an -i ending pattern when transitioning to plural form.
   revision_page_ids:
   - page-2-irregular-nouns-e
-
 - id: q-normal-3
   difficulty: normal
-  text: "How do you formulate the phrase \"It is 4 o'clock\" in Italian?"
+  text: How do you formulate the phrase "It is 4 o'clock" in Italian?
   answers:
   - id: a-normal-3-1
-    text: "È quattro ore."
+    text: È quattro ore.
   - id: a-normal-3-2
-    text: "Sono le quattro."
+    text: Sono le quattro.
   - id: a-normal-3-3
-    text: "È l'quattro."
+    text: È l'quattro.
   - id: a-normal-3-4
-    text: "Sono i quattro."
+    text: Sono i quattro.
   correct_answer: a-normal-3-2
-  weight: 10.0
-  feedback: "Time configuration uses plural architecture 'Sono le' combined with the feminine number framework."
+  weight: 20.0
+  feedback: Time configuration uses plural architecture 'Sono le' combined with the feminine number framework.
   revision_page_ids:
   - page-6-telling-time
-
 - id: q-normal-4
   difficulty: normal
-  text: "Which indefinite article choice is proper for the feminine noun \"amica\" (starting with a vowel)?"
+  text: Which indefinite article choice is proper for the feminine noun "amica" (starting with a vowel)?
   answers:
   - id: a-normal-4-1
-    text: "una amica"
+    text: una amica
   - id: a-normal-4-2
-    text: "un amica"
+    text: un amica
   - id: a-normal-4-3
-    text: "un'amica"
+    text: un'amica
   - id: a-normal-4-4
-    text: "uno amica"
+    text: uno amica
   correct_answer: a-normal-4-3
-  weight: 10.0
-  feedback: "Feminine vowel-starting nouns drop the ending of 'una' into an apostrophe ('un'amica') for smoother pronunciation."
+  weight: 20.0
+  feedback: Feminine vowel-starting nouns drop the ending of 'una' into an apostrophe ('un'amica') for smoother pronunciation.
   revision_page_ids:
   - page-3-indefinite-articles
-
 - id: q-normal-5
   difficulty: normal
-  text: "Which spelling statement regarding Italian calendar terms is structurally accurate?"
+  text: Which spelling statement regarding Italian calendar terms is structurally accurate?
   answers:
   - id: a-normal-5-1
-    text: "Days like lunedì must always capitalize their initial letter."
+    text: Days like lunedì must always capitalize their initial letter.
   - id: a-normal-5-2
-    text: "Days of the week and months are kept lowercase unless starting a sentence."
+    text: Days of the week and months are kept lowercase unless starting a sentence.
   - id: a-normal-5-3
-    text: "Only months require full capitalization tracking."
+    text: Only months require full capitalization tracking.
   - id: a-normal-5-4
-    text: "Days are written in block capitals only."
+    text: Days are written in block capitals only.
   correct_answer: a-normal-5-2
-  weight: 10.0
-  feedback: "Unlike English structural practices, Italian keeps calendar tracking elements lowercase by default."
+  weight: 20.0
+  feedback: Unlike English structural practices, Italian keeps calendar tracking elements lowercase by default.
   revision_page_ids:
   - page-7-days-months
-
 - id: q-hard-1
   difficulty: hard
-  text: "Translate the phrase \"the red apples\" by applying the grammar rules for definite articles, noun changes, and adjective agreement."
+  text: Translate the phrase "the red apples" by applying the grammar rules for definite articles, noun changes, and adjective
+    agreement.
   answers:
   - id: a-hard-1-1
-    text: "I mela rossi"
+    text: I mela rossi
   - id: a-hard-1-2
-    text: "Le mele rosse"
+    text: Le mele rosse
   - id: a-hard-1-3
-    text: "La mele rossa"
+    text: La mele rossa
   - id: a-hard-1-4
-    text: "Le meli rossi"
+    text: Le meli rossi
   correct_answer: a-hard-1-2
-  weight: 10.0
-  feedback: "'Le mele rosse' demonstrates complete plural feminine vowel alignment across the article, noun, and adjective strings."
+  weight: 20.0
+  feedback: '''Le mele rosse'' demonstrates complete plural feminine vowel alignment across the article, noun, and adjective
+    strings.'
   revision_page_ids:
   - page-1-noun-gender-basics
   - page-4-definite-articles
   - page-9-adjective-agreement
-
 - id: q-hard-2
   difficulty: hard
-  text: "Why does the phrase \"It is 1 o'clock\" use \"È l'una\" while \"It is 3 o'clock\" uses \"Sono le tre\"?"
+  text: Why does the phrase "It is 1 o'clock" use "È l'una" while "It is 3 o'clock" uses "Sono le tre"?
   answers:
   - id: a-hard-2-1
-    text: "1 o'clock is masculine, while 3 o'clock is feminine."
+    text: 1 o'clock is masculine, while 3 o'clock is feminine.
   - id: a-hard-2-2
-    text: "1 o'clock represents a singular point in time requiring singular verbs/articles, whereas 3 o'clock is plural."
+    text: 1 o'clock represents a singular point in time requiring singular verbs/articles, whereas 3 o'clock is plural.
   - id: a-hard-2-3
-    text: "'Tre' is irregular and forces a structural shift."
+    text: '''Tre'' is irregular and forces a structural shift.'
   - id: a-hard-2-4
-    text: "Italian time rules change completely depending on whether it is day or night."
+    text: Italian time rules change completely depending on whether it is day or night.
   correct_answer: a-hard-2-2
-  weight: 10.0
-  feedback: "One o'clock takes a singular verb and article framework ('È l'una'), while any value above one uses a plural framework ('Sono le')."
+  weight: 20.0
+  feedback: One o'clock takes a singular verb and article framework ('È l'una'), while any value above one uses a plural framework
+    ('Sono le').
   revision_page_ids:
   - page-6-telling-time
-
 - id: q-hard-3
   difficulty: hard
-  text: "Combine your knowledge of verbs and nouns. How do you say \"We have two restaurants\"?"
+  text: Combine your knowledge of verbs and nouns. How do you say "We have two restaurants"?
   answers:
   - id: a-hard-3-1
-    text: "Abbiamo due ristoranti."
+    text: Abbiamo due ristoranti.
   - id: a-hard-3-2
-    text: "Avete due ristorante."
+    text: Avete due ristorante.
   - id: a-hard-3-3
-    text: "Hanno due ristoranti."
+    text: Hanno due ristoranti.
   - id: a-hard-3-4
-    text: "Abbiamo due ristorante."
+    text: Abbiamo due ristorante.
   correct_answer: a-hard-3-1
-  weight: 10.0
-  feedback: "'Abbiamo' handles \"we have\" (verb pack), and 'ristoranti' accurately scales the singular -e noun 'ristorante' into its plural -i format."
+  weight: 20.0
+  feedback: '''Abbiamo'' handles "we have" (verb pack), and ''ristoranti'' accurately scales the singular -e noun ''ristorante''
+    into its plural -i format.'
   revision_page_ids:
   - page-2-irregular-nouns-e
   - page-5-numbers-counting
   - page-10-comprehensive-building
-
 - id: q-hard-4
   difficulty: hard
-  text: "Look at the phrase \"lo zaino\" (the backpack). When it becomes plural, what is the correct forms of the article and noun?"
+  text: Look at the phrase "lo zaino" (the backpack). When it becomes plural, what is the correct forms of the article and
+    noun?
   answers:
   - id: a-hard-4-1
-    text: "i zaini"
+    text: i zaini
   - id: a-hard-4-2
-    text: "gli zaini"
+    text: gli zaini
   - id: a-hard-4-3
-    text: "le zaine"
+    text: le zaine
   - id: a-hard-4-4
-    text: "gli zaino"
+    text: gli zaino
   correct_answer: a-hard-4-2
-  weight: 10.0
-  feedback: "Masculine words that start with 'z' use 'lo' in the singular, which shifts to 'gli' in the plural (*gli zaini*)."
+  weight: 20.0
+  feedback: Masculine words that start with 'z' use 'lo' in the singular, which shifts to 'gli' in the plural (*gli zaini*).
   revision_page_ids:
   - page-4-definite-articles
-
 - id: q-hard-5
   difficulty: hard
-  text: "Parse the syntax strategy behind \"Dov'è il bagno?\". What is happening with \"Dov'è\"?"
+  text: Parse the syntax strategy behind "Dov'è il bagno?". What is happening with "Dov'è"?
   answers:
   - id: a-hard-5-1
-    text: "It is a combination of 'Dove' (where) and 'è' (is), dropping the 'e' to avoid two vowels colliding."
+    text: It is a combination of 'Dove' (where) and 'è' (is), dropping the 'e' to avoid two vowels colliding.
   - id: a-hard-5-2
-    text: "It is a special plural adjective meaning 'inside'."
+    text: It is a special plural adjective meaning 'inside'.
   - id: a-hard-5-3
-    text: "It is an irregular noun modifier meaning 'left side'."
+    text: It is an irregular noun modifier meaning 'left side'.
   - id: a-hard-5-4
-    text: "It is an informal command form of a regular -ARE verb."
+    text: It is an informal command form of a regular -ARE verb.
   correct_answer: a-hard-5-1
-  weight: 10.0
-  feedback: "'Dove' drops its final vowel when it meets the singular verb 'è' (is), creating the smooth contraction 'Dov'è'."
+  weight: 20.0
+  feedback: '''Dove'' drops its final vowel when it meets the singular verb ''è'' (is), creating the smooth contraction ''Dov''è''.'
   revision_page_ids:
   - page-8-spatial-directions

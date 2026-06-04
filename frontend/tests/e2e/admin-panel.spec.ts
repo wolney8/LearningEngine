@@ -390,6 +390,48 @@ test.describe("Admin panel", () => {
       });
     });
 
+    await page.route(`${API_BASE_URL}/admin/packages/validate`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          valid: true,
+          preview: {
+            id: "validated-demo",
+            title: "Validated Demo",
+            description: "Validated package preview",
+            version: "1.0.0",
+            page_count: 2,
+            question_count: 4,
+          },
+          errors: [],
+          formatted_errors: [],
+          yaml_content: null,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/admin/packages/validate-upload`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          valid: true,
+          preview: {
+            id: "uploaded-demo",
+            title: "Uploaded Demo",
+            description: "Uploaded package preview",
+            version: "1.0.0",
+            page_count: 1,
+            question_count: 1,
+          },
+          errors: [],
+          formatted_errors: [],
+          yaml_content: "id: uploaded-demo\ntitle: Uploaded Demo\n",
+        }),
+      });
+    });
+
     await page.route(
       (url) => isBackendPath(url, "/admin/users"),
       (route) => {
@@ -545,6 +587,15 @@ test.describe("Admin panel", () => {
     });
 
     await page.route(`${API_BASE_URL}/admin/packages/*`, async (route) => {
+      const pathname = new URL(route.request().url()).pathname;
+      if (
+        pathname.endsWith("/admin/packages/validate") ||
+        pathname.endsWith("/admin/packages/validate-upload")
+      ) {
+        await route.fallback();
+        return;
+      }
+
       if (route.request().method() === "DELETE") {
         const url = new URL(route.request().url());
         const packageId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
@@ -1189,6 +1240,31 @@ test.describe("Admin panel", () => {
     });
     await expect(errorAlert).toBeVisible();
     await expect(errorAlert).toContainText("Failed to update package");
+  });
+
+  test("packages page validates pasted YAML and loads uploaded YAML preview", async ({
+    page,
+  }) => {
+    await page.addInitScript((token) => {
+      sessionStorage.setItem("lle_auth_token", token);
+    }, AUTH_TOKEN);
+
+    await page.goto("/admin/packages");
+    await checkA11y(page);
+
+    const yamlTextarea = page.getByLabel("YAML package content");
+    await yamlTextarea.fill("id: validated-demo");
+    await page.getByRole("button", { name: "Validate YAML" }).click();
+
+    const uploadInput = page.getByLabel("Upload YAML file");
+    await uploadInput.setInputFiles({
+      name: "candidate.yaml",
+      mimeType: "application/x-yaml",
+      buffer: Buffer.from("id: uploaded-demo\ntitle: Uploaded Demo\n", "utf-8"),
+    });
+
+    await expect(page.getByText("Validated package 'uploaded-demo'")).toBeVisible();
+    await expect(yamlTextarea).toHaveValue("id: uploaded-demo\ntitle: Uploaded Demo\n");
   });
 
   test("packages page enforces 8-20 question bounds before generate", async ({
