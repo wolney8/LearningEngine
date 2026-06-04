@@ -1,13 +1,15 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import "./AuthPages.css";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login, status, error } = useAuth();
+  const { login, status, error, clearError } = useAuth();
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  useEffect(() => clearError, [clearError]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,7 +44,10 @@ export function LoginPage() {
               type="text"
               autoComplete="username"
               value={usernameOrEmail}
-              onChange={(event) => setUsernameOrEmail(event.target.value)}
+              onChange={(event) => {
+                clearError();
+                setUsernameOrEmail(event.target.value);
+              }}
               required
             />
           </label>
@@ -53,7 +58,10 @@ export function LoginPage() {
               type="password"
               autoComplete="current-password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                clearError();
+                setPassword(event.target.value);
+              }}
               required
             />
           </label>

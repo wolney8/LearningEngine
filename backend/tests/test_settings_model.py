@@ -141,6 +141,16 @@ def test_game_settings_ai_rejects_empty_model() -> None:
         GameSettings.model_validate(payload)
 
 
+def test_game_settings_ai_accepts_supported_provider_variants() -> None:
+    payload = _valid_settings_dict()
+    payload["ai"] = {"provider": "openai", "model": "gpt-4o-mini"}
+
+    settings = GameSettings.model_validate(payload)
+
+    assert settings.ai.provider == "openai"
+    assert settings.ai.model == "gpt-4o-mini"
+
+
 def test_game_settings_spend_economy_defaults() -> None:
     settings = GameSettings.model_validate(_valid_settings_dict())
 

@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from dotenv import load_dotenv
@@ -21,7 +22,8 @@ from app.services.refresh_metadata_loader import (
 )
 from app.services.settings_loader import load_settings
 
-load_dotenv(override=True)
+DEFAULT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(dotenv_path=os.getenv("APP_ENV_FILE", str(DEFAULT_ENV_FILE)), override=True)
 
 logger = logging.getLogger(__name__)
 

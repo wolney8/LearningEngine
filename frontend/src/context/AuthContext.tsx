@@ -43,6 +43,7 @@ export type AuthContextValue = {
   error: string;
   bonusXPNotice: BonusXPNotice | null;
   dismissBonusXPNotice: () => void;
+  clearError: () => void;
   login: (payload: LoginRequest) => Promise<void>;
   register: (payload: RegisterRequest) => Promise<void>;
   logout: () => void;
@@ -299,6 +300,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBonusXPNotice(null);
   }, []);
 
+  const clearError = useCallback(() => {
+    setError("");
+    setStatus((current) => (current === "error" ? "idle" : current));
+  }, []);
+
   const setCurrentUser = useCallback((nextUser: User) => {
     setUser(nextUser);
   }, []);
@@ -311,6 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       bonusXPNotice,
       dismissBonusXPNotice,
+      clearError,
       login,
       register,
       logout,
@@ -319,6 +326,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       bonusXPNotice,
+      clearError,
       dismissBonusXPNotice,
       error,
       login,

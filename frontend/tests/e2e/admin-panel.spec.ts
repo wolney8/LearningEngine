@@ -198,7 +198,21 @@ const ADMIN_USERS = [
 const AI_CONFIG_PAYLOAD = {
   provider: "gemini",
   model: "gemini-2.0-flash-exp",
-  key_present: true,
+  configured: true,
+  key_source: "runtime",
+  key_last_updated_at: "2026-06-04T09:30:00Z",
+  key_masked_suffix: "...1234",
+  supported_providers: ["gemini", "openai", "anthropic", "groq", "mistral"],
+  provider_options: [
+    { provider: "gemini", recommended_model: "gemini-2.5-flash" },
+    { provider: "openai", recommended_model: "gpt-4o-mini" },
+    {
+      provider: "anthropic",
+      recommended_model: "claude-3-5-haiku-latest",
+    },
+    { provider: "groq", recommended_model: "llama-3.3-70b-versatile" },
+    { provider: "mistral", recommended_model: "mistral-small-latest" },
+  ],
 } as const;
 
 const AUDIT_LOGS = [
@@ -268,6 +282,7 @@ test.describe("Admin panel", () => {
 
     let adminSettings = structuredClone(SETTINGS_PAYLOAD);
     let adminPackages = PACKAGE_LIST.map((pkg) => ({ ...pkg }));
+    let aiConfig = { ...AI_CONFIG_PAYLOAD };
     const adminUsers = ADMIN_USERS.map((row) => ({ ...row }));
     const progressRecordCounts: Record<number, number> = {
       999: 0,
@@ -389,17 +404,18 @@ test.describe("Admin panel", () => {
     await page.route(`${API_BASE_URL}/admin/ai-config`, (route) => {
       if (route.request().method() === "PATCH") {
         const patch = route.request().postDataJSON() as {
-          provider: "gemini";
+          provider: "gemini" | "openai" | "anthropic" | "groq" | "mistral";
           model: string;
+        };
+        aiConfig = {
+          ...aiConfig,
+          provider: patch.provider,
+          model: patch.model,
         };
         route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({
-            provider: patch.provider,
-            model: patch.model,
-            key_present: true,
-          }),
+          body: JSON.stringify(aiConfig),
         });
         return;
       }
@@ -407,18 +423,50 @@ test.describe("Admin panel", () => {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(AI_CONFIG_PAYLOAD),
+        body: JSON.stringify(aiConfig),
       });
     });
 
     await page.route(`${API_BASE_URL}/admin/ai-config/test`, (route) => {
+      const body = route.request().postDataJSON() as {
+        provider?: string;
+        model?: string;
+      };
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           success: true,
           message: "Connection test succeeded.",
-          model_used: "gemini-2.0-flash-exp",
+          model_used: body.model ?? aiConfig.model,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/admin/ai-config/key`, (route) => {
+      const body = route.request().postDataJSON() as {
+        api_key: string;
+        provider: "gemini" | "openai" | "anthropic" | "groq" | "mistral";
+        model: string;
+      };
+      aiConfig = {
+        ...aiConfig,
+        provider: body.provider,
+        model: body.model,
+        configured: true,
+        key_source: "runtime",
+        key_last_updated_at: "2026-06-04T11:15:00Z",
+        key_masked_suffix: "...-key",
+      };
+
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          message: "API key saved and connection test succeeded.",
+          model_used: body.model,
+          config: aiConfig,
         }),
       });
     });
@@ -833,15 +881,19 @@ test.describe("Admin panel", () => {
     await expect(respectReducedMotion).not.toBeChecked();
     await expect(bonus).toHaveValue("42");
 
-    const keyInput = page.getByLabel("Connection test API key (write-only)");
-    await expect(keyInput).toHaveValue("");
+    await expect(page.getByText("API Key:")).toBeVisible();
+    await expect(page.getByLabel("Present")).toBeVisible();
+    await expect(page.getByText("API key last updated: 04/06/2026")).toBeVisible();
+    await expect(page.getByText("Key source: runtime")).toBeVisible();
+    await expect(page.getByText("Key ending: ...1234")).toBeVisible();
+    await expect(
+      page.getByText("Recommended starter model for gemini: gemini-2.5-flash"),
+    ).toBeVisible();
 
-    await keyInput.fill("temporary-key");
-    await page.getByRole("button", { name: "Test AI Connection" }).click();
+    await page.getByRole("button", { name: "Test API Key" }).click();
 
     await expect(page.getByText("Connection test succeeded.")).toBeVisible();
     await expect(page.getByText("Model tested: gemini-2.0-flash-exp.")).toBeVisible();
-    await expect(keyInput).toHaveValue("");
   });
 
   test("settings page shows friendly AI connection failure copy without provider blobs", async ({
@@ -868,9 +920,7 @@ test.describe("Admin panel", () => {
 
     await page.goto("/admin/settings");
 
-    const keyInput = page.getByLabel("Connection test API key (write-only)");
-    await keyInput.fill("temporary-key");
-    await page.getByRole("button", { name: "Test AI Connection" }).click();
+    await page.getByRole("button", { name: "Test API Key" }).click();
 
     await expect(
       page.getByText(
@@ -880,6 +930,70 @@ test.describe("Admin panel", () => {
     await expect(page.locator("body")).not.toContainText("provider_status");
     await expect(page.locator("body")).not.toContainText("raw_response");
     await expect(page.locator("body")).not.toContainText("UNAVAILABLE");
+  });
+
+  test("settings page resets provider and model when entering a new API key and blocks actions until restored", async ({
+    page,
+  }) => {
+    await page.addInitScript((token) => {
+      sessionStorage.setItem("lle_auth_token", token);
+    }, AUTH_TOKEN);
+
+    await page.goto("/admin/settings");
+    await checkA11y(page);
+
+    const providerSelect = page.getByLabel("Provider");
+    const modelInput = page.getByLabel("Model preset");
+    const newKeyInput = page.getByLabel("New API key");
+    const saveConfigButton = page.getByRole("button", { name: "Save AI Config" });
+    const testSavedKeyButton = page.getByRole("button", { name: "Test API Key" });
+    const saveNewKeyButton = page.getByRole("button", {
+      name: "Save new key and test",
+    });
+
+    await expect(providerSelect).toHaveValue("gemini");
+    await expect(modelInput).toHaveValue("gemini-2.0-flash-exp");
+    await expect(saveConfigButton).toBeEnabled();
+    await expect(testSavedKeyButton).toBeEnabled();
+
+    await newKeyInput.fill("replacement-key");
+
+    await expect(providerSelect).toHaveValue("");
+    await expect(modelInput).toHaveValue("");
+    await expect(
+      page.getByText("Choose a provider and model before saving the new API key."),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Provider is unset. Choose a provider before saving or testing."),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Model preset is unset. Enter a model before saving or testing."),
+    ).toBeVisible();
+    await expect(saveConfigButton).toBeDisabled();
+    await expect(testSavedKeyButton).toBeDisabled();
+    await expect(saveNewKeyButton).toBeDisabled();
+
+    await providerSelect.selectOption("openai");
+    await expect(modelInput).toHaveValue("gpt-4o-mini");
+    await expect(
+      page.getByText("Recommended starter model for openai: gpt-4o-mini"),
+    ).toBeVisible();
+
+    await expect(saveConfigButton).toBeEnabled();
+    await expect(saveNewKeyButton).toBeEnabled();
+
+    await saveNewKeyButton.click();
+
+    await expect(
+      page.getByText("API key saved and connection test succeeded."),
+    ).toBeVisible();
+    await expect(page.getByText("Model tested: gpt-4o-mini.")).toBeVisible();
+    await expect(page.getByText("Key source: runtime")).toBeVisible();
+    await expect(page.getByText("Key ending: ...-key")).toBeVisible();
+    await expect(page.getByText("API key last updated: 04/06/2026")).toBeVisible();
+    await expect(newKeyInput).toHaveValue("");
+    await expect(providerSelect).toHaveValue("openai");
+    await expect(modelInput).toHaveValue("gpt-4o-mini");
   });
 
   test("admin celebration lightning setting propagates to learner streak milestone", async ({
@@ -1101,7 +1215,7 @@ test.describe("Admin panel", () => {
     const questionsInput = page.getByLabel("Questions");
     await expect(questionsInput).toHaveValue("8");
     await expect(questionsInput).toHaveAttribute("min", "8");
-    await expect(questionsInput).toHaveAttribute("max", "20");
+    await expect(questionsInput).toHaveAttribute("max", "40");
 
     await page.getByLabel("Topic").fill("Incident response essentials");
     await questionsInput.fill("7");
@@ -1110,7 +1224,7 @@ test.describe("Admin panel", () => {
     await expect(
       page.getByRole("alert").filter({
         hasText:
-          "Enter a topic (3+ chars), pages between 1-10, and questions between 8-20.",
+          "Enter a topic (3+ chars), pages between 1-20, and questions between 8-40.",
       }),
     ).toBeVisible();
     expect(generateRequestCount).toBe(0);

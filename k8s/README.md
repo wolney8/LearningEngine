@@ -52,6 +52,22 @@ kubectl -n learning-engine create secret generic learning-engine-secrets \
 
 Optional bootstrap admin credentials can be added later as extra env vars in `backend-deployment.yaml` if you want the first admin user created automatically.
 
+## AI key management
+
+- The backend deployment sets `APP_AI_KEY_STORE_FILE=/app/runtime/ai-provider-secrets.yaml`.
+- When an admin saves a new AI provider key from the UI, the backend:
+  - writes the provider key into `/app/runtime/ai-provider-secrets.yaml`
+  - uses that runtime key first for future AI calls in the running pod
+- Because `/app/runtime` is on the backend PVC, the saved AI key survives backend pod restarts on the same PVC.
+
+Important limits:
+
+- Admin-saved AI keys are not synced back into Kubernetes Secret resources.
+- The `learning-engine-secrets` Secret is bootstrap and fallback only.
+- If you rotate the Kubernetes Secret, restart the backend deployment for new pods to see that fallback value.
+- If you want fully declarative secret management, mount provider keys from a Kubernetes Secret instead and do not rotate them through the admin UI.
+- If the PVC is deleted, recreated, or manually migrated to another node, include `/app/runtime/ai-provider-secrets.yaml` in that migration if you want to keep the saved AI key state.
+
 ## Apply order
 
 Apply the manifests in this order:

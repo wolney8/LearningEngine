@@ -93,6 +93,11 @@
   color: var(--colour-text-strong);
 }
 
+.admin-page__field .admin-page__field-control--error {
+  border-color: #c53b32;
+  color: #9f1d17;
+}
+
 .admin-page__fieldset {
   margin: 1rem 0 0;
   border: 1px solid var(--colour-border);
@@ -189,6 +194,28 @@
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+.admin-page__key-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-page__key-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+  font-weight: 800;
+}
+
+.admin-page__key-status-icon--present {
+  color: #15803d;
+}
+
+.admin-page__key-status-icon--missing {
+  color: #b91c1c;
+}
+
 .admin-page__field--wide {
   grid-column: 1 / -1;
 }
@@ -198,6 +225,7 @@
   display: flex;
   gap: 0.8rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .admin-page__actions button {
@@ -218,6 +246,25 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
+}
+
+.admin-page__status-stack {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.admin-page__status-stack p {
+  margin: 0;
+}
+
+.admin-page__hint {
+  color: var(--colour-text-secondary);
+}
+
+.admin-page__warning {
+  color: #9f1d17;
+  font-weight: 700;
 }
 
 .admin-page__button-spinner {

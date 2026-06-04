@@ -8,11 +8,23 @@ from typing import Literal
 
 import yaml
 from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.gemini import GeminiModel
+from pydantic_ai.models.groq import GroqModel
+from pydantic_ai.models.mistral import MistralModel
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google_gla import GoogleGLAProvider
+from pydantic_ai.providers.groq import GroqProvider
+from pydantic_ai.providers.mistral import MistralProvider
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.models.package import Package
-from app.models.settings import GameSettings
+from app.models.settings import AIProviderName, GameSettings
+from app.services.ai_key_store import (
+    get_ai_key_store_file,
+    resolve_ai_api_key,
+)
 
 _SYSTEM_PROMPT = """\
 You are an expert instructional designer creating training packages for a
@@ -74,6 +86,57 @@ DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
 REFRESH_MAX_ATTEMPTS = 3
 MIN_CHANGED_PAGE_RATIO = 0.5
 MIN_CHANGED_QUESTION_RATIO = 0.5
+SUPPORTED_AI_PROVIDERS: tuple[AIProviderName, ...] = (
+    "gemini",
+    "openai",
+    "anthropic",
+    "groq",
+    "mistral",
+)
+AI_PROVIDER_DEFAULT_MODELS: dict[AIProviderName, str] = {
+    "gemini": "gemini-2.5-flash",
+    "openai": "gpt-4o-mini",
+    "anthropic": "claude-3-5-haiku-latest",
+    "groq": "llama-3.3-70b-versatile",
+    "mistral": "mistral-small-latest",
+}
+_GENERIC_TAGS = {
+    "ai",
+    "ai-course",
+    "ai-generated",
+    "course",
+    "courses",
+    "general",
+    "general-audience",
+    "general-learning",
+    "general-learners",
+    "learners",
+    "learning",
+    "training",
+    "existing-audience",
+}
+_GENERIC_TAG_COMPONENTS = {
+    "a",
+    "an",
+    "and",
+    "audience",
+    "basics",
+    "beginners",
+    "course",
+    "for",
+    "general",
+    "intro",
+    "introduction",
+    "learners",
+    "learning",
+    "new",
+    "skills",
+    "the",
+    "training",
+}
+
+
+AI_KEY_STORE_FILE = get_ai_key_store_file()
 
 
 def _normalise_text(value: str) -> str:
@@ -176,21 +239,60 @@ def _slugify_tag(value: str) -> str:
     return slug
 
 
-def _fallback_generation_tags(topic: str, audience: str) -> list[str]:
+def _is_generic_tag(tag: str) -> bool:
+    normalised = _slugify_tag(tag)
+    if not normalised:
+        return True
+    if normalised in _GENERIC_TAGS:
+        return True
+    components = [part for part in normalised.split("-") if part]
+    if not components:
+        return True
+    if all(component in _GENERIC_TAG_COMPONENTS for component in components):
+        return True
+    return False
+
+
+def _extract_keyword_tags(value: str) -> list[str]:
+    words = re.findall(r"[a-z0-9]+", value.lower())
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for word in words:
+        if len(word) < 4 or word in _GENERIC_TAG_COMPONENTS:
+            continue
+        if word in seen:
+            continue
+        seen.add(word)
+        deduped.append(word)
+    return deduped
+
+
+def _derive_informative_tags(*sources: str) -> list[str]:
     candidates: list[str] = []
-    topic_tag = _slugify_tag(topic)
-    audience_tag = _slugify_tag(audience)
+    for source in sources:
+        slug = _slugify_tag(source)
+        if slug and not _is_generic_tag(slug):
+            candidates.append(slug)
+        candidates.extend(_extract_keyword_tags(source))
 
-    if topic_tag:
-        candidates.append(topic_tag)
-    if audience_tag:
-        candidates.append(f"audience-{audience_tag}")
-    candidates.append("ai-generated")
+    tags = _normalise_tags(candidates)
+    filtered = [tag for tag in tags if not _is_generic_tag(tag)]
+    if filtered:
+        return filtered[:8]
+    return ["subject-matter", "skills-practice"]
 
-    fallback = _normalise_tags(candidates)
-    if fallback:
-        return fallback
-    return ["ai-generated", "general-learning"]
+
+def _resolve_output_tags(existing_tags: object, *fallback_sources: str) -> list[str]:
+    generated_tags = [
+        tag for tag in _normalise_tags(existing_tags) if not _is_generic_tag(tag)
+    ]
+    if generated_tags:
+        return generated_tags
+    return _derive_informative_tags(*fallback_sources)
+
+
+def get_recommended_ai_model(provider: AIProviderName) -> str:
+    return AI_PROVIDER_DEFAULT_MODELS[provider]
 
 
 def _with_tags(pkg: Package, tags: list[str]) -> Package:
@@ -199,9 +301,9 @@ def _with_tags(pkg: Package, tags: list[str]) -> Package:
 
 def _resolve_provider_and_model(
     settings: GameSettings | None,
-    provider_override: Literal["gemini"] | None,
+    provider_override: AIProviderName | None,
     model_override: str | None,
-) -> tuple[Literal["gemini"], str]:
+) -> tuple[AIProviderName, str]:
     configured_provider = (
         settings.ai.provider if settings is not None else DEFAULT_AI_PROVIDER
     )
@@ -210,11 +312,14 @@ def _resolve_provider_and_model(
     )
 
     provider = provider_override or configured_provider
-    model_name = model_override or configured_model or os.getenv(
-        "GEMINI_MODEL", DEFAULT_GEMINI_MODEL
+    model_name = (
+        model_override
+        or configured_model
+        or os.getenv("GEMINI_MODEL")
+        or get_recommended_ai_model(provider)
     )
 
-    if provider != "gemini":
+    if provider not in SUPPORTED_AI_PROVIDERS:
         raise AIGenerationError("Unsupported AI provider")
 
     return provider, model_name
@@ -271,25 +376,43 @@ def _classify_provider_failure(exc: Exception) -> str:
 def _get_agent(
     *,
     settings: GameSettings | None = None,
-    provider_override: Literal["gemini"] | None = None,
+    provider_override: AIProviderName | None = None,
     model_override: str | None = None,
     api_key_override: str | None = None,
 ) -> Agent[None, Package]:
-    _, model_name = _resolve_provider_and_model(
+    provider_name, model_name = _resolve_provider_and_model(
         settings=settings,
         provider_override=provider_override,
         model_override=model_override,
     )
 
-    api_key = api_key_override or os.getenv("GEMINI_API_KEY")
+    resolved_api_key, _, _, _ = resolve_ai_api_key(
+        provider_name,
+        key_store_file=AI_KEY_STORE_FILE,
+    )
+    api_key = api_key_override or resolved_api_key
     if not api_key:
         raise AIGenerationError(
             "AI service is not configured.",
             error_code=AI_ERROR_CODE_MISSING_API_KEY,
         )
 
-    provider = GoogleGLAProvider(api_key=api_key)
-    model = GeminiModel(model_name, provider=provider)
+    if provider_name == "gemini":
+        provider = GoogleGLAProvider(api_key=api_key)
+        model = GeminiModel(model_name, provider=provider)
+    elif provider_name == "openai":
+        provider = OpenAIProvider(api_key=api_key)
+        model = OpenAIChatModel(model_name, provider=provider)
+    elif provider_name == "anthropic":
+        provider = AnthropicProvider(api_key=api_key)
+        model = AnthropicModel(model_name, provider=provider)
+    elif provider_name == "groq":
+        provider = GroqProvider(api_key=api_key)
+        model = GroqModel(model_name, provider=provider)
+    else:
+        provider = MistralProvider(api_key=api_key)
+        model = MistralModel(model_name, provider=provider)
+
     return Agent(model=model, output_type=Package, system_prompt=_SYSTEM_PROMPT)
 
 
@@ -314,6 +437,9 @@ async def generate_package(
         f"Create a training package about: {topic}\n"
         f"Target audience: {audience}\n"
         f"Include exactly {num_pages} pages and exactly {num_questions} questions.\n"
+        "Generate 4-8 concise, specific discovery tags tied to the subject matter "
+        "and audience. Do not use generic placeholder tags such as "
+        "'ai-generated', 'general-learning', or 'general-learners'.\n"
         "Distribute questions evenly across all four difficulty levels "
         f"(aim for {num_questions // 4} per group, adjust the last group "
         f"if {num_questions} is not divisible by 4). "
@@ -329,11 +455,7 @@ async def generate_package(
         ) from exc
 
     pkg: Package = result.output
-    generated_tags = _normalise_tags(pkg.tags)
-    if generated_tags:
-        pkg = _with_tags(pkg, generated_tags)
-    else:
-        pkg = _with_tags(pkg, _fallback_generation_tags(topic, audience))
+    pkg = _with_tags(pkg, _resolve_output_tags(pkg.tags, pkg.title, topic, audience))
 
     pkg_dict = pkg.model_dump(mode="python")
     return yaml.dump(
@@ -355,6 +477,9 @@ async def refresh_package(
         f"Original description: {existing.description}\n"
         f"Include exactly {len(existing.pages)} pages and "
         f"exactly {len(existing.questions)} questions.\n"
+        "Return 4-8 concise, specific discovery tags for the refreshed content. "
+        "Do not use generic placeholder tags such as 'ai-generated' or "
+        "'general-learning'.\n"
         "Generate completely new, fresh content on the same topic. "
         "Do NOT reuse existing question text or page content verbatim.\n"
         "Distribute questions evenly across all four difficulty levels. "
@@ -397,18 +522,15 @@ async def refresh_package(
             + "; ".join(quality_issues)
         )
 
-    generated_tags = _normalise_tags(pkg.tags)
-    if generated_tags:
-        pkg = _with_tags(pkg, generated_tags)
-    else:
-        existing_tags = _normalise_tags(existing.tags)
-        if existing_tags:
-            pkg = _with_tags(pkg, existing_tags)
-        else:
-            pkg = _with_tags(
-                pkg,
-                _fallback_generation_tags(existing.title, "existing-audience"),
-            )
+    pkg = _with_tags(
+        pkg,
+        _resolve_output_tags(
+            pkg.tags,
+            *existing.tags,
+            existing.title,
+            existing.description,
+        ),
+    )
 
     pkg_dict = pkg.model_dump(mode="python")
     return yaml.dump(
@@ -422,8 +544,8 @@ async def refresh_package(
 async def test_connection(
     *,
     settings: GameSettings,
-    api_key: str,
-    provider_override: Literal["gemini"] | None = None,
+    api_key: str | None = None,
+    provider_override: AIProviderName | None = None,
     model_override: str | None = None,
 ) -> str:
     _, model_name = _resolve_provider_and_model(

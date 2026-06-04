@@ -27,12 +27,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: learning-engine-backend-config
-          env:
-            - name: JWT_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: learning-engine-secrets
-                  key: JWT_SECRET_KEY
+            - secretRef:
+                name: learning-engine-secrets
           readinessProbe:
             httpGet:
               path: /health

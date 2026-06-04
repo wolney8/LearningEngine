@@ -191,7 +191,54 @@ test.describe("Optional auth shell", () => {
     await page.getByLabel("Password").fill("WrongPass123");
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page.getByRole("alert")).toContainText("Login failed (401)");
+    await expect(page.getByRole("alert")).toContainText(
+      "Invalid username/email or password",
+    );
+  });
+
+  test("login validation error is human-readable and clears on input change", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+    await checkA11y(page);
+
+    await page.getByLabel("Username or email").fill("learner1");
+    await page.getByLabel("Password").fill("short");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("Password must be at least 8 characters.");
+
+    await page.getByLabel("Password").fill("shorter");
+    await expect(alert).toHaveCount(0);
+  });
+
+  test("registration backend error is human-readable and clears on input change", async ({
+    page,
+  }) => {
+    await page.route(`${API_BASE_URL}/auth/register`, (route) => {
+      route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Username is already taken" }),
+      });
+    });
+
+    await page.goto("/register");
+    await checkA11y(page);
+    await page.getByLabel("Username").fill("existing-user");
+    await page.getByLabel("Email").fill("existing@example.com");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByLabel("Sample Package").check();
+    await page.getByRole("button", { name: "Create account" }).click();
+
+    const alert = page.getByRole("alert").filter({
+      hasText: "Username is already taken",
+    });
+    await expect(alert).toBeVisible();
+
+    await page.getByLabel("Username").fill("existing-user-2");
+    await expect(alert).toHaveCount(0);
   });
 
   test("successful login updates shared auth state above routes", async ({ page }) => {

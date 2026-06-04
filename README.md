@@ -23,7 +23,7 @@ The application is implemented and contains active backend, frontend, tests, CI,
 | Python linting                | Ruff                             |
 | Frontend linting / formatting | Biome                            |
 | Accessibility                 | WCAG 2.2 AA target               |
-| Optional admin AI integration | `pydantic-ai` with Google Gemini |
+| Optional admin AI integration | `pydantic-ai` with Gemini, OpenAI, Anthropic, Groq, and Mistral |
 
 ---
 
@@ -117,13 +117,42 @@ LocalLearningEngine/
 | ------------------------------ | ------------------------------- | --------------------------------------------------------- |
 | `PACKAGES_DIR`                 | `packages/`                     | Directory scanned for YAML learning packages              |
 | `PORT`                         | `8000`                          | Backend API port                                          |
+| `APP_ENV_FILE`                 | repo-root `.env`                | Bootstrap dotenv file loaded at backend startup           |
+| `APP_AI_KEY_STORE_FILE`        | `<runtime>/ai-provider-secrets.yaml` | Persistent runtime AI provider key store              |
 | `DATABASE_URL`                 | `sqlite:///backend/data/lle.db` | SQLModel database connection string                       |
 | `VITE_API_BASE_URL`            | `http://localhost:8000`         | Backend URL used by the frontend                          |
-| `GEMINI_API_KEY`               | unset                           | Optional admin AI provider key                            |
+| `GEMINI_API_KEY`               | unset                           | Optional Gemini API key                                   |
+| `OPENAI_API_KEY`               | unset                           | Optional OpenAI API key                                   |
+| `ANTHROPIC_API_KEY`            | unset                           | Optional Anthropic API key                                |
+| `GROQ_API_KEY`                 | unset                           | Optional Groq API key                                     |
+| `MISTRAL_API_KEY`              | unset                           | Optional Mistral API key                                  |
+| `AI_API_KEY_LAST_UPDATED_AT`   | unset                           | Timestamp written when an admin rotates the provider key  |
 | `GEMINI_MODEL`                 | `gemini-2.0-flash-exp`          | Optional model override for admin AI workflows            |
 | `LLE_BOOTSTRAP_ADMIN_USERNAME` | unset                           | Optional initial admin username                           |
 | `LLE_BOOTSTRAP_ADMIN_EMAIL`    | unset                           | Optional initial admin email                              |
 | `LLE_BOOTSTRAP_ADMIN_PASSWORD` | unset                           | Optional initial admin password                           |
+
+## AI key storage policy
+
+- Local development:
+  - By default, the backend loads bootstrap env vars from the repo-root `.env`.
+  - Admin AI key changes made in the UI persist to the dedicated runtime key store and are used immediately by the running backend.
+- Docker and k3s:
+  - The backend uses `APP_AI_KEY_STORE_FILE=/app/runtime/ai-provider-secrets.yaml`.
+  - That file lives on the backend runtime volume, so UI-saved AI provider keys survive pod or container restarts as long as the same volume is kept.
+- Kubernetes:
+  - `JWT_SECRET_KEY` remains a Kubernetes Secret.
+  - `GEMINI_API_KEY` and the other provider env vars may still be injected from a Kubernetes Secret as bootstrap or fallback values.
+  - Admin-saved AI provider keys are not written back into Kubernetes Secret objects. They are stored in the backend runtime key store on the PVC instead.
+  - If you prefer declarative secret management, set the provider key via deployment env/Secret and avoid changing it through the admin UI.
+
+Operational notes:
+
+- Rotating an AI key through the admin UI writes `/app/runtime/ai-provider-secrets.yaml` and the running backend uses that new key immediately.
+- After a backend restart, the app first checks the persisted runtime key store and only falls back to environment variables if no runtime key exists for that provider.
+- Rotating the Kubernetes Secret changes only the bootstrap or fallback value and requires a backend restart to affect new pods.
+- If the backend PVC is moved or recreated, copy `ai-provider-secrets.yaml` with the rest of the backend runtime data if you want to preserve the saved AI key state.
+- Do not commit real `.env` files or copied runtime secret files.
 
 ---
 

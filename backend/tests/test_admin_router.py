@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import yaml
@@ -186,7 +185,9 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
     from app.routers import admin as admin_router
 
     original_settings_file = admin_router.SETTINGS_FILE
+    original_key_store_file = admin_router.AI_KEY_STORE_FILE
     admin_router.SETTINGS_FILE = tmp_path / "settings.yaml"
+    admin_router.AI_KEY_STORE_FILE = tmp_path / "ai-provider-secrets.yaml"
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -221,6 +222,7 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
 
     app.dependency_overrides.clear()
     admin_router.SETTINGS_FILE = original_settings_file
+    admin_router.AI_KEY_STORE_FILE = original_key_store_file
 
     assert put_response.status_code == 200
     assert put_response.json()["xp"]["first_completion_bonus"] == 77
@@ -267,7 +269,9 @@ async def test_admin_settings_audit_logs_include_changed_keys_only_when_meaningf
     from app.routers import admin as admin_router
 
     original_settings_file = admin_router.SETTINGS_FILE
+    original_key_store_file = admin_router.AI_KEY_STORE_FILE
     admin_router.SETTINGS_FILE = tmp_path / "settings.yaml"
+    admin_router.AI_KEY_STORE_FILE = tmp_path / "ai-provider-secrets.yaml"
 
     unchanged_payload = baseline_settings.model_dump(mode="json")
     changed_payload = _sample_settings(first_completion_bonus=45).model_dump(
@@ -293,6 +297,7 @@ async def test_admin_settings_audit_logs_include_changed_keys_only_when_meaningf
 
     app.dependency_overrides.clear()
     admin_router.SETTINGS_FILE = original_settings_file
+    admin_router.AI_KEY_STORE_FILE = original_key_store_file
 
     assert unchanged_response.status_code == 200
     assert changed_response.status_code == 200
@@ -1160,9 +1165,11 @@ async def test_admin_ai_config_rejects_invalid_token() -> None:
     assert response.status_code == 401
 
 
-async def test_admin_ai_config_get_and_update_roundtrip(tmp_path: Path) -> None:
+async def test_admin_ai_config_get_and_update_roundtrip(
+    tmp_path: Path, monkeypatch
+) -> None:
     _install_admin_override()
-    os.environ["GEMINI_API_KEY"] = "secret-test-key"
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-test-key")
 
     settings_cache = _sample_settings()
     app.dependency_overrides[get_settings_cache] = lambda: settings_cache
@@ -1170,7 +1177,9 @@ async def test_admin_ai_config_get_and_update_roundtrip(tmp_path: Path) -> None:
     from app.routers import admin as admin_router
 
     original_settings_file = admin_router.SETTINGS_FILE
+    original_key_store_file = admin_router.AI_KEY_STORE_FILE
     admin_router.SETTINGS_FILE = tmp_path / "settings.yaml"
+    admin_router.AI_KEY_STORE_FILE = tmp_path / "ai-provider-secrets.yaml"
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -1182,7 +1191,33 @@ async def test_admin_ai_config_get_and_update_roundtrip(tmp_path: Path) -> None:
         assert get_response.json() == {
             "provider": "gemini",
             "model": "gemini-2.0-flash-exp",
-            "key_present": True,
+            "configured": True,
+            "key_source": "env",
+            "key_last_updated_at": None,
+            "key_masked_suffix": "...-key",
+            "supported_providers": [
+                "gemini",
+                "openai",
+                "anthropic",
+                "groq",
+                "mistral",
+            ],
+            "provider_options": [
+                {"provider": "gemini", "recommended_model": "gemini-2.5-flash"},
+                {"provider": "openai", "recommended_model": "gpt-4o-mini"},
+                {
+                    "provider": "anthropic",
+                    "recommended_model": "claude-3-5-haiku-latest",
+                },
+                {
+                    "provider": "groq",
+                    "recommended_model": "llama-3.3-70b-versatile",
+                },
+                {
+                    "provider": "mistral",
+                    "recommended_model": "mistral-small-latest",
+                },
+            ],
         }
 
         put_response = await client.put(
@@ -1192,12 +1227,39 @@ async def test_admin_ai_config_get_and_update_roundtrip(tmp_path: Path) -> None:
 
     app.dependency_overrides.clear()
     admin_router.SETTINGS_FILE = original_settings_file
+    admin_router.AI_KEY_STORE_FILE = original_key_store_file
 
     assert put_response.status_code == 200
     assert put_response.json() == {
         "provider": "gemini",
         "model": "gemini-2.5-flash",
-        "key_present": True,
+        "configured": True,
+        "key_source": "env",
+        "key_last_updated_at": None,
+        "key_masked_suffix": "...-key",
+        "supported_providers": [
+            "gemini",
+            "openai",
+            "anthropic",
+            "groq",
+            "mistral",
+        ],
+        "provider_options": [
+            {"provider": "gemini", "recommended_model": "gemini-2.5-flash"},
+            {"provider": "openai", "recommended_model": "gpt-4o-mini"},
+            {
+                "provider": "anthropic",
+                "recommended_model": "claude-3-5-haiku-latest",
+            },
+            {
+                "provider": "groq",
+                "recommended_model": "llama-3.3-70b-versatile",
+            },
+            {
+                "provider": "mistral",
+                "recommended_model": "mistral-small-latest",
+            },
+        ],
     }
 
     saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
@@ -1258,6 +1320,76 @@ async def test_admin_ai_connection_test_uses_write_only_key(
         "settings_model": "gemini-2.0-flash-exp",
     }
     assert "api_key" not in response.text
+
+
+async def test_admin_ai_connection_test_can_use_saved_runtime_key(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _install_admin_override()
+
+    settings_cache = _sample_settings().model_copy(
+        update={
+            "ai": _sample_settings().ai.model_copy(
+                update={"provider": "groq", "model": "llama-3.3-70b-versatile"}
+            )
+        }
+    )
+    app.dependency_overrides[get_settings_cache] = lambda: settings_cache
+
+    from app.routers import admin as admin_router
+    from app.services.ai_key_store import save_runtime_ai_api_key
+
+    original_key_store_file = admin_router.AI_KEY_STORE_FILE
+    admin_router.AI_KEY_STORE_FILE = tmp_path / "ai-provider-secrets.yaml"
+    save_runtime_ai_api_key(
+        "groq",
+        "saved-groq-key",
+        key_store_file=admin_router.AI_KEY_STORE_FILE,
+    )
+
+    observed: dict[str, object] = {}
+
+    async def fake_test_connection(
+        *,
+        settings: GameSettings,
+        api_key: str | None,
+        provider_override: str | None,
+        model_override: str | None,
+    ) -> None:
+        observed["provider"] = provider_override
+        observed["model"] = model_override
+        observed["api_key"] = api_key
+        observed["settings_provider"] = settings.ai.provider
+
+    monkeypatch.setattr(admin_router, "test_connection", fake_test_connection)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/ai-config/test",
+            json={
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+            },
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.AI_KEY_STORE_FILE = original_key_store_file
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": True,
+        "message": "Connection test succeeded.",
+        "model_used": "llama-3.3-70b-versatile",
+    }
+    assert observed == {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile",
+        "api_key": None,
+        "settings_provider": "groq",
+    }
 
 
 async def test_admin_ai_connection_test_failure_redacts_details(
@@ -1340,3 +1472,77 @@ async def test_admin_ai_connection_test_overloaded_returns_actionable_message(
     }
     assert "super-secret" not in response.text
     assert "overload-secret" not in response.text
+
+
+async def test_admin_ai_key_save_updates_settings_and_runtime_store(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _install_admin_override()
+
+    settings_cache = _sample_settings()
+    app.dependency_overrides[get_settings_cache] = lambda: settings_cache
+
+    from app.routers import admin as admin_router
+
+    original_settings_file = admin_router.SETTINGS_FILE
+    original_key_store_file = admin_router.AI_KEY_STORE_FILE
+    admin_router.SETTINGS_FILE = tmp_path / "settings.yaml"
+    admin_router.AI_KEY_STORE_FILE = tmp_path / "ai-provider-secrets.yaml"
+
+    async def fake_test_connection(
+        *,
+        settings: GameSettings,
+        api_key: str | None,
+        provider_override: str | None,
+        model_override: str | None,
+    ) -> str:
+        assert settings.ai.provider == "openai"
+        assert settings.ai.model == "gpt-4o-mini"
+        assert api_key == "new-openai-key"
+        assert provider_override == "openai"
+        assert model_override == "gpt-4o-mini"
+        return "gpt-4o-mini"
+
+    monkeypatch.setattr(admin_router, "test_connection", fake_test_connection)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/admin/ai-config/key",
+            json={
+                "api_key": "new-openai-key",
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+            },
+        )
+
+    app.dependency_overrides.clear()
+    admin_router.SETTINGS_FILE = original_settings_file
+    admin_router.AI_KEY_STORE_FILE = original_key_store_file
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["message"] == "API key saved and connection test succeeded."
+    assert body["model_used"] == "gpt-4o-mini"
+    assert body["config"]["provider"] == "openai"
+    assert body["config"]["model"] == "gpt-4o-mini"
+    assert body["config"]["configured"] is True
+    assert body["config"]["key_source"] == "runtime"
+    assert body["config"]["key_last_updated_at"] is not None
+    assert body["config"]["key_masked_suffix"] == "...-key"
+    assert body["config"]["provider_options"][1] == {
+        "provider": "openai",
+        "recommended_model": "gpt-4o-mini",
+    }
+    assert "new-openai-key" not in response.text
+    saved_store = yaml.safe_load(
+        (tmp_path / "ai-provider-secrets.yaml").read_text(encoding="utf-8")
+    )
+    assert saved_store["providers"]["openai"]["api_key"] == "new-openai-key"
+    assert saved_store["providers"]["openai"]["updated_at"]
+
+    saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
+    assert saved["ai"] == {"provider": "openai", "model": "gpt-4o-mini"}

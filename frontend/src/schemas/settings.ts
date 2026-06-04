@@ -54,9 +54,17 @@ const ContentRefreshSettingsSchema = z
   })
   .strict();
 
+export const AIProviderSchema = z.enum([
+  "gemini",
+  "openai",
+  "anthropic",
+  "groq",
+  "mistral",
+]);
+
 const AISettingsSchema = z
   .object({
-    provider: z.literal("gemini").default("gemini"),
+    provider: AIProviderSchema.default("gemini"),
     model: z.string().min(1).default("gemini-2.0-flash-exp"),
   })
   .strict();
@@ -106,3 +114,4 @@ export const SettingsSchema = z
   .strict();
 
 export type Settings = z.infer<typeof SettingsSchema>;
+export type AIProvider = z.infer<typeof AIProviderSchema>;

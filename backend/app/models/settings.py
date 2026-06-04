@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+AIProviderName = Literal["gemini", "openai", "anthropic", "groq", "mistral"]
+
 
 class MinCorrectForXPSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -104,7 +106,7 @@ class ContentRefreshSettings(BaseModel):
 class AISettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    provider: Literal["gemini"] = "gemini"
+    provider: AIProviderName = "gemini"
     model: str = Field(default="gemini-2.0-flash-exp", min_length=1)
 
 

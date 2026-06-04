@@ -25,8 +25,8 @@ import type {
   UserProgressRecord,
   UserProgressUpsertRequest,
 } from "../schemas/progress";
-import { SettingsSchema } from "../schemas/settings";
-import type { Settings } from "../schemas/settings";
+import { AIProviderSchema, SettingsSchema } from "../schemas/settings";
+import type { AIProvider, Settings } from "../schemas/settings";
 import { UnlockedDifficultiesSchema, XpSpendResponseSchema } from "../schemas/xpSpend";
 import type {
   UnlockedDifficulties,
@@ -91,9 +91,21 @@ const UserProfileUpdateRequestSchema = z
   .strict();
 const AdminAIConfigSchema = z
   .object({
-    provider: z.literal("gemini"),
+    provider: AIProviderSchema,
     model: z.string().min(1),
-    key_present: z.boolean(),
+    configured: z.boolean(),
+    key_source: z.enum(["runtime", "env", "none"]),
+    key_last_updated_at: z.string().datetime().nullable().optional(),
+    key_masked_suffix: z.string().min(1).nullable().optional(),
+    supported_providers: z.array(AIProviderSchema),
+    provider_options: z.array(
+      z
+        .object({
+          provider: AIProviderSchema,
+          recommended_model: z.string().min(1),
+        })
+        .strict(),
+    ),
   })
   .strict();
 const AdminAIConnectionTestSchema = z
@@ -101,6 +113,14 @@ const AdminAIConnectionTestSchema = z
     success: z.boolean(),
     message: z.string(),
     model_used: z.string(),
+  })
+  .strict();
+const AdminAIKeyUpdateResponseSchema = z
+  .object({
+    success: z.boolean(),
+    message: z.string(),
+    model_used: z.string(),
+    config: AdminAIConfigSchema,
   })
   .strict();
 const AdminPackageGenerateResponseSchema = z
@@ -174,6 +194,7 @@ const AdminAuditLogEntrySchema = z
 
 export type AdminAIConfig = z.infer<typeof AdminAIConfigSchema>;
 export type AdminAIConnectionTestResult = z.infer<typeof AdminAIConnectionTestSchema>;
+export type AdminAIKeyUpdateResult = z.infer<typeof AdminAIKeyUpdateResponseSchema>;
 export type AdminPackageGenerateResponse = z.infer<
   typeof AdminPackageGenerateResponseSchema
 >;
@@ -217,6 +238,60 @@ async function fetchWithTimeout(
   } finally {
     clearTimeout(id);
   }
+}
+
+function formatFieldLabel(field: string): string {
+  const trimmed = field.trim();
+  if (trimmed.length === 0) {
+    return "This field";
+  }
+  const withSpaces = trimmed.replace(/_/g, " ");
+  return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+}
+
+function formatValidationIssueMessage(issue: z.ZodIssue): string {
+  const field = issue.path[0];
+  const fieldLabel = typeof field === "string" ? formatFieldLabel(field) : "This field";
+
+  if (
+    issue.code === "invalid_type" &&
+    "received" in issue &&
+    issue.received === "undefined"
+  ) {
+    return `${fieldLabel} is required.`;
+  }
+
+  if (
+    issue.code === "too_small" &&
+    "type" in issue &&
+    issue.type === "string" &&
+    "minimum" in issue
+  ) {
+    return `${fieldLabel} must be at least ${issue.minimum} characters.`;
+  }
+
+  if (
+    issue.code === "invalid_string" &&
+    "validation" in issue &&
+    issue.validation === "email"
+  ) {
+    return "Enter a valid email address.";
+  }
+
+  return issue.message;
+}
+
+function readUserFacingErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof z.ZodError) {
+    const messages = error.issues.map(formatValidationIssueMessage);
+    return messages.join(" ");
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
 }
 
 export async function fetchPackages(): Promise<PackageSummary[]> {
@@ -725,37 +800,45 @@ export function markXPReconciliationDecision(userId: number): void {
 }
 
 export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
-  const parsed = RegisterRequestSchema.parse(payload);
-  const response = await fetchWithTimeout(`${BASE_URL}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
+  try {
+    const parsed = RegisterRequestSchema.parse(payload);
+    const response = await fetchWithTimeout(`${BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed),
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Registration failed (${response.status}): ${detail}`);
+    if (!response.ok) {
+      const detail = await readBackendErrorMessage(response);
+      throw new Error(detail || "Registration failed.");
+    }
+
+    const data: unknown = await response.json();
+    return AuthResponseSchema.parse(data);
+  } catch (error) {
+    throw new Error(readUserFacingErrorMessage(error, "Registration failed."));
   }
-
-  const data: unknown = await response.json();
-  return AuthResponseSchema.parse(data);
 }
 
 export async function loginUser(payload: LoginRequest): Promise<AuthResponse> {
-  const parsed = LoginRequestSchema.parse(payload);
-  const response = await fetchWithTimeout(`${BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
+  try {
+    const parsed = LoginRequestSchema.parse(payload);
+    const response = await fetchWithTimeout(`${BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed),
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Login failed (${response.status}): ${detail}`);
+    if (!response.ok) {
+      const detail = await readBackendErrorMessage(response);
+      throw new Error(detail || "Login failed.");
+    }
+
+    const data: unknown = await response.json();
+    return AuthResponseSchema.parse(data);
+  } catch (error) {
+    throw new Error(readUserFacingErrorMessage(error, "Login failed."));
   }
-
-  const data: unknown = await response.json();
-  return AuthResponseSchema.parse(data);
 }
 
 export async function fetchCurrentUser(token: string): Promise<User> {
@@ -1042,7 +1125,7 @@ export async function fetchAdminAIConfig(token: string): Promise<AdminAIConfig> 
 
 export async function updateAdminAIConfig(
   token: string,
-  config: { provider: "gemini"; model: string },
+  config: { provider: AIProvider; model: string },
 ): Promise<AdminAIConfig> {
   const response = await fetchWithTimeout(`${BASE_URL}/admin/ai-config`, {
     method: "PATCH",
@@ -1059,8 +1142,8 @@ export async function updateAdminAIConfig(
 export async function testAdminAIConnection(
   token: string,
   payload: {
-    api_key: string;
-    provider?: "gemini";
+    api_key?: string;
+    provider?: AIProvider;
     model?: string;
   },
 ): Promise<AdminAIConnectionTestResult> {
@@ -1078,6 +1161,31 @@ export async function testAdminAIConnection(
   }
   const data: unknown = await response.json();
   return AdminAIConnectionTestSchema.parse(data);
+}
+
+export async function saveAdminAIKey(
+  token: string,
+  payload: {
+    api_key: string;
+    provider: AIProvider;
+    model: string;
+  },
+): Promise<AdminAIKeyUpdateResult> {
+  const response = await fetchWithTimeout(
+    `${BASE_URL}/admin/ai-config/key`,
+    {
+      method: "POST",
+      headers: getAdminHeaders(token),
+      body: JSON.stringify(payload),
+    },
+    ADMIN_AI_TIMEOUT_MS,
+  );
+  if (!response.ok) {
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(detail || "Failed to save admin AI key.");
+  }
+  const data: unknown = await response.json();
+  return AdminAIKeyUpdateResponseSchema.parse(data);
 }
 
 export async function fetchAdminPackages(
@@ -1108,6 +1216,19 @@ function extractBackendErrorDetail(payload: unknown): string | null {
   const asRecord = payload as Record<string, unknown>;
   if (typeof asRecord.detail === "string") {
     const trimmed = asRecord.detail.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  if (
+    asRecord.detail &&
+    typeof asRecord.detail === "object" &&
+    typeof (asRecord.detail as Record<string, unknown>).message === "string"
+  ) {
+    const trimmed = (
+      (asRecord.detail as Record<string, unknown>).message as string
+    ).trim();
     if (trimmed.length > 0) {
       return trimmed;
     }

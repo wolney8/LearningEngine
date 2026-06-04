@@ -7,7 +7,7 @@ import "./AuthPages.css";
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const { register, status, error } = useAuth();
+  const { register, status, error, clearError } = useAuth();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,6 +18,8 @@ export function RegisterPage() {
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [selectionError, setSelectionError] = useState("");
   const selectionErrorRef = useRef<HTMLParagraphElement | null>(null);
+
+  useEffect(() => clearError, [clearError]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +58,7 @@ export function RegisterPage() {
   );
 
   function handleSelectionChange(packageId: string, selected: boolean): void {
+    clearError();
     setSelectionError("");
     setSelectedPackageIds((current) => {
       if (selected) {
@@ -109,7 +112,10 @@ export function RegisterPage() {
               type="text"
               autoComplete="username"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                clearError();
+                setUsername(event.target.value);
+              }}
               required
               minLength={3}
             />
@@ -121,7 +127,10 @@ export function RegisterPage() {
               type="email"
               autoComplete="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                clearError();
+                setEmail(event.target.value);
+              }}
               required
             />
           </label>
@@ -132,7 +141,10 @@ export function RegisterPage() {
               type="password"
               autoComplete="new-password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                clearError();
+                setPassword(event.target.value);
+              }}
               required
               minLength={8}
             />

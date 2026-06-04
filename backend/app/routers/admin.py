@@ -16,7 +16,7 @@ from app.models.refresh import (
     RefreshResult,
     StalePackageInfo,
 )
-from app.models.settings import GameSettings
+from app.models.settings import AIProviderName, GameSettings
 from app.models.user import (
     AdminAuditLog,
     SpendHistory,
@@ -31,10 +31,18 @@ from app.services.ai_generator import (
     AI_ERROR_CODE_PROVIDER_UNAVAILABLE,
     AI_ERROR_CODE_UPSTREAM_FAILURE,
     DEFAULT_GEMINI_MODEL,
+    SUPPORTED_AI_PROVIDERS,
     AIGenerationError,
     generate_package,
+    get_recommended_ai_model,
     refresh_package,
     test_connection,
+)
+from app.services.ai_key_store import (
+    KeySource,
+    get_ai_key_store_file,
+    read_ai_key_status,
+    save_runtime_ai_api_key,
 )
 from app.services.db import get_session
 from app.services.overrides_loader import (
@@ -63,6 +71,8 @@ router = APIRouter(
     dependencies=[Depends(require_admin_user)],
 )
 
+AI_KEY_STORE_FILE = get_ai_key_store_file()
+
 
 class PackageOverridePatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -90,8 +100,8 @@ class GenerateRequest(BaseModel):
 
     topic: str = Field(min_length=3, max_length=500)
     audience: str = Field(default="general learners", max_length=200)
-    num_pages: int = Field(default=3, ge=1, le=10)
-    num_questions: int = Field(default=8, ge=8, le=20)
+    num_pages: int = Field(default=3, ge=1, le=20)
+    num_questions: int = Field(default=8, ge=8, le=40)
 
 
 class GenerateResponse(BaseModel):
@@ -101,25 +111,34 @@ class GenerateResponse(BaseModel):
 
 
 class AdminAIConfigResponse(BaseModel):
+    class ProviderOption(BaseModel):
+        provider: AIProviderName
+        recommended_model: str
+
     model_config = ConfigDict(extra="forbid")
 
-    provider: Literal["gemini"]
+    provider: AIProviderName
     model: str
-    key_present: bool
+    configured: bool
+    key_source: KeySource
+    key_last_updated_at: datetime | None = None
+    key_masked_suffix: str | None = None
+    supported_providers: list[AIProviderName]
+    provider_options: list[ProviderOption]
 
 
 class AdminAIConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    provider: Literal["gemini"]
+    provider: AIProviderName
     model: str = Field(min_length=1)
 
 
 class AdminAIConnectionTestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    api_key: str = Field(min_length=1)
-    provider: Literal["gemini"] | None = None
+    api_key: str | None = Field(default=None, min_length=1)
+    provider: AIProviderName | None = None
     model: str | None = Field(default=None, min_length=1)
 
 
@@ -129,6 +148,23 @@ class AdminAIConnectionTestResponse(BaseModel):
     success: bool
     message: str
     model_used: str
+
+
+class AdminAIKeyUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    api_key: str = Field(min_length=1)
+    provider: AIProviderName
+    model: str = Field(min_length=1)
+
+
+class AdminAIKeyUpdateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    success: bool
+    message: str
+    model_used: str
+    config: AdminAIConfigResponse
 
 
 class AdminUserSummary(BaseModel):
@@ -426,10 +462,25 @@ def build_admin_package_summary(
 
 
 def build_ai_config_response(settings: GameSettings) -> AdminAIConfigResponse:
+    key_status = read_ai_key_status(
+        settings.ai.provider,
+        key_store_file=AI_KEY_STORE_FILE,
+    )
     return AdminAIConfigResponse(
         provider=settings.ai.provider,
         model=settings.ai.model,
-        key_present=bool(os.getenv("GEMINI_API_KEY")),
+        configured=key_status.configured,
+        key_source=key_status.source,
+        key_last_updated_at=key_status.last_updated_at,
+        key_masked_suffix=key_status.masked_suffix,
+        supported_providers=list(SUPPORTED_AI_PROVIDERS),
+        provider_options=[
+            AdminAIConfigResponse.ProviderOption(
+                provider=provider,
+                recommended_model=get_recommended_ai_model(provider),
+            )
+            for provider in SUPPORTED_AI_PROVIDERS
+        ],
     )
 
 
@@ -633,6 +684,49 @@ async def test_admin_ai_connection(
         success=True,
         message="Connection test succeeded.",
         model_used=tested_model or model_used,
+    )
+
+
+@router.post(
+    "/ai-config/key",
+    response_model=AdminAIKeyUpdateResponse,
+)
+async def save_admin_ai_key(
+    body: AdminAIKeyUpdateRequest,
+    request: Request,
+    settings: GameSettings = Depends(get_settings_cache),
+) -> AdminAIKeyUpdateResponse:
+    updated_ai = settings.ai.model_copy(
+        update={"provider": body.provider, "model": body.model}
+    )
+    updated_settings = settings.model_copy(update={"ai": updated_ai})
+    save_settings(updated_settings, SETTINGS_FILE)
+    request.app.state.settings = updated_settings
+    save_runtime_ai_api_key(
+        body.provider,
+        body.api_key,
+        key_store_file=AI_KEY_STORE_FILE,
+    )
+
+    try:
+        tested_model = await test_connection(
+            settings=updated_settings,
+            api_key=body.api_key,
+            provider_override=body.provider,
+            model_override=body.model,
+        )
+        message = "API key saved and connection test succeeded."
+        success = True
+    except AIGenerationError as exc:
+        tested_model = _resolve_ai_test_model(updated_settings, body.model)
+        message = _build_ai_connection_test_failure_message(exc.error_code)
+        success = False
+
+    return AdminAIKeyUpdateResponse(
+        success=success,
+        message=message,
+        model_used=tested_model,
+        config=build_ai_config_response(updated_settings),
     )
 
 

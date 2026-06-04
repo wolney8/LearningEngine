@@ -3,11 +3,12 @@ import { Link, Navigate, useBlocker } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
 import { useCelebrationEffects } from "../hooks/useCelebrationEffects";
-import type { Settings } from "../schemas/settings";
+import type { AIProvider, Settings } from "../schemas/settings";
 import {
   type AdminAIConfig,
   fetchAdminAIConfig,
   fetchAdminSettings,
+  saveAdminAIKey,
   testAdminAIConnection,
   updateAdminAIConfig,
   updateAdminSettings,
@@ -22,24 +23,20 @@ import {
 import "./AdminSettingsPage.css";
 
 const LIGHTNING_PREVIEW_DURATION_MS = 640;
+type AIProviderSelection = AIProvider | "";
+type ProviderOption = AdminAIConfig["provider_options"][number];
 
-const GEMINI_MODEL_PRESETS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-pro",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-exp",
-] as const;
-
-type GeminiModelPreset = (typeof GEMINI_MODEL_PRESETS)[number];
-type GeminiModelSelection = GeminiModelPreset | "custom";
-
-function resolveGeminiModelSelection(model: string): GeminiModelSelection {
-  if (GEMINI_MODEL_PRESETS.some((preset) => preset === model)) {
-    return model as GeminiModelPreset;
+function getRecommendedModelForProvider(
+  provider: AIProviderSelection,
+  providerOptions: ProviderOption[],
+): string {
+  if (!provider) {
+    return "";
   }
-
-  return "custom";
+  return (
+    providerOptions.find((option) => option.provider === provider)?.recommended_model ??
+    ""
+  );
 }
 
 type NumberPath =
@@ -193,13 +190,12 @@ export function AdminSettingsPage() {
     "loading",
   );
   const [message, setMessage] = useState<string>("");
-  const [aiProvider, setAIProvider] = useState<"gemini">("gemini");
+  const [aiProvider, setAIProvider] = useState<AIProviderSelection>("gemini");
   const [aiModel, setAIModel] = useState<string>("");
-  const [aiModelSelection, setAIModelSelection] =
-    useState<GeminiModelSelection>("gemini-2.5-flash");
-  const [aiApiKey, setAIApiKey] = useState<string>("");
+  const [pendingAIApiKey, setPendingAIApiKey] = useState<string>("");
   const [aiSaving, setAISaving] = useState<boolean>(false);
   const [aiTesting, setAITesting] = useState<boolean>(false);
+  const [aiSavingKey, setAISavingKey] = useState<boolean>(false);
   const [aiMessage, setAIMessage] = useState<string>("");
   const [aiTestedModel, setAITestedModel] = useState<string>("");
   const [isLightningPreviewActive, setLightningPreviewActive] =
@@ -209,13 +205,15 @@ export function AdminSettingsPage() {
   const lightningPreviewTimerRef = useRef<number | null>(null);
   const [persistedNotice, setPersistedNotice] = useState<AdminTaskNotice | null>(null);
   const shouldPersistCompletionNoticeRef = useRef(false);
+  const previousPendingApiKeyRef = useRef("");
+  const previousAIProviderRef = useRef<AIProviderSelection>("gemini");
 
   const { lightningEnabled, shouldReduceMotion, canTriggerConfetti, triggerConfetti } =
     useCelebrationEffects({
       celebrationSettingsOverride: settings?.celebration_effects,
     });
 
-  const isActionInFlight = status === "saving" || aiSaving || aiTesting;
+  const isActionInFlight = status === "saving" || aiSaving || aiTesting || aiSavingKey;
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -237,8 +235,7 @@ export function AdminSettingsPage() {
         setAIConfig(aiData);
         setAIProvider(aiData.provider);
         setAIModel(aiData.model);
-        setAIModelSelection(resolveGeminiModelSelection(aiData.model));
-        setAIApiKey("");
+        setPendingAIApiKey("");
         setAIMessage("");
         setStatus("ready");
       } catch {
@@ -256,6 +253,47 @@ export function AdminSettingsPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    const hadPendingKey = previousPendingApiKeyRef.current.trim().length > 0;
+    const hasPendingKey = pendingAIApiKey.trim().length > 0;
+    if (hasPendingKey && !hadPendingKey) {
+      setAIProvider("");
+      setAIModel("");
+      setAITestedModel("");
+      setAIMessage("Choose a provider and model before saving the new API key.");
+    }
+    previousPendingApiKeyRef.current = pendingAIApiKey;
+  }, [pendingAIApiKey]);
+
+  const providerOptions = aiConfig?.provider_options ?? [];
+
+  useEffect(() => {
+    const previousProvider = previousAIProviderRef.current;
+    if (previousProvider === aiProvider) {
+      return;
+    }
+
+    const previousRecommendedModel = getRecommendedModelForProvider(
+      previousProvider,
+      providerOptions,
+    );
+    const nextRecommendedModel = getRecommendedModelForProvider(
+      aiProvider,
+      providerOptions,
+    );
+    const trimmedModel = aiModel.trim();
+    const shouldReplaceModel =
+      trimmedModel.length === 0 ||
+      (previousRecommendedModel.length > 0 &&
+        trimmedModel === previousRecommendedModel);
+
+    if (nextRecommendedModel && shouldReplaceModel) {
+      setAIModel(nextRecommendedModel);
+    }
+
+    previousAIProviderRef.current = aiProvider;
+  }, [aiModel, aiProvider, providerOptions]);
 
   useEffect(() => {
     if (blocker.state !== "blocked") {
@@ -334,6 +372,12 @@ export function AdminSettingsPage() {
     enqueueAdminTaskNotice(level, message);
   }
 
+  const supportedProviders = aiConfig?.supported_providers ?? [];
+  const providerUnset = aiProvider === "";
+  const modelUnset = aiModel.trim().length === 0;
+  const savedKeyAvailable = aiConfig?.configured ?? false;
+  const recommendedModel = getRecommendedModelForProvider(aiProvider, providerOptions);
+
   async function handleSave() {
     if (!settings) {
       return;
@@ -355,22 +399,31 @@ export function AdminSettingsPage() {
   }
 
   async function handleSaveAIConfig() {
-    if (!aiModel.trim()) {
-      setAIMessage("Model is required.");
+    if (providerUnset) {
+      setAIMessage("Provider is required.");
       return;
     }
 
+    if (modelUnset) {
+      setAIMessage(
+        recommendedModel
+          ? `Model preset is required. Recommended starter model for ${aiProvider}: ${recommendedModel}.`
+          : "Model preset is required.",
+      );
+      return;
+    }
+
+    const selectedProvider = aiProvider as AIProvider;
     setAISaving(true);
     setAIMessage("");
     try {
       const updated = await updateAdminAIConfig(adminToken, {
-        provider: aiProvider,
+        provider: selectedProvider,
         model: aiModel.trim(),
       });
       setAIConfig(updated);
       setAIProvider(updated.provider);
       setAIModel(updated.model);
-      setAIModelSelection(resolveGeminiModelSelection(updated.model));
       setAIMessage("AI config saved.");
       persistCompletionNotice("success", "AI config saved.");
     } catch {
@@ -381,21 +434,38 @@ export function AdminSettingsPage() {
     }
   }
 
-  async function handleTestAIConnection() {
-    if (!aiApiKey.trim()) {
-      setAIMessage("API key is required for connection test.");
+  async function handleTestAIConnection(useSavedKey: boolean) {
+    if (providerUnset) {
+      setAIMessage("Provider is required.");
       setAITestedModel("");
       return;
     }
 
+    if (modelUnset) {
+      setAIMessage(
+        recommendedModel
+          ? `Model preset is required. Recommended starter model for ${aiProvider}: ${recommendedModel}.`
+          : "Model preset is required.",
+      );
+      setAITestedModel("");
+      return;
+    }
+
+    if (!useSavedKey && !pendingAIApiKey.trim()) {
+      setAIMessage("Enter an API key to test.");
+      setAITestedModel("");
+      return;
+    }
+
+    const selectedProvider = aiProvider as AIProvider;
     setAITesting(true);
     setAIMessage("");
     setAITestedModel("");
     try {
       const result = await testAdminAIConnection(adminToken, {
-        api_key: aiApiKey,
-        provider: aiProvider,
-        model: aiModel.trim() || undefined,
+        api_key: useSavedKey ? undefined : pendingAIApiKey.trim(),
+        provider: selectedProvider,
+        model: aiModel.trim(),
       });
       setAIMessage(result.message);
       setAITestedModel(result.model_used);
@@ -406,16 +476,75 @@ export function AdminSettingsPage() {
       setAIMessage(safeErrorMessage);
       persistCompletionNotice("error", safeErrorMessage);
     } finally {
-      setAIApiKey("");
       setAITesting(false);
     }
   }
 
-  function handleModelSelectionChange(selection: GeminiModelSelection) {
-    setAIModelSelection(selection);
-    if (selection !== "custom") {
-      setAIModel(selection);
+  async function handleSaveNewAIKey() {
+    if (providerUnset) {
+      setAIMessage("Provider is required before saving a new API key.");
+      setAITestedModel("");
+      return;
     }
+
+    if (modelUnset) {
+      setAIMessage(
+        recommendedModel
+          ? `Model preset is required before saving a new API key. Recommended starter model for ${aiProvider}: ${recommendedModel}.`
+          : "Model preset is required before saving a new API key.",
+      );
+      setAITestedModel("");
+      return;
+    }
+
+    if (!pendingAIApiKey.trim()) {
+      setAIMessage("Enter a new API key before saving.");
+      setAITestedModel("");
+      return;
+    }
+
+    const selectedProvider = aiProvider as AIProvider;
+    setAISavingKey(true);
+    setAIMessage("");
+    setAITestedModel("");
+    try {
+      const result = await saveAdminAIKey(adminToken, {
+        api_key: pendingAIApiKey.trim(),
+        provider: selectedProvider,
+        model: aiModel.trim(),
+      });
+      setAIConfig(result.config);
+      setAIProvider(result.config.provider);
+      setAIModel(result.config.model);
+      setPendingAIApiKey("");
+      setAIMessage(result.message);
+      setAITestedModel(result.model_used);
+      persistCompletionNotice(result.success ? "success" : "error", result.message);
+    } catch {
+      const safeErrorMessage =
+        "Could not save the new API key. Check provider, model, and key, then try again.";
+      setAIMessage(safeErrorMessage);
+      persistCompletionNotice("error", safeErrorMessage);
+    } finally {
+      setAISavingKey(false);
+    }
+  }
+
+  function formatDateOnly(value: string | null | undefined): string {
+    if (!value) {
+      return "API key last updated: unavailable";
+    }
+
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) {
+      return "API key last updated: unavailable";
+    }
+
+    const date = new Date(parsed);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `API key last updated: ${day}/${month}/${year}`;
   }
 
   const fields: Array<{ key: NumberPath; label: string; step?: string }> = [
@@ -819,59 +948,78 @@ export function AdminSettingsPage() {
                 <span>Provider</span>
                 <select
                   value={aiProvider}
-                  onChange={(event) => setAIProvider(event.target.value as "gemini")}
-                >
-                  <option value="gemini">gemini</option>
-                </select>
-              </label>
-
-              <label className="admin-page__field">
-                <span>Model preset</span>
-                <select
-                  value={aiModelSelection}
+                  className={providerUnset ? "admin-page__field-control--error" : ""}
+                  aria-invalid={providerUnset}
                   onChange={(event) =>
-                    handleModelSelectionChange(
-                      event.target.value as GeminiModelSelection,
-                    )
+                    setAIProvider(event.target.value as AIProviderSelection)
                   }
                 >
-                  {GEMINI_MODEL_PRESETS.map((preset) => (
-                    <option key={preset} value={preset}>
-                      {preset}
+                  <option value="">Unset</option>
+                  {supportedProviders.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {provider}
                     </option>
                   ))}
-                  <option value="custom">Custom model…</option>
                 </select>
               </label>
 
-              {aiModelSelection === "custom" && (
-                <label className="admin-page__field admin-page__field--wide">
-                  <span>Custom model</span>
-                  <input
-                    type="text"
-                    value={aiModel}
-                    onChange={(event) => setAIModel(event.target.value)}
-                    placeholder="Enter full model name"
-                  />
-                </label>
-              )}
-
-              <label className="admin-page__field">
-                <span>Connection test API key (write-only)</span>
+              <label className="admin-page__field admin-page__field--wide">
+                <span>Model preset</span>
                 <input
-                  type="password"
-                  value={aiApiKey}
-                  onChange={(event) => setAIApiKey(event.target.value)}
-                  autoComplete="off"
+                  type="text"
+                  value={aiModel}
+                  className={modelUnset ? "admin-page__field-control--error" : ""}
+                  aria-invalid={modelUnset}
+                  onChange={(event) => setAIModel(event.target.value)}
+                  placeholder={recommendedModel || "Enter full model name"}
                 />
               </label>
+            </div>
+
+            <div className="admin-page__status-stack">
+              <p aria-live="polite" className="admin-page__key-status">
+                <span>API Key:</span>
+                <span
+                  className={
+                    savedKeyAvailable
+                      ? "admin-page__key-status-icon admin-page__key-status-icon--present"
+                      : "admin-page__key-status-icon admin-page__key-status-icon--missing"
+                  }
+                  role="img"
+                  aria-label={savedKeyAvailable ? "Present" : "Missing"}
+                >
+                  {savedKeyAvailable ? "✓" : "✗"}
+                </span>
+              </p>
+              <p aria-live="polite">{formatDateOnly(aiConfig?.key_last_updated_at)}</p>
+              <p aria-live="polite">Key source: {aiConfig?.key_source ?? "none"}</p>
+              {aiConfig?.key_masked_suffix && (
+                <p aria-live="polite">Key ending: {aiConfig.key_masked_suffix}</p>
+              )}
+              {recommendedModel && (
+                <p aria-live="polite" className="admin-page__hint">
+                  Recommended starter model for {aiProvider}: {recommendedModel}
+                </p>
+              )}
+              {providerUnset && (
+                <p className="admin-page__warning" role="alert">
+                  Provider is unset. Choose a provider before saving or testing.
+                </p>
+              )}
+              {modelUnset && (
+                <p className="admin-page__warning" role="alert">
+                  {recommendedModel
+                    ? `Model preset is unset. Recommended starter model for ${aiProvider}: ${recommendedModel}.`
+                    : "Model preset is unset. Enter a model before saving or testing."}
+                </p>
+              )}
             </div>
 
             <div className="admin-page__actions">
               <button
                 type="button"
                 onClick={() => void handleSaveAIConfig()}
-                disabled={aiSaving}
+                disabled={aiSaving || providerUnset || modelUnset}
                 aria-busy={aiSaving}
               >
                 <span className="admin-page__button-content">
@@ -883,22 +1031,57 @@ export function AdminSettingsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => void handleTestAIConnection()}
-                disabled={aiTesting}
+                onClick={() => void handleTestAIConnection(true)}
+                disabled={
+                  aiTesting || providerUnset || modelUnset || !savedKeyAvailable
+                }
                 aria-busy={aiTesting}
               >
                 <span className="admin-page__button-content">
                   {aiTesting && (
                     <span className="admin-page__button-spinner" aria-hidden="true" />
                   )}
-                  <span>Test AI Connection</span>
+                  <span>Test API Key</span>
                 </span>
               </button>
-              {aiConfig && (
-                <p aria-live="polite">
-                  Key present in runtime env: {aiConfig.key_present ? "Yes" : "No"}
-                </p>
-              )}
+            </div>
+
+            <fieldset className="admin-page__fieldset">
+              <legend>Set new API key</legend>
+              <div className="admin-page__grid admin-page__grid--ai">
+                <label className="admin-page__field admin-page__field--wide">
+                  <span>New API key</span>
+                  <input
+                    type="password"
+                    value={pendingAIApiKey}
+                    onChange={(event) => setPendingAIApiKey(event.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+              <div className="admin-page__actions">
+                <button
+                  type="button"
+                  onClick={() => void handleSaveNewAIKey()}
+                  disabled={
+                    aiSavingKey ||
+                    providerUnset ||
+                    modelUnset ||
+                    !pendingAIApiKey.trim()
+                  }
+                  aria-busy={aiSavingKey}
+                >
+                  <span className="admin-page__button-content">
+                    {aiSavingKey && (
+                      <span className="admin-page__button-spinner" aria-hidden="true" />
+                    )}
+                    <span>Save new key and test</span>
+                  </span>
+                </button>
+              </div>
+            </fieldset>
+
+            <div className="admin-page__actions">
               {aiMessage && (
                 <p aria-live="polite">
                   {aiMessage}

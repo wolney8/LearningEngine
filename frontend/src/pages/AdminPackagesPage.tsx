@@ -249,14 +249,14 @@ export function AdminPackagesPage() {
       generateTopic.trim().length < 3 ||
       Number.isNaN(parsedPages) ||
       parsedPages < 1 ||
-      parsedPages > 10 ||
+      parsedPages > 20 ||
       Number.isNaN(parsedQuestions) ||
       parsedQuestions < 8 ||
-      parsedQuestions > 20
+      parsedQuestions > 40
     ) {
       setGenerateStatus("error");
       setGenerateMessage(
-        "Enter a topic (3+ chars), pages between 1-10, and questions between 8-20.",
+        "Enter a topic (3+ chars), pages between 1-20, and questions between 8-40.",
       );
       return;
     }
@@ -465,7 +465,7 @@ export function AdminPackagesPage() {
               id="generate-pages"
               type="number"
               min={1}
-              max={10}
+              max={20}
               value={generatePages}
               onChange={(event) => setGeneratePages(event.target.value)}
             />
@@ -476,7 +476,7 @@ export function AdminPackagesPage() {
               id="generate-questions"
               type="number"
               min={8}
-              max={20}
+              max={40}
               value={generateQuestions}
               onChange={(event) => setGenerateQuestions(event.target.value)}
             />
