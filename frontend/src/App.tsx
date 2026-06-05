@@ -10,6 +10,7 @@ import { XPProvider } from "./context/XPContext";
 import { useAuth } from "./hooks/useAuth";
 import { useInactivityLogout } from "./hooks/useInactivityLogout";
 import { useTheme } from "./hooks/useTheme";
+import { useToast } from "./hooks/useToast";
 import { useXP } from "./hooks/useXP";
 import { AdminAuditLogsPage } from "./pages/AdminAuditLogsPage";
 import { AdminPackagesPage } from "./pages/AdminPackagesPage";
@@ -31,7 +32,9 @@ function GlobalToastRegion() {
 
 function AppRoutes() {
   const { status, user, logout } = useAuth();
-  const { xp, levelProgress, lastChangeKind } = useXP();
+  const { xp, levelProgress, lastChangeKind, latestDecayNotice, clearDecayNotice } =
+    useXP();
+  const { info } = useToast();
   const { resolvedTheme, setMode: setThemeMode } = useTheme();
   const [levelUpState, setLevelUpState] = useState<{
     level: number;
@@ -65,6 +68,20 @@ function AppRoutes() {
 
     previousLevelRef.current = levelProgress.level;
   }, [lastChangeKind, levelProgress.level, xp]);
+
+  useEffect(() => {
+    if (!latestDecayNotice || latestDecayNotice.deducted_xp <= 0) {
+      return;
+    }
+
+    const packagesLabel =
+      latestDecayNotice.stale_package_count === 1 ? "package" : "packages";
+    info(
+      `XP refresher decay applied: -${latestDecayNotice.deducted_xp} XP across ${latestDecayNotice.stale_package_count} stale ${packagesLabel}.`,
+      { title: "Refresher reminder", durationMs: 7000 },
+    );
+    clearDecayNotice();
+  }, [clearDecayNotice, info, latestDecayNotice]);
 
   return (
     <div className="app-shell" key={authBoundaryKey} data-auth-status={status}>

@@ -575,6 +575,109 @@ test.describe("Optional auth shell", () => {
     await expect(page.getByText("updated-profile-user")).toHaveCount(2);
   });
 
+  test("profile page allows password update and validates confirmation", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 22,
+      username: "password-viewer",
+      email: "password-viewer@example.com",
+      role: "student",
+      xp: 52,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+    let receivedPasswordBody: {
+      current_password?: string;
+      new_password?: string;
+    } | null = null;
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "token-password-viewer");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 2,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/xp`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ xp: 52 }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/password`, (route) => {
+      receivedPasswordBody = route.request().postDataJSON() as {
+        current_password?: string;
+        new_password?: string;
+      };
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Password updated successfully" }),
+      });
+    });
+
+    await page.goto("/profile");
+    await checkA11y(page);
+
+    await page.getByLabel("Current password", { exact: true }).fill("StrongPass123");
+    await page.getByLabel("New password", { exact: true }).fill("NewStrongPass456");
+    await page.getByLabel("Confirm new password", { exact: true }).fill("Mismatch999");
+    await page.getByRole("button", { name: "Save password" }).click();
+
+    await expect(page.getByRole("alert")).toContainText(
+      "New password and confirmation must match.",
+    );
+
+    await page
+      .getByLabel("Confirm new password", { exact: true })
+      .fill("NewStrongPass456");
+    await page.getByRole("button", { name: "Save password" }).click();
+
+    await expect(
+      page.locator(".profile-page__message--success").filter({
+        hasText: "Password updated successfully",
+      }),
+    ).toContainText("Password updated successfully");
+    await expect(page.getByTestId("toast-success")).toContainText(
+      "Password updated successfully",
+    );
+    expect(receivedPasswordBody).toEqual({
+      current_password: "StrongPass123",
+      new_password: "NewStrongPass456",
+    });
+    await expect(page.getByLabel("Current password", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("New password", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("Confirm new password", { exact: true })).toHaveValue(
+      "",
+    );
+  });
+
   test("register accepts anonymous import and merges XP, progress, and streak", async ({
     page,
   }) => {

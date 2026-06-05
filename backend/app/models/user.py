@@ -38,6 +38,9 @@ class UserTestResult(SQLModel, table=True):
     difficulty_results_json: str | None = Field(default=None)
     attempt_count: int = Field(default=1, ge=1)
     first_completed_at: datetime | None = Field(default=None)
+    refresher_last_passed_at: datetime | None = Field(default=None)
+    refresher_best_xp_base: int = Field(default=0, ge=0)
+    refresher_decay_intervals_applied: int = Field(default=0, ge=0)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

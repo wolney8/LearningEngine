@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (anonymousXP !== null) {
         try {
           const serverXP = await fetchMyXP(nextToken);
-          const mergedXP = Math.max(anonymousXP, serverXP);
+          const mergedXP = Math.max(anonymousXP, serverXP.xp);
           await updateMyXP(nextToken, mergedXP);
         } catch {
           importSucceeded = false;

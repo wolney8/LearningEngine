@@ -124,6 +124,25 @@ def _ensure_sqlite_user_test_result_schema_compatibility() -> None:
                 "ADD COLUMN difficulty_results_json TEXT"
             )
 
+        if "refresher_last_passed_at" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "usertestresult" '
+                "ADD COLUMN refresher_last_passed_at TIMESTAMP"
+            )
+
+        if "refresher_best_xp_base" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "usertestresult" '
+                "ADD COLUMN refresher_best_xp_base INTEGER NOT NULL DEFAULT 0"
+            )
+
+        if "refresher_decay_intervals_applied" not in existing_columns:
+            connection.exec_driver_sql(
+                'ALTER TABLE "usertestresult" '
+                "ADD COLUMN refresher_decay_intervals_applied "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+
 
 def _ensure_sqlite_spend_history_schema_compatibility(session: Session) -> None:
     """Add missing columns to spend_history for existing DBs.

@@ -1,11 +1,13 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
 import { useXP } from "../hooks/useXP";
 import {
   fetchMyProgress,
   fetchMyStreak,
   fetchPackages,
+  updateMyPassword,
   updateMyProfile,
 } from "../services/api";
 import "./ProfilePage.css";
@@ -19,6 +21,7 @@ type ProfileScoreRow = {
 
 export function ProfilePage() {
   const { status, token, user, setCurrentUser } = useAuth();
+  const { success: showSuccessToast } = useToast();
   const { xp } = useXP();
   const [isLoadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState("");
@@ -29,6 +32,13 @@ export function ProfilePage() {
     "idle",
   );
   const [saveMessage, setSaveMessage] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<
+    "idle" | "saving" | "success" | "error"
+  >("idle");
+  const [passwordMessage, setPasswordMessage] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -137,6 +147,52 @@ export function ProfilePage() {
     }
   }
 
+  async function handlePasswordSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!token) {
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus("error");
+      setPasswordMessage("New password and confirmation must match.");
+      return;
+    }
+
+    setPasswordStatus("saving");
+    setPasswordMessage("");
+
+    try {
+      const response = await updateMyPassword(token, {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordStatus("success");
+      setPasswordMessage(response.message);
+      showSuccessToast(response.message, { title: "Password updated" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not update password";
+      const statusMatch = message.match(/\((\d+)\)/);
+      const statusCode = statusMatch ? Number(statusMatch[1]) : null;
+
+      if (statusCode === 401) {
+        setPasswordMessage("Current password is incorrect.");
+      } else if (message.includes("must be different")) {
+        setPasswordMessage("New password must be different from the current password.");
+      } else if (statusCode === 422) {
+        setPasswordMessage("New password must be at least 8 characters.");
+      } else {
+        setPasswordMessage("Could not update password. Please try again.");
+      }
+
+      setPasswordStatus("error");
+    }
+  }
+
   return (
     <main className="profile-page">
       <section className="profile-page__panel" aria-labelledby="profile-page-title">
@@ -199,6 +255,85 @@ export function ProfilePage() {
               role="alert"
             >
               {saveMessage}
+            </p>
+          )}
+        </form>
+
+        <form
+          className="profile-page__form"
+          onSubmit={(event) => void handlePasswordSave(event)}
+        >
+          <label htmlFor="profile-current-password">
+            Current password
+            <input
+              id="profile-current-password"
+              type="password"
+              autoComplete="current-password"
+              minLength={8}
+              maxLength={128}
+              value={currentPassword}
+              onChange={(event) => {
+                setCurrentPassword(event.target.value);
+                if (passwordStatus !== "idle") {
+                  setPasswordStatus("idle");
+                  setPasswordMessage("");
+                }
+              }}
+              required
+            />
+          </label>
+          <label htmlFor="profile-new-password">
+            New password
+            <input
+              id="profile-new-password"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              maxLength={128}
+              value={newPassword}
+              onChange={(event) => {
+                setNewPassword(event.target.value);
+                if (passwordStatus !== "idle") {
+                  setPasswordStatus("idle");
+                  setPasswordMessage("");
+                }
+              }}
+              required
+            />
+          </label>
+          <label htmlFor="profile-confirm-password">
+            Confirm new password
+            <input
+              id="profile-confirm-password"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              maxLength={128}
+              value={confirmPassword}
+              onChange={(event) => {
+                setConfirmPassword(event.target.value);
+                if (passwordStatus !== "idle") {
+                  setPasswordStatus("idle");
+                  setPasswordMessage("");
+                }
+              }}
+              required
+            />
+          </label>
+          <button type="submit" disabled={passwordStatus === "saving"}>
+            {passwordStatus === "saving" ? "Saving..." : "Save password"}
+          </button>
+          {passwordStatus === "success" && (
+            <output className="profile-page__message profile-page__message--success">
+              {passwordMessage}
+            </output>
+          )}
+          {passwordStatus === "error" && (
+            <p
+              className="profile-page__message profile-page__message--error"
+              role="alert"
+            >
+              {passwordMessage}
             </p>
           )}
         </form>

@@ -254,6 +254,51 @@ const MOCK_HARD_ONLY_PACKAGE = {
   ],
 };
 
+const SPEND_ENABLED_SETTINGS = {
+  version: 1,
+  xp: {
+    lesson_base_xp_per_correct: 10,
+    first_completion_bonus: 20,
+    attempt_multipliers: {
+      "1": 1.0,
+      "2": 0.5,
+      "3": 0.25,
+    },
+    hard_expert_exit_penalty: 50,
+    hard_expert_low_answer_penalty: 50,
+    min_correct_for_xp: {
+      easy: 2,
+      normal: 2,
+      hard: 0,
+      expert: 0,
+    },
+  },
+  difficulty: {
+    seconds_per_question: {
+      easy: 90,
+      normal: 45,
+      hard: 20,
+      expert: 10,
+    },
+    xp_multiplier: {
+      easy: 0.5,
+      normal: 1.0,
+      hard: 1.5,
+      expert: 2.0,
+    },
+  },
+  spend_economy: {
+    enabled: true,
+    allow_non_admin_ai_generation_spend: false,
+    costs: {
+      generate_ai_course: 500,
+      refresh_stale_course: 300,
+      increase_difficulty_cap: 200,
+      unlock_hidden_package: 250,
+    },
+  },
+};
+
 const toSummary = (pkg: {
   id: string;
   title: string;
@@ -319,6 +364,90 @@ test.describe("Test Mode", () => {
     await expect(page.getByRole("button", { name: /Normal/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Hard/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Expert/i })).toBeVisible();
+  });
+
+  test("already unlocked hard difficulty refreshes backend state and starts the exam", async ({
+    page,
+  }) => {
+    let unlockedFetchCount = 0;
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "hard-unlock-token");
+    });
+
+    await page.route(`${API_BASE_URL}/api/settings`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(SPEND_ENABLED_SETTINGS),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: 91,
+          username: "unlock-user",
+          email: "unlock-user@example.com",
+          role: "student",
+          xp: 450,
+          created_at: "2026-05-23T00:00:00Z",
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/xp`, (route) => {
+      if (route.request().method() === "GET") {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ xp: 450 }),
+        });
+        return;
+      }
+
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ xp: 450 }),
+      });
+    });
+
+    await page.route(
+      `${API_BASE_URL}/users/me/unlocked-difficulties/${MOCK_PACKAGE_ID}`,
+      (route) => {
+        unlockedFetchCount += 1;
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(
+            unlockedFetchCount === 1
+              ? { hard: false, expert: false }
+              : { hard: true, expert: false },
+          ),
+        });
+      },
+    );
+
+    await page.route(`${API_BASE_URL}/users/me/xp/spend`, (route) => {
+      route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Already unlocked" }),
+      });
+    });
+
+    await page.goto(`/test/exam/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
+    await expect(page.getByText("Unlock Hard and Expert tests with XP.")).toBeVisible();
+    await page.getByRole("button", { name: /Hard/i }).click();
+    await expect(page.getByTestId("spend-confirm-modal")).toBeVisible();
+    await page.getByRole("button", { name: "Confirm" }).click();
+
+    await expect(page.locator(".test-mode-page__warning-callout")).toBeVisible();
+    await expect(page.getByText(/raw schema/i)).toHaveCount(0);
   });
 
   test("selecting Normal difficulty shows exam view with timer", async ({ page }) => {

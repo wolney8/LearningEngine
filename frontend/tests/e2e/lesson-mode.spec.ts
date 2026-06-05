@@ -176,6 +176,68 @@ test.describe("Lesson Mode", () => {
     ).toBeVisible();
   });
 
+  test("lesson questions update correct count immediately on answer selection", async ({
+    page,
+  }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+
+    await expect(page.getByText("1 / 2 correct")).toBeVisible();
+    await expect(page.getByText("Correct!")).toBeVisible();
+  });
+
+  test("lesson streak updates before next is clicked", async ({ page }) => {
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+
+    await expect(page.getByLabel("Streak: 2 correct in a row")).toBeVisible();
+    await expect(page.getByText("2 / 2 correct")).toBeVisible();
+  });
+
+  test("lesson mode shuffles answers once per attempt", async ({ page }) => {
+    await page.addInitScript(() => {
+      Math.random = () => 0;
+    });
+
+    const shuffledPackage = {
+      ...MOCK_FULL_PACKAGE,
+      questions: [
+        {
+          ...MOCK_FULL_PACKAGE.questions[0],
+          answers: [
+            { id: "a1", text: "A programming language" },
+            { id: "a2", text: "A snake" },
+            { id: "a3", text: "A database" },
+            { id: "a4", text: "An operating system" },
+          ],
+        },
+        ...MOCK_FULL_PACKAGE.questions.slice(1),
+      ],
+    };
+
+    await page.route(`${API_BASE_URL}/packages/${MOCK_PACKAGE_ID}`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(shuffledPackage),
+      });
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+
+    await expect(page.locator(".question-view__answer").first()).not.toContainText(
+      "A programming language",
+    );
+  });
+
   test("answering a question incorrectly shows incorrect feedback", async ({
     page,
   }) => {
@@ -321,7 +383,7 @@ test.describe("Lesson Mode", () => {
     await expect(page.getByText("+35 XP bonus")).toBeVisible();
   });
 
-  test("authenticated lesson mode uses server metadata and skips localStorage metadata keys", async ({
+  test("authenticated lesson mode keeps lesson attempts separate from test progress", async ({
     page,
   }) => {
     const authUser = {
@@ -332,23 +394,16 @@ test.describe("Lesson Mode", () => {
       xp: 110,
       created_at: "2026-05-23T00:00:00Z",
     };
-    const progressRow = {
-      package_id: MOCK_PACKAGE_ID,
-      difficulty: "normal",
-      latest_weighted_score: 0.4,
-      completed: true,
-      best_xp_earned: 10,
-      attempt_count: 1,
-      first_completed_at: "2026-05-23T08:30:00Z",
-      updated_at: "2026-05-23T08:30:00Z",
-    };
-
-    let capturedAttemptCount: number | null = null;
+    let progressRequests = 0;
 
     await page.addInitScript(() => {
+      const today = new Date().toISOString().slice(0, 10);
       sessionStorage.setItem("lle_auth_token", "lesson-meta-auth-token");
-      localStorage.removeItem("lle_attempt_python-basics");
-      localStorage.removeItem("lle_completed_python-basics");
+      localStorage.setItem(
+        "lle_attempt_python-basics",
+        JSON.stringify({ count: 1, date: today }),
+      );
+      localStorage.setItem("lle_completed_python-basics", "1");
       localStorage.removeItem("lle_daily_streak");
       localStorage.removeItem("lle_last_active");
     });
@@ -362,40 +417,13 @@ test.describe("Lesson Mode", () => {
     });
 
     await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      progressRequests += 1;
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify([progressRow]),
+        body: JSON.stringify([]),
       });
     });
-
-    await page.route(
-      `${API_BASE_URL}/users/me/progress/${MOCK_PACKAGE_ID}`,
-      async (route) => {
-        const payload = route.request().postDataJSON() as {
-          difficulty?: "easy" | "normal" | "hard" | "expert";
-          latest_weighted_score: number;
-          completed: boolean;
-          best_xp_earned?: number;
-          attempt_count?: number;
-        };
-        capturedAttemptCount = payload.attempt_count ?? null;
-
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            ...progressRow,
-            difficulty: payload.difficulty ?? progressRow.difficulty,
-            latest_weighted_score: payload.latest_weighted_score,
-            completed: payload.completed,
-            best_xp_earned: payload.best_xp_earned ?? progressRow.best_xp_earned,
-            attempt_count: payload.attempt_count ?? progressRow.attempt_count,
-            updated_at: "2026-05-24T11:00:00Z",
-          }),
-        });
-      },
-    );
 
     await page.route(`${API_BASE_URL}/users/me/xp`, (route) => {
       if (route.request().method() === "GET") {
@@ -445,7 +473,7 @@ test.describe("Lesson Mode", () => {
     await page.getByRole("button", { name: "Store data" }).click();
     await page.getByRole("button", { name: "Next" }).click();
 
-    await expect.poll(() => capturedAttemptCount).toBe(2);
+    await expect.poll(() => progressRequests).toBe(0);
     await expect(page.getByText("Reduced XP this attempt")).toHaveCount(0);
     await expect(page.getByText("+20 XP bonus")).toHaveCount(0);
 
@@ -453,8 +481,8 @@ test.describe("Lesson Mode", () => {
       attempt: localStorage.getItem("lle_attempt_python-basics"),
       firstCompletion: localStorage.getItem("lle_completed_python-basics"),
     }));
-    expect(localMetadata.attempt).toBeNull();
-    expect(localMetadata.firstCompletion).toBeNull();
+    expect(localMetadata.attempt).not.toBeNull();
+    expect(localMetadata.firstCompletion).toBe("1");
   });
 
   test("authenticated lesson completion marks streak via backend endpoint", async ({
@@ -534,5 +562,30 @@ test.describe("Lesson Mode", () => {
 
     await expect(page.getByRole("heading", { name: "Lesson complete!" })).toBeVisible();
     await expect.poll(() => streakMarkCalls).toBe(1);
+  });
+
+  test("lesson completion does not mark the Normal difficulty indicator", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.removeItem("lle_test_results_python-basics");
+    });
+
+    await page.goto(`/packages/${MOCK_PACKAGE_ID}`);
+    await checkA11y(page);
+    await page.getByRole("button", { name: /Skip to Questions/i }).click();
+    await page.getByRole("button", { name: "A programming language" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Store data" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.goto("/");
+
+    const normalCircle = page.locator('.difficulty-circle[data-difficulty="normal"]');
+    await expect(normalCircle).toHaveClass(/difficulty-circle--not-attempted/);
+
+    const localResults = await page.evaluate(() =>
+      localStorage.getItem("lle_test_results_python-basics"),
+    );
+    expect(localResults).toBeNull();
   });
 });

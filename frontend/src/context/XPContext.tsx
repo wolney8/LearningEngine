@@ -16,7 +16,10 @@ import {
   updateMyXP,
   writeAnonymousXP,
 } from "../services/api";
+import type { UserXPBalance } from "../services/api";
 import { type LevelProgress, deriveLevelProgress } from "../utils/levelProgress";
+
+type XPDecayNotice = NonNullable<UserXPBalance["decay_notice"]>;
 
 interface XPContextValue {
   xp: number;
@@ -26,6 +29,8 @@ interface XPContextValue {
   levelProgress: LevelProgress;
   changeVersion: number;
   lastChangeKind: "add" | "subtract" | "sync" | null;
+  latestDecayNotice: XPDecayNotice | null;
+  clearDecayNotice: () => void;
 }
 
 const XPContext = createContext<XPContextValue | null>(null);
@@ -46,6 +51,9 @@ export function XPProvider({ children }: { children: ReactNode }) {
   const [lastChangeKind, setLastChangeKind] = useState<
     "add" | "subtract" | "sync" | null
   >(null);
+  const [latestDecayNotice, setLatestDecayNotice] = useState<XPDecayNotice | null>(
+    null,
+  );
   const requestChain = useRef<Promise<void>>(Promise.resolve());
   const xpRef = useRef<number>(xp);
 
@@ -64,11 +72,12 @@ export function XPProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     void fetchMyXP(token)
-      .then((nextXP) => {
+      .then((snapshot) => {
         if (!cancelled) {
-          xpRef.current = nextXP;
-          setXP(nextXP);
+          xpRef.current = snapshot.xp;
+          setXP(snapshot.xp);
           setLastChangeKind("sync");
+          setLatestDecayNotice(snapshot.decay_notice ?? null);
         }
       })
       .catch(() => {
@@ -76,6 +85,7 @@ export function XPProvider({ children }: { children: ReactNode }) {
           xpRef.current = 0;
           setXP(0);
           setLastChangeKind("sync");
+          setLatestDecayNotice(null);
         }
       });
 
@@ -155,6 +165,10 @@ export function XPProvider({ children }: { children: ReactNode }) {
     writeXP(next);
   }
 
+  function clearDecayNotice(): void {
+    setLatestDecayNotice(null);
+  }
+
   const levelProgress = useMemo(
     () => deriveLevelProgress(xp, settings.xp.base_xp_per_level),
     [xp, settings.xp.base_xp_per_level],
@@ -168,6 +182,8 @@ export function XPProvider({ children }: { children: ReactNode }) {
     levelProgress,
     changeVersion,
     lastChangeKind,
+    latestDecayNotice,
+    clearDecayNotice,
   };
 
   return <XPContext.Provider value={value}>{children}</XPContext.Provider>;

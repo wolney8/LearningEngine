@@ -10,7 +10,6 @@ import { useCelebrationEffects } from "../hooks/useCelebrationEffects";
 import { useFirstCompletion } from "../hooks/useFirstCompletion";
 import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
-import { useTestResults } from "../hooks/useTestResults";
 import { useXP } from "../hooks/useXP";
 import type { Package } from "../schemas/package";
 import {
@@ -19,6 +18,7 @@ import {
   getAnonymousGuestPackageCapStatus,
   markAnonymousGuestPackageEngaged,
 } from "../services/api";
+import { shuffleArray } from "../utils/randomise";
 import "./LessonPage.css";
 
 // ---------------------------------------------------------------------------
@@ -36,10 +36,13 @@ type LessonPhase =
     }
   | {
       kind: "questions";
+      shuffledQuestions: Package["questions"];
       questionIndex: number;
       correctCount: number;
       streak: number;
       xpEarned: number;
+      selectedAnswerId: string | null;
+      submitted: boolean;
     }
   | {
       kind: "complete";
@@ -64,16 +67,11 @@ export function LessonPage() {
   const { attemptNumber, recordAttempt } = useAttempts(id ?? "");
   const { isFirstCompletion, markCompleted } = useFirstCompletion(id ?? "");
   const { status } = useAuth();
-  const { saveResult, progressMetadata } = useTestResults(id ?? "");
   const { settings } = useSettings();
 
   const isAuthenticated = status === "authenticated";
-  const activeAttemptNumber = isAuthenticated
-    ? (progressMetadata?.attemptCount ?? 0) + 1
-    : attemptNumber;
-  const activeIsFirstCompletion = isAuthenticated
-    ? progressMetadata?.firstCompletedAt == null
-    : isFirstCompletion;
+  const activeAttemptNumber = attemptNumber;
+  const activeIsFirstCompletion = isFirstCompletion;
 
   const [pkg, setPkg] = useState<Package | null>(null);
   const [phase, setPhase] = useState<LessonPhase>({ kind: "loading" });
@@ -186,13 +184,22 @@ export function LessonPage() {
   }
 
   function startQuestions(): void {
+    const shuffledQuestions =
+      pkg?.questions.map((question) => ({
+        ...question,
+        answers: shuffleArray(question.answers),
+      })) ?? [];
+
     if (!id || isAuthenticated) {
       setPhase({
         kind: "questions",
+        shuffledQuestions,
         questionIndex: 0,
         correctCount: 0,
         streak: 0,
         xpEarned: 0,
+        selectedAnswerId: null,
+        submitted: false,
       });
       return;
     }
@@ -211,21 +218,37 @@ export function LessonPage() {
 
     setPhase({
       kind: "questions",
+      shuffledQuestions,
       questionIndex: 0,
       correctCount: 0,
       streak: 0,
       xpEarned: 0,
+      selectedAnswerId: null,
+      submitted: false,
     });
   }
 
-  function handleAnswer(_answerId: string, correct: boolean): void {
+  function handleAnswer(answerId: string, correct: boolean): void {
     if (!pkg || phase.kind !== "questions") return;
+    if (phase.submitted) return;
 
     const newStreak = correct ? phase.streak + 1 : 0;
     const newCorrectCount = phase.correctCount + (correct ? 1 : 0);
+    setPhase({
+      ...phase,
+      selectedAnswerId: answerId,
+      submitted: true,
+      correctCount: newCorrectCount,
+      streak: newStreak,
+    });
+  }
+
+  function handleNextQuestion(): void {
+    if (!pkg || phase.kind !== "questions" || !phase.submitted) return;
+
     const nextQIndex = phase.questionIndex + 1;
 
-    if (nextQIndex >= pkg.questions.length) {
+    if (nextQIndex >= phase.shuffledQuestions.length) {
       // All questions done
       const currentAttemptNumber = activeAttemptNumber;
       const wasFirstCompletion = activeIsFirstCompletion;
@@ -233,41 +256,22 @@ export function LessonPage() {
         settings.xp.attempt_multipliers[
           String(currentAttemptNumber) as "1" | "2" | "3"
         ] ?? 0;
-      const baseXP = newCorrectCount * settings.xp.lesson_base_xp_per_correct;
+      const baseXP = phase.correctCount * settings.xp.lesson_base_xp_per_correct;
       let earned = Math.round(baseXP * multiplier);
 
-      if (isAuthenticated) {
-        if (wasFirstCompletion) {
-          earned += settings.xp.first_completion_bonus;
-        }
-      } else {
-        recordAttempt();
-        if (wasFirstCompletion) {
-          markCompleted();
-          earned += settings.xp.first_completion_bonus;
-        }
+      recordAttempt();
+      if (wasFirstCompletion) {
+        markCompleted();
+        earned += settings.xp.first_completion_bonus;
       }
 
       addXP(earned);
       markPractised();
 
-      if (isAuthenticated) {
-        saveResult(
-          "normal",
-          {
-            passed: true,
-            bestScore: Math.round((newCorrectCount / pkg.questions.length) * 100),
-            bestXpEarned: earned,
-            lastAttemptedAt: new Date().toISOString(),
-          },
-          { attemptCount: currentAttemptNumber },
-        );
-      }
-
       setPhase({
         kind: "complete",
-        correctCount: newCorrectCount,
-        totalQuestions: pkg.questions.length,
+        correctCount: phase.correctCount,
+        totalQuestions: phase.shuffledQuestions.length,
         xpEarned: earned,
         attemptNumber: currentAttemptNumber,
         wasFirstCompletion,
@@ -277,10 +281,13 @@ export function LessonPage() {
     } else {
       setPhase({
         kind: "questions",
+        shuffledQuestions: phase.shuffledQuestions,
         questionIndex: nextQIndex,
-        correctCount: newCorrectCount,
-        streak: newStreak,
+        correctCount: phase.correctCount,
+        streak: phase.streak,
         xpEarned: phase.xpEarned,
+        selectedAnswerId: null,
+        submitted: false,
       });
     }
   }
@@ -367,11 +374,15 @@ export function LessonPage() {
 
         {phase.kind === "questions" && pkg && (
           <QuestionView
-            question={pkg.questions[phase.questionIndex]}
+            question={phase.shuffledQuestions[phase.questionIndex]}
             questionIndex={phase.questionIndex}
-            questionCount={pkg.questions.length}
+            questionCount={phase.shuffledQuestions.length}
+            correctCount={phase.correctCount}
             streak={phase.streak}
+            selectedAnswerId={phase.selectedAnswerId}
+            submitted={phase.submitted}
             onAnswer={handleAnswer}
+            onNext={handleNextQuestion}
           />
         )}
 

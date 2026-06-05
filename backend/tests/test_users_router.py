@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -9,7 +9,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app.main import app
 from app.models.package import Package
 from app.models.settings import GameSettings
-from app.models.user import UserXPSpendHistory
+from app.models.user import SpendHistory, UserTestResult, UserXPSpendHistory
 from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
 from app.services.overrides_loader import PackageOverride
@@ -271,6 +271,83 @@ async def test_users_profile_patch_rejects_empty_payload(
     assert response.json() == {"detail": "At least one field must be provided"}
 
 
+async def test_users_password_change_updates_hashed_password(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="password-change-user",
+        email="password-change-user@example.com",
+    )
+
+    response = await users_client.post(
+        "/users/me/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "StrongPass123",
+            "new_password": "NewStrongPass456",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "Password updated successfully"}
+
+    login_response = await users_client.post(
+        "/auth/login",
+        json={
+            "username_or_email": "password-change-user",
+            "password": "NewStrongPass456",
+        },
+    )
+    assert login_response.status_code == 200
+
+
+async def test_users_password_change_rejects_wrong_current_password(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="password-change-wrong-current",
+        email="password-change-wrong-current@example.com",
+    )
+
+    response = await users_client.post(
+        "/users/me/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "WrongPass999",
+            "new_password": "NewStrongPass456",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Current password is incorrect"}
+
+
+async def test_users_password_change_rejects_same_new_password(
+    users_client: AsyncClient,
+) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="password-change-same",
+        email="password-change-same@example.com",
+    )
+
+    response = await users_client.post(
+        "/users/me/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "current_password": "StrongPass123",
+            "new_password": "StrongPass123",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "New password must be different from the current password"
+    }
+
+
 async def _register_user_and_get_token(
     users_client: AsyncClient,
     *,
@@ -289,6 +366,16 @@ async def _register_user_and_get_token(
     return register.json()["access_token"]
 
 
+async def _set_user_xp(users_client: AsyncClient, token: str, xp: int) -> None:
+    response = await users_client.put(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"xp": xp},
+    )
+    assert response.status_code == 200
+    assert response.json()["xp"] == xp
+
+
 async def test_users_progress_returns_empty_for_new_user(
     users_client: AsyncClient,
 ) -> None:
@@ -305,6 +392,196 @@ async def test_users_progress_returns_empty_for_new_user(
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+async def test_read_my_xp_applies_lazy_decay_once(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="xp-decay-user",
+        email="xp-decay-user@example.com",
+    )
+    await _set_user_xp(users_client, token, 500)
+
+    progress_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "normal",
+            "latest_weighted_score": 0.9,
+            "completed": True,
+            "best_xp_earned": 200,
+        },
+    )
+    assert progress_response.status_code == 200
+
+    with Session(app.state._test_users_engine) as session:
+        result = session.exec(select(UserTestResult)).first()
+        assert result is not None
+        result.refresher_last_passed_at = datetime.now(timezone.utc) - timedelta(days=8)
+        result.refresher_decay_intervals_applied = 0
+        session.add(result)
+        session.commit()
+
+    first_response = await users_client.get(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert first_response.status_code == 200
+    first_body = first_response.json()
+    assert first_body["xp"] == 480
+    assert first_body["decay_notice"]["deducted_xp"] == 20
+    assert first_body["decay_notice"]["stale_package_count"] == 1
+
+    second_response = await users_client.get(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert second_response.status_code == 200
+    second_body = second_response.json()
+    assert second_body["xp"] == 480
+    assert "decay_notice" not in second_body
+
+
+async def test_read_me_applies_lazy_decay_once(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="read-me-xp-decay-user",
+        email="read-me-xp-decay-user@example.com",
+    )
+    await _set_user_xp(users_client, token, 500)
+
+    progress_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "normal",
+            "latest_weighted_score": 0.9,
+            "completed": True,
+            "best_xp_earned": 200,
+        },
+    )
+    assert progress_response.status_code == 200
+
+    with Session(app.state._test_users_engine) as session:
+        result = session.exec(select(UserTestResult)).first()
+        assert result is not None
+        result.refresher_last_passed_at = datetime.now(timezone.utc) - timedelta(days=8)
+        result.refresher_decay_intervals_applied = 0
+        session.add(result)
+        session.commit()
+
+    first_response = await users_client.get(
+        "/users/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert first_response.status_code == 200
+    first_body = first_response.json()
+    assert first_body["xp"] == 480
+
+    second_response = await users_client.get(
+        "/users/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert second_response.status_code == 200
+    second_body = second_response.json()
+    assert second_body["xp"] == 480
+
+
+async def test_read_my_xp_respects_decay_floor(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="xp-floor-user",
+        email="xp-floor-user@example.com",
+    )
+    await _set_user_xp(users_client, token, 110)
+
+    progress_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "normal",
+            "latest_weighted_score": 0.9,
+            "completed": True,
+            "best_xp_earned": 200,
+        },
+    )
+    assert progress_response.status_code == 200
+
+    with Session(app.state._test_users_engine) as session:
+        result = session.exec(select(UserTestResult)).first()
+        assert result is not None
+        result.refresher_last_passed_at = datetime.now(timezone.utc) - timedelta(days=8)
+        result.refresher_decay_intervals_applied = 0
+        session.add(result)
+        session.commit()
+
+    response = await users_client.get(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["xp"] == 100
+    assert body["decay_notice"]["deducted_xp"] == 10
+    assert body["decay_notice"]["floor_reached"] is True
+
+
+async def test_stale_normal_repass_auto_unlocks_hard(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="refresher-hard-user",
+        email="refresher-hard-user@example.com",
+    )
+
+    initial_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "normal",
+            "latest_weighted_score": 0.8,
+            "completed": True,
+            "best_xp_earned": 150,
+        },
+    )
+    assert initial_response.status_code == 200
+
+    with Session(app.state._test_users_engine) as session:
+        result = session.exec(select(UserTestResult)).first()
+        assert result is not None
+        result.refresher_last_passed_at = datetime.now(timezone.utc) - timedelta(days=8)
+        result.refresher_decay_intervals_applied = 0
+        session.add(result)
+        session.commit()
+
+    refresher_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "normal",
+            "latest_weighted_score": 0.95,
+            "completed": True,
+            "best_xp_earned": 180,
+        },
+    )
+    assert refresher_response.status_code == 200
+
+    unlocked_response = await users_client.get(
+        "/users/me/unlocked-difficulties/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert unlocked_response.status_code == 200
+    assert unlocked_response.json() == {"hard": True, "expert": False}
+
+    with Session(app.state._test_users_engine) as session:
+        unlock_row = session.exec(
+            select(SpendHistory).where(
+                SpendHistory.action == "difficulty_unlock",
+                SpendHistory.package_id == "sample-demo",
+                SpendHistory.difficulty == "hard",
+                SpendHistory.cost == 0,
+            )
+        ).first()
+        assert unlock_row is not None
 
 
 async def test_users_library_returns_selected_visible_summaries(

@@ -268,6 +268,9 @@ def test_init_db_adds_missing_user_test_result_columns(
     assert "first_completed_at" in column_names
     assert "best_xp_earned" in column_names
     assert "difficulty_results_json" in column_names
+    assert "refresher_last_passed_at" in column_names
+    assert "refresher_best_xp_base" in column_names
+    assert "refresher_decay_intervals_applied" in column_names
 
     attempt_count_column = next(row for row in table_info if row[1] == "attempt_count")
     assert attempt_count_column[2].upper() == "INTEGER"
@@ -295,6 +298,27 @@ def test_init_db_adds_missing_user_test_result_columns(
     assert difficulty_results_json_column[3] == 0
     assert difficulty_results_json_column[4] is None
 
+    refresher_last_passed_at_column = next(
+        row for row in table_info if row[1] == "refresher_last_passed_at"
+    )
+    assert refresher_last_passed_at_column[2].upper() == "TIMESTAMP"
+    assert refresher_last_passed_at_column[3] == 0
+    assert refresher_last_passed_at_column[4] is None
+
+    refresher_best_xp_base_column = next(
+        row for row in table_info if row[1] == "refresher_best_xp_base"
+    )
+    assert refresher_best_xp_base_column[2].upper() == "INTEGER"
+    assert refresher_best_xp_base_column[3] == 1
+    assert refresher_best_xp_base_column[4] == "0"
+
+    refresher_decay_intervals_applied_column = next(
+        row for row in table_info if row[1] == "refresher_decay_intervals_applied"
+    )
+    assert refresher_decay_intervals_applied_column[2].upper() == "INTEGER"
+    assert refresher_decay_intervals_applied_column[3] == 1
+    assert refresher_decay_intervals_applied_column[4] == "0"
+
     db.init_db()
     second_pass_columns = [
         row[1] for row in _read_table_info(db_path, "usertestresult")
@@ -303,6 +327,9 @@ def test_init_db_adds_missing_user_test_result_columns(
     assert second_pass_columns.count("first_completed_at") == 1
     assert second_pass_columns.count("best_xp_earned") == 1
     assert second_pass_columns.count("difficulty_results_json") == 1
+    assert second_pass_columns.count("refresher_last_passed_at") == 1
+    assert second_pass_columns.count("refresher_best_xp_base") == 1
+    assert second_pass_columns.count("refresher_decay_intervals_applied") == 1
 
 
 def test_init_db_creates_user_xp_spend_history_table(

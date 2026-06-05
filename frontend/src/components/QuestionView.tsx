@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { Question } from "../schemas/package";
 import { FeedbackPanel } from "./FeedbackPanel";
 import { ProgressBar } from "./ProgressBar";
@@ -9,43 +8,42 @@ interface QuestionViewProps {
   question: Question;
   questionIndex: number; // 0-based
   questionCount: number;
+  correctCount: number;
   streak: number;
+  selectedAnswerId: string | null;
+  submitted: boolean;
   onAnswer: (answerId: string, correct: boolean) => void;
+  onNext: () => void;
 }
 
 export function QuestionView({
   question,
   questionIndex,
   questionCount,
+  correctCount,
   streak,
+  selectedAnswerId,
+  submitted,
   onAnswer,
+  onNext,
 }: QuestionViewProps) {
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-
   const current = questionIndex + 1;
   const label = `Question ${current} of ${questionCount}`;
 
   function handleSelect(answerId: string): void {
     if (submitted) return; // Guard against double-submission
-    setSelectedAnswer(answerId);
-    setSubmitted(true);
+    onAnswer(answerId, answerId === question.correct_answer);
   }
 
-  function handleNext(): void {
-    if (selectedAnswer === null) return;
-    onAnswer(selectedAnswer, selectedAnswer === question.correct_answer);
-    // Reset local state for next question
-    setSelectedAnswer(null);
-    setSubmitted(false);
-  }
-
-  const isCorrect = submitted && selectedAnswer === question.correct_answer;
+  const isCorrect = submitted && selectedAnswerId === question.correct_answer;
 
   return (
     <section className="question-view" aria-label={`Question ${current}`}>
       <div className="question-view__top-bar">
         <ProgressBar current={current} total={questionCount} label={label} />
+        <p className="question-view__score" aria-live="polite">
+          {correctCount} / {questionCount} correct
+        </p>
         <StreakBadge streak={streak} />
       </div>
 
@@ -54,7 +52,7 @@ export function QuestionView({
 
         <ul className="question-view__answers">
           {question.answers.map((answer) => {
-            const isSelected = selectedAnswer === answer.id;
+            const isSelected = selectedAnswerId === answer.id;
             const isThisCorrect = submitted && answer.id === question.correct_answer;
             const isThisWrong = submitted && isSelected && !isThisCorrect;
 
@@ -97,7 +95,7 @@ export function QuestionView({
         <FeedbackPanel
           correct={isCorrect}
           feedbackText={question.feedback}
-          onNext={handleNext}
+          onNext={onNext}
         />
       )}
     </section>

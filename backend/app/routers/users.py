@@ -35,7 +35,13 @@ from app.services.overrides_loader import (
     PackageOverride,
     resolve_effective_availability,
 )
-from app.services.security import decode_access_token
+from app.services.progression import (
+    apply_lazy_xp_decay,
+    ensure_hard_unlocked_for_refresher,
+    refresh_refresher_progress,
+    should_auto_unlock_hard,
+)
+from app.services.security import decode_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/users", tags=["users"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -76,6 +82,7 @@ class UserTestResultResponse(BaseModel):
 
 class UserXPResponse(BaseModel):
     xp: int = Field(ge=0)
+    decay_notice: dict[str, int | bool] | None = None
 
 
 class UserXPUpdateRequest(BaseModel):
@@ -93,6 +100,17 @@ class UserProfileUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     username: str | None = None
+
+
+class UserPasswordChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class UserPasswordChangeResponse(BaseModel):
+    message: str
 
 
 class UserCatalogueItemResponse(PackageSummary):
@@ -133,6 +151,7 @@ class UserXPSpendResponse(BaseModel):
     xp_remaining: int | None = Field(default=None, ge=0)
     package_id: str | None = None
     difficulty: str | None = None
+    latest_unlocked_difficulties: dict[str, bool] | None = None
 
 
 class SpendAction(str, Enum):
@@ -397,7 +416,11 @@ def require_authenticated_user(
 
 
 @router.get("/me", response_model=UserResponse)
-async def read_me(current_user: User = Depends(get_current_user)) -> UserResponse:
+async def read_me(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> UserResponse:
+    apply_lazy_xp_decay(session, current_user)
     return UserResponse(
         id=current_user.id or 0,
         username=current_user.username,
@@ -457,12 +480,52 @@ async def update_my_profile(
     )
 
 
-@router.get("/me/xp", response_model=UserXPResponse)
-async def read_my_xp(current_user: User = Depends(get_current_user)) -> UserXPResponse:
-    return UserXPResponse(xp=current_user.xp)
+@router.post("/me/password", response_model=UserPasswordChangeResponse)
+async def update_my_password(
+    body: UserPasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> UserPasswordChangeResponse:
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+
+    if body.current_password == body.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password must be different from the current password",
+        )
+
+    current_user.hashed_password = hash_password(body.new_password)
+    session.add(current_user)
+    session.commit()
+
+    return UserPasswordChangeResponse(message="Password updated successfully")
 
 
-@router.put("/me/xp", response_model=UserXPResponse)
+@router.get(
+    "/me/xp",
+    response_model=UserXPResponse,
+    response_model_exclude_none=True,
+)
+async def read_my_xp(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> UserXPResponse:
+    decay_notice = apply_lazy_xp_decay(session, current_user)
+    return UserXPResponse(
+        xp=current_user.xp,
+        decay_notice=decay_notice.to_payload() if decay_notice else None,
+    )
+
+
+@router.put(
+    "/me/xp",
+    response_model=UserXPResponse,
+    response_model_exclude_none=True,
+)
 async def update_my_xp(
     body: UserXPUpdateRequest,
     current_user: User = Depends(get_current_user),
@@ -484,6 +547,7 @@ async def spend_my_xp(
     session: Session = Depends(get_session),
 ) -> UserXPSpendResponse:
     user_id = _require_current_user_id(current_user)
+    apply_lazy_xp_decay(session, current_user)
     is_unlock_action = body.action in {
         SpendAction.difficulty_unlock.value,
         SpendAction.package_unlock.value,
@@ -567,6 +631,12 @@ async def spend_my_xp(
         session.commit()
         session.refresh(current_user)
         now = datetime.now(timezone.utc)
+        latest_unlocked_difficulties = None
+        if body.action == SpendAction.difficulty_unlock.value:
+            latest_unlocked_difficulties = {
+                "hard": body.difficulty == "hard",
+                "expert": body.difficulty == "expert",
+            }
         return UserXPSpendResponse(
             id=0,
             action=body.action,
@@ -582,6 +652,7 @@ async def spend_my_xp(
             xp_remaining=current_user.xp,
             package_id=normalised_package_id,
             difficulty=body.difficulty,
+            latest_unlocked_difficulties=latest_unlocked_difficulties,
         )
 
     if (
@@ -711,6 +782,7 @@ async def read_my_progress(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> list[UserTestResultResponse]:
+    apply_lazy_xp_decay(session, current_user)
     user_id = current_user.id
     if user_id is None:
         raise HTTPException(
@@ -908,6 +980,12 @@ async def upsert_my_progress_for_package(
     ).first()
     now = datetime.now(timezone.utc)
     best_xp_earned = body.best_xp_earned or 0
+    should_auto_unlock = (
+        body.difficulty == "normal"
+        and body.completed
+        and existing_result is not None
+        and should_auto_unlock_hard(existing_result, now)
+    )
 
     if existing_result is None:
         initial_difficulty_results = {
@@ -930,6 +1008,13 @@ async def upsert_my_progress_for_package(
             attempt_count=body.attempt_count or 1,
             first_completed_at=now if body.completed else None,
         )
+        if body.difficulty == "normal":
+            refresh_refresher_progress(
+                result,
+                completed=body.completed,
+                best_xp_earned=best_xp_earned,
+                now=now,
+            )
         session.add(result)
     else:
         difficulty_results = _parse_difficulty_results_json(
@@ -991,8 +1076,23 @@ async def upsert_my_progress_for_package(
             existing_result.attempt_count = body.attempt_count
         if existing_result.first_completed_at is None and body.completed:
             existing_result.first_completed_at = now
+        if body.difficulty == "normal":
+            refresh_refresher_progress(
+                existing_result,
+                completed=body.completed,
+                best_xp_earned=best_xp_earned,
+                now=now,
+            )
         existing_result.updated_at = now
         result = existing_result
+
+    if should_auto_unlock:
+        ensure_hard_unlocked_for_refresher(
+            session,
+            user_id=user_id,
+            package_id=normalised_package_id,
+            now=now,
+        )
 
     session.commit()
     session.refresh(result)
@@ -1017,6 +1117,7 @@ async def get_unlocked_difficulties(
     session: Session = Depends(get_session),
 ) -> dict[str, bool]:
     """Return which difficulty tiers the user has unlocked for this package."""
+    apply_lazy_xp_decay(session, current_user)
     normalised_package_id = normalise_package_id(package_id)
     rows = session.exec(
         select(SpendHistory).where(

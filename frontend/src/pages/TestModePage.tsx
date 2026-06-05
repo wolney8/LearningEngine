@@ -119,6 +119,21 @@ export function TestModePage() {
     setPhase({ kind: "guest-limit", message });
   }, []);
 
+  const refreshUnlockedDifficulties = useCallback(
+    async (packageId: string): Promise<UnlockedDifficulties> => {
+      if (!spendEconomyEnabled || !token || !packageId) {
+        const empty = { hard: false, expert: false };
+        setUnlockedDifficulties(empty);
+        return empty;
+      }
+
+      const nextUnlocked = await fetchUnlockedDifficulties(token, packageId);
+      setUnlockedDifficulties(nextUnlocked);
+      return nextUnlocked;
+    },
+    [spendEconomyEnabled, token],
+  );
+
   const applyExitPenalty = useCallback((): void => {
     if (exitPenaltyAppliedRef.current) return;
     exitPenaltyAppliedRef.current = true;
@@ -147,7 +162,7 @@ export function TestModePage() {
 
     let cancelled = false;
 
-    fetchUnlockedDifficulties(token, phase.pkg.id)
+    refreshUnlockedDifficulties(phase.pkg.id)
       .then((nextUnlocked) => {
         if (!cancelled) {
           setUnlockedDifficulties(nextUnlocked);
@@ -162,7 +177,7 @@ export function TestModePage() {
     return () => {
       cancelled = true;
     };
-  }, [phase, reset, spendEconomyEnabled, token]);
+  }, [phase, refreshUnlockedDifficulties, reset, spendEconomyEnabled, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -573,17 +588,31 @@ export function TestModePage() {
             }
 
             try {
-              await spend("difficulty_unlock", pkg.id, pendingSpendDifficulty);
+              const unlockedDifficulty = pendingSpendDifficulty;
+              await spend("difficulty_unlock", pkg.id, unlockedDifficulty);
               setUnlockedDifficulties((prev) => ({
                 ...prev,
-                [pendingSpendDifficulty]: true,
+                [unlockedDifficulty]: true,
               }));
-
-              const unlockedDifficulty = pendingSpendDifficulty;
+              await refreshUnlockedDifficulties(pkg.id).catch(() => undefined);
               setPendingSpendDifficulty(null);
               reset();
               handleSelectDifficulty(unlockedDifficulty);
-            } catch {
+            } catch (err) {
+              if (
+                err instanceof Error &&
+                err.message === "This difficulty is already unlocked."
+              ) {
+                const unlockedDifficulty = pendingSpendDifficulty;
+                setUnlockedDifficulties((prev) => ({
+                  ...prev,
+                  [unlockedDifficulty]: true,
+                }));
+                await refreshUnlockedDifficulties(pkg.id).catch(() => undefined);
+                setPendingSpendDifficulty(null);
+                reset();
+                handleSelectDifficulty(unlockedDifficulty);
+              }
               // useXPSpend already stores the error; keep modal open for user feedback.
             }
           }}

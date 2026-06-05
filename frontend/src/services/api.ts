@@ -73,8 +73,19 @@ export interface AnonymousStreakSnapshot {
   last_practised_date: string | null;
 }
 
+const XPDecayNoticeSchema = z
+  .object({
+    deducted_xp: z.number().int().nonnegative(),
+    stale_package_count: z.number().int().nonnegative(),
+    intervals_applied: z.number().int().nonnegative(),
+    floor_reached: z.boolean(),
+    stale_window_days: z.number().int().positive(),
+  })
+  .strict();
+
 const UserXPSchema = z.object({
   xp: z.number().int().nonnegative(),
+  decay_notice: XPDecayNoticeSchema.nullable().optional(),
 });
 const UserStreakSchema = z.object({
   streak_count: z.number().int().nonnegative(),
@@ -87,6 +98,17 @@ const UserStreakUpdateSchema = z.object({
 const UserProfileUpdateRequestSchema = z
   .object({
     username: z.string().trim().min(3).max(50).optional(),
+  })
+  .strict();
+const UserPasswordChangeRequestSchema = z
+  .object({
+    current_password: z.string().min(8).max(128),
+    new_password: z.string().min(8).max(128),
+  })
+  .strict();
+const UserPasswordChangeResponseSchema = z
+  .object({
+    message: z.string().min(1),
   })
   .strict();
 const AdminAIConfigSchema = z
@@ -247,6 +269,8 @@ export interface AdminAuditLogFilters {
   from?: string;
   until?: string;
 }
+
+export type UserXPBalance = z.infer<typeof UserXPSchema>;
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
@@ -908,18 +932,41 @@ export async function updateMyProfile(
   return UserSchema.parse(data);
 }
 
-export async function fetchMyXP(token: string): Promise<number> {
+export async function updateMyPassword(
+  token: string,
+  payload: { current_password: string; new_password: string },
+): Promise<{ message: string }> {
+  const parsed = UserPasswordChangeRequestSchema.parse(payload);
+  const response = await fetchWithTimeout(`${BASE_URL}/users/me/password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify(parsed),
+  });
+
+  if (!response.ok) {
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(`Could not update password (${response.status}): ${detail}`);
+  }
+
+  const data: unknown = await response.json();
+  return UserPasswordChangeResponseSchema.parse(data);
+}
+
+export async function fetchMyXP(token: string): Promise<UserXPBalance> {
   const response = await fetchWithTimeout(`${BASE_URL}/users/me/xp`, {
     headers: getAuthHeaders(token),
   });
 
   if (!response.ok) {
-    const detail = await response.text();
+    const detail = await readBackendErrorMessage(response);
     throw new Error(`Could not fetch user XP (${response.status}): ${detail}`);
   }
 
   const data: unknown = await response.json();
-  return UserXPSchema.parse(data).xp;
+  return UserXPSchema.parse(data);
 }
 
 export async function updateMyXP(token: string, xp: number): Promise<number> {
@@ -964,19 +1011,28 @@ export async function spendXP(
     throw new Error("You must be logged in to spend XP");
   }
   if (response.status === 402) {
-    throw new Error("Insufficient XP");
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(detail || "You do not have enough XP for that unlock.");
   }
   if (response.status === 404) {
-    throw new Error("Package not found");
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(detail || "That package could not be found.");
   }
   if (response.status === 409) {
-    throw new Error("Already unlocked");
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(
+      detail === "Already unlocked"
+        ? "This difficulty is already unlocked."
+        : detail || "This item is already unlocked.",
+    );
   }
   if (response.status === 423) {
-    throw new Error("XP spending is currently disabled");
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(detail || "XP spending is currently disabled.");
   }
   if (!response.ok) {
-    throw new Error("Failed to spend XP");
+    const detail = await readBackendErrorMessage(response);
+    throw new Error(detail || "Failed to spend XP.");
   }
 
   const data: unknown = await response.json();

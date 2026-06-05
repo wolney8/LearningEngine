@@ -12,12 +12,26 @@ export const XpSpendRequestSchema = z
 
 export const XpSpendResponseSchema = z
   .object({
+    id: z.number().int().nonnegative().optional(),
     xp_remaining: z.number().int().nonnegative(),
     action: z.string().min(1),
     package_id: z.string().min(1),
     difficulty: z.string().nullable(),
     cost: z.number().int().nonnegative(),
     success: z.boolean(),
+    status: z.enum(["pending", "succeeded", "failed"]).optional(),
+    refunded: z.boolean().optional(),
+    xp: z.number().int().nonnegative().optional(),
+    idempotency_key: z.string().nullable().optional(),
+    failure_reason: z.string().nullable().optional(),
+    created_at: z.string().datetime().optional(),
+    updated_at: z.string().datetime().optional(),
+    latest_unlocked_difficulties: z
+      .object({
+        hard: z.boolean(),
+        expert: z.boolean(),
+      })
+      .optional(),
   })
   .strict();
 
