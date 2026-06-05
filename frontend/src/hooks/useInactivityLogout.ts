@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 
 const DEFAULT_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
@@ -22,8 +21,6 @@ export function useInactivityLogout(
   isAuthenticated: boolean,
   logout: () => void,
 ): void {
-  const navigate = useNavigate();
-  const location = useLocation();
   const timeoutIdRef = useRef<number | null>(null);
   const hasTimedOutRef = useRef(false);
 
@@ -52,10 +49,6 @@ export function useInactivityLogout(
       hasTimedOutRef.current = true;
       clearTimer();
       logout();
-
-      if (location.pathname !== "/login") {
-        navigate("/login", { replace: true });
-      }
     };
 
     const scheduleTimeout = () => {
@@ -86,5 +79,5 @@ export function useInactivityLogout(
         window.removeEventListener(eventName, handleActivity);
       }
     };
-  }, [isAuthenticated, location.pathname, logout, navigate]);
+  }, [isAuthenticated, logout]);
 }

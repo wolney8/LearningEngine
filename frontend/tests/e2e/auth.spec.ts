@@ -963,9 +963,11 @@ test.describe("Optional auth shell", () => {
 
     await page.getByRole("button", { name: "Sign out" }).click();
 
-    await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Create account" })).toBeVisible();
+    await expect(page).toHaveURL("/login");
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    await expect(
+      page.locator(".auth-page").getByRole("link", { name: "Create account" }),
+    ).toBeVisible();
 
     const storage = await page.evaluate(() => ({
       xp: localStorage.getItem("lle_xp"),

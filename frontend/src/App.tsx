@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { AdminGuard } from "./components/AdminGuard";
 import { AppTopBar } from "./components/AppTopBar";
 import { LevelUpOverlay } from "./components/LevelUpOverlay";
@@ -31,11 +31,13 @@ function GlobalToastRegion() {
 }
 
 function AppRoutes() {
-  const { status, user, logout } = useAuth();
+  const { status, user, logout, logoutVersion } = useAuth();
   const { xp, levelProgress, lastChangeKind, latestDecayNotice, clearDecayNotice } =
     useXP();
   const { info } = useToast();
   const { resolvedTheme, setMode: setThemeMode } = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [levelUpState, setLevelUpState] = useState<{
     level: number;
     totalXP: number;
@@ -46,6 +48,16 @@ function AppRoutes() {
     status === "authenticated" && user ? `auth-${user.id}` : "anonymous";
 
   useInactivityLogout(status === "authenticated", logout);
+
+  useEffect(() => {
+    if (logoutVersion === 0) {
+      return;
+    }
+
+    if (location.pathname !== "/login") {
+      navigate("/login", { replace: true });
+    }
+  }, [location.pathname, logoutVersion, navigate]);
 
   useEffect(() => {
     if (previousLevelRef.current == null) {

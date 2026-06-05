@@ -41,6 +41,7 @@ export type AuthContextValue = {
   token: string | null;
   status: AuthStatus;
   error: string;
+  logoutVersion: number;
   bonusXPNotice: BonusXPNotice | null;
   dismissBonusXPNotice: () => void;
   clearError: () => void;
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [error, setError] = useState<string>("");
+  const [logoutVersion, setLogoutVersion] = useState(0);
   const [bonusXPNotice, setBonusXPNotice] = useState<BonusXPNotice | null>(null);
 
   useEffect(() => {
@@ -294,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBonusXPNotice(null);
     setStatus("idle");
     setError("");
+    setLogoutVersion((current) => current + 1);
   }, []);
 
   const dismissBonusXPNotice = useCallback(() => {
@@ -315,6 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       status,
       error,
+      logoutVersion,
       bonusXPNotice,
       dismissBonusXPNotice,
       clearError,
@@ -329,6 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearError,
       dismissBonusXPNotice,
       error,
+      logoutVersion,
       login,
       logout,
       register,
