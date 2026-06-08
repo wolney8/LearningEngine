@@ -34,7 +34,24 @@ import type {
   XpSpendResponse,
 } from "../schemas/xpSpend";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (typeof window === "undefined") {
+    return "/api";
+  }
+
+  const { hostname, port } = window.location;
+  const isLocalViteDev =
+    (hostname === "localhost" || hostname === "127.0.0.1") && port === "5173";
+
+  return isLocalViteDev ? "http://localhost:8000" : "/api";
+}
+
+const BASE_URL = resolveApiBaseUrl();
 const TIMEOUT_MS = 10_000;
 const ADMIN_AI_TIMEOUT_MS = 90_000;
 const AUTH_TOKEN_KEY = "lle_auth_token";
@@ -425,7 +442,7 @@ export async function fetchPackage(id: string): Promise<Package> {
 }
 
 export async function fetchSettings(): Promise<Settings> {
-  const response = await fetchWithTimeout(`${BASE_URL}/api/settings`);
+  const response = await fetchWithTimeout(`${BASE_URL}/settings`);
   if (!response.ok) {
     throw new Error(`Failed to fetch settings: ${response.status}`);
   }

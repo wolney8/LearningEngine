@@ -120,7 +120,7 @@ LocalLearningEngine/
 | `APP_ENV_FILE`                 | repo-root `.env`                | Bootstrap dotenv file loaded at backend startup           |
 | `APP_AI_KEY_STORE_FILE`        | `<runtime>/ai-provider-secrets.yaml` | Persistent runtime AI provider key store              |
 | `DATABASE_URL`                 | `sqlite:///backend/data/lle.db` | SQLModel database connection string                       |
-| `VITE_API_BASE_URL`            | `http://localhost:8000`         | Backend URL used by the frontend                          |
+| `VITE_API_BASE_URL`            | `/api`                          | Backend base path used by the frontend; local Vite dev may use `http://localhost:8000` |
 | `GEMINI_API_KEY`               | unset                           | Optional Gemini API key                                   |
 | `OPENAI_API_KEY`               | unset                           | Optional OpenAI API key                                   |
 | `ANTHROPIC_API_KEY`            | unset                           | Optional Anthropic API key                                |
