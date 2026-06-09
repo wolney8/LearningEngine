@@ -49,6 +49,7 @@ export function StreakBadge({ streak }: StreakBadgeProps) {
       aria-label={label}
     >
       <span className="streak-badge__lightning" aria-hidden="true" />
+      <span className="streak-badge__sparks" aria-hidden="true" />
       <Icon size={16} aria-hidden="true" />
       <span className="streak-badge__count">{streak}</span>
     </div>

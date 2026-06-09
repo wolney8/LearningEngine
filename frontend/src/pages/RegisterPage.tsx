@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import type { PackageSummary } from "../schemas/package";
 import { fetchPackages } from "../services/api";
@@ -20,6 +20,10 @@ export function RegisterPage() {
   const selectionErrorRef = useRef<HTMLParagraphElement | null>(null);
 
   useEffect(() => clearError, [clearError]);
+
+  if (status === "authenticated") {
+    return <Navigate to="/" replace />;
+  }
 
   useEffect(() => {
     let cancelled = false;

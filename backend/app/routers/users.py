@@ -293,6 +293,32 @@ def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def _normalise_user_streak(
+    session: Session,
+    current_user: User,
+    *,
+    today: date | None = None,
+) -> None:
+    effective_today = today or _utc_today()
+    previous = current_user.last_practised_date
+    if previous is None:
+        if current_user.streak_count != 0:
+            current_user.streak_count = 0
+            session.add(current_user)
+            session.commit()
+            session.refresh(current_user)
+        return
+
+    if (
+        previous < (effective_today - timedelta(days=1))
+        and current_user.streak_count != 0
+    ):
+        current_user.streak_count = 0
+        session.add(current_user)
+        session.commit()
+        session.refresh(current_user)
+
+
 def _normalise_idempotency_key(key: str | None) -> str | None:
     if key is None:
         return None
@@ -419,8 +445,10 @@ def require_authenticated_user(
 async def read_me(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
+    settings: GameSettings = Depends(get_settings),
 ) -> UserResponse:
-    apply_lazy_xp_decay(session, current_user)
+    apply_lazy_xp_decay(session, current_user, settings)
+    _normalise_user_streak(session, current_user)
     return UserResponse(
         id=current_user.id or 0,
         username=current_user.username,
@@ -513,8 +541,9 @@ async def update_my_password(
 async def read_my_xp(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
+    settings: GameSettings = Depends(get_settings),
 ) -> UserXPResponse:
-    decay_notice = apply_lazy_xp_decay(session, current_user)
+    decay_notice = apply_lazy_xp_decay(session, current_user, settings)
     return UserXPResponse(
         xp=current_user.xp,
         decay_notice=decay_notice.to_payload() if decay_notice else None,
@@ -547,7 +576,7 @@ async def spend_my_xp(
     session: Session = Depends(get_session),
 ) -> UserXPSpendResponse:
     user_id = _require_current_user_id(current_user)
-    apply_lazy_xp_decay(session, current_user)
+    apply_lazy_xp_decay(session, current_user, settings)
     is_unlock_action = body.action in {
         SpendAction.difficulty_unlock.value,
         SpendAction.package_unlock.value,
@@ -740,7 +769,9 @@ async def spend_my_xp(
 @router.get("/me/streak", response_model=UserStreakResponse)
 async def read_my_streak(
     current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ) -> UserStreakResponse:
+    _normalise_user_streak(session, current_user)
     return UserStreakResponse(
         streak_count=current_user.streak_count,
         last_practised_date=current_user.last_practised_date,
@@ -781,8 +812,9 @@ async def mark_my_streak_practised_today(
 async def read_my_progress(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
+    settings: GameSettings = Depends(get_settings),
 ) -> list[UserTestResultResponse]:
-    apply_lazy_xp_decay(session, current_user)
+    apply_lazy_xp_decay(session, current_user, settings)
     user_id = current_user.id
     if user_id is None:
         raise HTTPException(
@@ -968,6 +1000,7 @@ async def upsert_my_progress_for_package(
     body: UserTestResultUpsertRequest,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
+    settings: GameSettings = Depends(get_settings),
 ) -> UserTestResultResponse:
     user_id = _require_current_user_id(current_user)
     normalised_package_id = normalise_package_id(package_id)
@@ -984,7 +1017,7 @@ async def upsert_my_progress_for_package(
         body.difficulty == "normal"
         and body.completed
         and existing_result is not None
-        and should_auto_unlock_hard(existing_result, now)
+        and should_auto_unlock_hard(existing_result, now, settings)
     )
 
     if existing_result is None:
@@ -1115,9 +1148,10 @@ async def get_unlocked_difficulties(
     package_id: str,
     current_user: User = Depends(require_authenticated_user),
     session: Session = Depends(get_session),
+    settings: GameSettings = Depends(get_settings),
 ) -> dict[str, bool]:
     """Return which difficulty tiers the user has unlocked for this package."""
-    apply_lazy_xp_decay(session, current_user)
+    apply_lazy_xp_decay(session, current_user, settings)
     normalised_package_id = normalise_package_id(package_id)
     rows = session.exec(
         select(SpendHistory).where(

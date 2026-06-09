@@ -8,6 +8,7 @@ import { PackageFilterBar } from "../components/PackageFilterBar";
 import type { FilterKey, FilterOption } from "../components/PackageFilterBar";
 import { PackageSearchBar } from "../components/PackageSearchBar";
 import { useAuth } from "../hooks/useAuth";
+import { useCelebrationEffects } from "../hooks/useCelebrationEffects";
 import { usePackageProgress } from "../hooks/usePackageProgress";
 import { useSettings } from "../hooks/useSettings";
 import { useStreak } from "../hooks/useStreak";
@@ -51,11 +52,25 @@ function parseFilter(value: string | null): FilterKey {
   return "all";
 }
 
+function getDailyStreakTier(streak: number): string {
+  if (streak >= 14) {
+    return "storm";
+  }
+  if (streak >= 7) {
+    return "surge";
+  }
+  if (streak >= 3) {
+    return "flame";
+  }
+  return "warm";
+}
+
 export function PackageListPage() {
-  const { status: authStatus, token, user } = useAuth();
+  const { status: authStatus, token } = useAuth();
   const { settings } = useSettings();
   const navigate = useNavigate();
   const { dailyStreak } = useStreak();
+  const { lightningEnabled } = useCelebrationEffects();
   const [packages, setPackages] = useState<PackageSummary[]>([]);
   const [libraryNotice, setLibraryNotice] = useState("");
   const [guestLimitMessage, setGuestLimitMessage] = useState("");
@@ -75,6 +90,7 @@ export function PackageListPage() {
   const query = searchParams.get("q") ?? "";
   const activeFilter = parseFilter(searchParams.get("filter"));
   const activeTagParam = (searchParams.get("tag") ?? "").trim().toLowerCase();
+  const streakTier = getDailyStreakTier(dailyStreak);
 
   const loadPackages = useCallback(async () => {
     setStatus("loading");
@@ -400,24 +416,20 @@ export function PackageListPage() {
     <main className="package-list-page">
       {isAuthenticated && (
         <div className="package-list-page__status-strip">
-          {user && (
-            <p className="package-list-page__auth-status" aria-live="polite">
-              <span className="package-list-page__auth-user">{user.username}</span>
-            </p>
-          )}
-
           {dailyStreak > 0 && (
             <p
-              className="package-list-page__streak"
+              className={`package-list-page__streak package-list-page__streak--${streakTier} ${
+                lightningEnabled ? "package-list-page__streak--animated" : ""
+              }`}
               aria-label={`${dailyStreak} day streak`}
             >
+              <span className="package-list-page__streak-sparks" aria-hidden="true" />
               <Flame
                 className="package-list-page__streak-icon"
                 aria-hidden="true"
                 focusable="false"
                 size={16}
               />
-              <span className="package-list-page__status-label">Current streak</span>
               <span className="package-list-page__streak-value">
                 {dailyStreak} {dailyStreak === 1 ? "day" : "days"} streak
               </span>

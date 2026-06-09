@@ -245,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthToken(response.access_token);
         setToken(response.access_token);
         setUser(response.user);
+        setLogoutVersion(0);
         setBonusXPNotice(response.user.bonus_xp_notice ?? null);
         setStatus("authenticated");
         void reconcileAnonymousLocalState(
@@ -271,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthToken(response.access_token);
         setToken(response.access_token);
         setUser(response.user);
+        setLogoutVersion(0);
         setBonusXPNotice(null);
         setStatus("authenticated");
         void reconcileAnonymousLocalState(

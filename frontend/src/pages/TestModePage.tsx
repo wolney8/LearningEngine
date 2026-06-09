@@ -330,6 +330,8 @@ export function TestModePage() {
       const correctCount = shuffledQuestions.filter(
         (q) => answers[q.id] === q.correct_answer,
       ).length;
+      const isPerfectScore =
+        shuffledQuestions.length > 0 && correctCount === shuffledQuestions.length;
       const passed =
         totalPossibleWeight > 0
           ? weightScore / totalPossibleWeight >= phase.pkg.passing_score
@@ -380,6 +382,11 @@ export function TestModePage() {
 
       if (passed) {
         triggerConfetti("pass");
+        if (isPerfectScore) {
+          window.setTimeout(() => {
+            triggerConfetti("pass");
+          }, 150);
+        }
       }
 
       const scorePercent =
@@ -869,6 +876,9 @@ export function TestModePage() {
         isFirstCompletion={phase.wasFirstCompletion}
         firstCompletionBonus={settings.xp.first_completion_bonus}
         timedOut={phase.timedOut}
+        isPerfectScore={phase.shuffledQuestions.every(
+          (question) => phase.answers[question.id] === question.correct_answer,
+        )}
         onRetry={() => {
           if (!isAuthenticated) {
             const capState = getAnonymousGuestPackageCapStatus(id);

@@ -21,6 +21,14 @@ function yesterdayISO(): string {
 
 function readStreak(): number {
   try {
+    const lastActive = readLastActive();
+    if (
+      lastActive !== null &&
+      lastActive !== todayISO() &&
+      lastActive !== yesterdayISO()
+    ) {
+      return 0;
+    }
     const raw = localStorage.getItem(DAILY_STREAK_KEY);
     const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
@@ -35,6 +43,12 @@ function readLastActive(): string | null {
   } catch {
     return null;
   }
+}
+
+function isStreakStale(lastActive: string | null): boolean {
+  return (
+    lastActive !== null && lastActive !== todayISO() && lastActive !== yesterdayISO()
+  );
 }
 
 function writeStreak(streak: number): void {
@@ -95,6 +109,14 @@ export function useStreak(): {
     if (lastActive === today) {
       // Already practised today - no change
       return;
+    }
+
+    if (isStreakStale(lastActive)) {
+      try {
+        localStorage.setItem(DAILY_STREAK_KEY, "0");
+      } catch {
+        // Silent no-op
+      }
     }
 
     const next = lastActive === yesterdayISO() ? readStreak() + 1 : 1;

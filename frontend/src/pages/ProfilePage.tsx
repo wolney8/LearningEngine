@@ -210,7 +210,7 @@ export function ProfilePage() {
             <p>{xp}</p>
           </li>
           <li className="profile-page__stat">
-            <h2>Current streak</h2>
+            <h2>Streak</h2>
             <p>{streakCount}</p>
           </li>
           <li className="profile-page__stat">

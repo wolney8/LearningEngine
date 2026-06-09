@@ -210,11 +210,14 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
             get_response.json()["celebration_effects"]["respect_reduced_motion"]
             is True
         )
+        assert get_response.json()["progression"]["xp_decay_enabled"] is True
+        assert get_response.json()["progression"]["xp_decay_floor"] == 100
 
         payload = _sample_settings(first_completion_bonus=77).model_dump(mode="json")
         payload["spend_economy"]["enabled"] = True
         payload["spend_economy"]["allow_non_admin_ai_generation_spend"] = True
         payload["spend_economy"]["costs"]["generate_ai_course"] = 777
+        payload["progression"]["xp_decay_rate_percent"] = 12
         put_response = await client.put(
             "/admin/settings",
             json=payload,
@@ -235,6 +238,7 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
     assert put_response.json()["spend_economy"]["costs"]["generate_ai_course"] == 777
     assert put_response.json()["celebration_effects"]["enabled"] is False
     assert put_response.json()["celebration_effects"]["confetti_on_pass"] is True
+    assert put_response.json()["progression"]["xp_decay_rate_percent"] == 12
 
     saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
     assert saved["xp"]["first_completion_bonus"] == 77
@@ -244,6 +248,7 @@ async def test_admin_settings_get_and_put_roundtrip(tmp_path: Path) -> None:
     assert saved["spend_economy"]["costs"]["generate_ai_course"] == 777
     assert saved["celebration_effects"]["enabled"] is False
     assert saved["celebration_effects"]["lightning_on_streak_milestones"] is True
+    assert saved["progression"]["xp_decay_rate_percent"] == 12
 
 
 async def test_admin_settings_audit_logs_include_changed_keys_only_when_meaningful(

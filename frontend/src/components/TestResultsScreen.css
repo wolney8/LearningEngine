@@ -106,6 +106,12 @@
   background: var(--colour-panel-bg-muted);
 }
 
+.test-results__badge--perfect {
+  border-color: #4338ca;
+  color: #312e81;
+  background: linear-gradient(90deg, #ede9fe 0%, #dbeafe 100%);
+}
+
 .test-results__note {
   margin: 0;
   color: var(--colour-text-secondary);

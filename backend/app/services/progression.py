@@ -5,13 +5,10 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
+from app.models.settings import GameSettings
 from app.models.user import SpendHistory, User, UserTestResult
 
-STALE_WINDOW_DAYS = 7
-DECAY_RATE = 0.10
-XP_DECAY_FLOOR = 100
 REFRESHER_DIFFICULTY = "normal"
-_STALE_WINDOW = timedelta(days=STALE_WINDOW_DAYS)
 
 
 @dataclass
@@ -27,8 +24,10 @@ class XPDecayNotice:
             "stale_package_count": self.stale_package_count,
             "intervals_applied": self.intervals_applied,
             "floor_reached": self.floor_reached,
-            "stale_window_days": STALE_WINDOW_DAYS,
+            "stale_window_days": self.stale_window_days,
         }
+
+    stale_window_days: int
 
 
 def _normalise_datetime(value: datetime | None) -> datetime | None:
@@ -39,31 +38,43 @@ def _normalise_datetime(value: datetime | None) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
-def _stale_intervals(last_passed_at: datetime, now: datetime) -> int:
-    stale_start = last_passed_at + _STALE_WINDOW
+def _stale_intervals(
+    last_passed_at: datetime,
+    now: datetime,
+    *,
+    stale_window: timedelta,
+) -> int:
+    stale_start = last_passed_at + stale_window
     if now < stale_start:
         return 0
     elapsed = now - stale_start
-    return int(elapsed // _STALE_WINDOW) + 1
+    return int(elapsed // stale_window) + 1
 
 
-def _per_interval_decay(base_xp: int) -> int:
+def _per_interval_decay(base_xp: int, *, rate_percent: int) -> int:
     if base_xp <= 0:
         return 0
-    return max(1, round(base_xp * DECAY_RATE))
+    return max(1, round(base_xp * (rate_percent / 100)))
 
 
 def apply_lazy_xp_decay(
     session: Session,
     current_user: User,
+    settings: GameSettings,
     *,
     now: datetime | None = None,
 ) -> XPDecayNotice | None:
     user_id = current_user.id
     if user_id is None:
         return None
+    if not settings.progression.xp_decay_enabled:
+        return None
 
     current_time = _normalise_datetime(now) or datetime.now(timezone.utc)
+    stale_window_days = settings.progression.xp_decay_stale_window_days
+    stale_window = timedelta(days=stale_window_days)
+    decay_floor = settings.progression.xp_decay_floor
+    rate_percent = settings.progression.xp_decay_rate_percent
     rows = session.exec(
         select(UserTestResult).where(UserTestResult.user_id == user_id)
     ).all()
@@ -78,7 +89,11 @@ def apply_lazy_xp_decay(
         if last_passed_at is None:
             continue
 
-        interval_count = _stale_intervals(last_passed_at, current_time)
+        interval_count = _stale_intervals(
+            last_passed_at,
+            current_time,
+            stale_window=stale_window,
+        )
         if interval_count <= row.refresher_decay_intervals_applied:
             continue
 
@@ -88,7 +103,10 @@ def apply_lazy_xp_decay(
         intervals_applied += delta_intervals
         changed = True
 
-        per_interval = _per_interval_decay(row.refresher_best_xp_base)
+        per_interval = _per_interval_decay(
+            row.refresher_best_xp_base,
+            rate_percent=rate_percent,
+        )
         if per_interval > 0:
             total_deduction += per_interval * delta_intervals
 
@@ -99,7 +117,7 @@ def apply_lazy_xp_decay(
 
     original_xp = current_user.xp
     if total_deduction > 0:
-        floor = min(original_xp, XP_DECAY_FLOOR)
+        floor = min(original_xp, decay_floor)
         current_user.xp = max(floor, current_user.xp - total_deduction)
         session.add(current_user)
 
@@ -111,8 +129,9 @@ def apply_lazy_xp_decay(
         deducted_xp=actual_deduction,
         stale_package_count=stale_package_count,
         intervals_applied=intervals_applied,
-        floor_reached=current_user.xp == min(original_xp, XP_DECAY_FLOOR)
-        and original_xp > XP_DECAY_FLOOR,
+        floor_reached=current_user.xp == min(original_xp, decay_floor)
+        and original_xp > decay_floor,
+        stale_window_days=stale_window_days,
     )
 
 
@@ -131,12 +150,21 @@ def refresh_refresher_progress(
     result.refresher_best_xp_base = max(result.refresher_best_xp_base, best_xp_earned)
 
 
-def should_auto_unlock_hard(result: UserTestResult, now: datetime) -> bool:
+def should_auto_unlock_hard(
+    result: UserTestResult,
+    now: datetime,
+    settings: GameSettings,
+) -> bool:
+    if not settings.progression.hard_auto_unlock_on_stale_normal_repass:
+        return False
+
     last_passed_at = _normalise_datetime(result.refresher_last_passed_at)
     if last_passed_at is None:
         return False
 
-    return now >= last_passed_at + _STALE_WINDOW
+    return now >= last_passed_at + timedelta(
+        days=settings.progression.xp_decay_stale_window_days
+    )
 
 
 def ensure_hard_unlocked_for_refresher(

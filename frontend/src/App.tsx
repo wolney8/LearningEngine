@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { AdminGuard } from "./components/AdminGuard";
 import { AppTopBar } from "./components/AppTopBar";
+import { InactivityWarningModal } from "./components/InactivityWarningModal";
 import { LevelUpOverlay } from "./components/LevelUpOverlay";
 import { Toast } from "./components/Toast";
 import { AuthProvider } from "./context/AuthContext";
@@ -47,7 +48,8 @@ function AppRoutes() {
   const authBoundaryKey =
     status === "authenticated" && user ? `auth-${user.id}` : "anonymous";
 
-  useInactivityLogout(status === "authenticated", logout);
+  const { warningOpen, countdownSeconds, staySignedIn, signOutNow } =
+    useInactivityLogout(status === "authenticated", logout);
 
   useEffect(() => {
     if (logoutVersion === 0) {
@@ -110,6 +112,12 @@ function AppRoutes() {
         level={levelUpState?.level ?? levelProgress.level}
         totalXP={levelUpState?.totalXP ?? xp}
         onDismiss={() => setLevelUpState(null)}
+      />
+      <InactivityWarningModal
+        open={warningOpen}
+        secondsRemaining={countdownSeconds}
+        onStaySignedIn={staySignedIn}
+        onSignOutNow={signOutNow}
       />
       <main className="app-shell__content">
         <Routes>

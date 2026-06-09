@@ -60,6 +60,13 @@ export const DEFAULT_SETTINGS: Settings = {
     lightning_on_streak_milestones: true,
     respect_reduced_motion: true,
   },
+  progression: {
+    xp_decay_enabled: true,
+    xp_decay_stale_window_days: 7,
+    xp_decay_rate_percent: 10,
+    xp_decay_floor: 100,
+    hard_auto_unlock_on_stale_normal_repass: true,
+  },
 };
 
 let cachedSettings: Settings | null = null;

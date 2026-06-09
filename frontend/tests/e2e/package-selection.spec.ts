@@ -589,7 +589,6 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(page.getByText("Current streak")).toHaveCount(0);
     await expect(page.getByText("3 days streak")).toHaveCount(0);
     await expect(page.locator(".package-list-page__status-strip")).toHaveCount(0);
   });
@@ -754,7 +753,6 @@ test.describe("Package Selection Screen", () => {
     await page.goto("/");
     await checkA11y(page);
 
-    await expect(page.getByText("Current streak")).toBeVisible();
     await expect(page.getByText("6 days streak")).toBeVisible();
     await expect(page.getByText("1 day streak")).toHaveCount(0);
   });

@@ -61,10 +61,15 @@ type NumberPath =
   | "difficulty.xp_multiplier.normal"
   | "difficulty.xp_multiplier.hard"
   | "difficulty.xp_multiplier.expert"
+  | "progression.xp_decay_stale_window_days"
+  | "progression.xp_decay_rate_percent"
+  | "progression.xp_decay_floor"
   | "spend_economy.costs.increase_difficulty_cap"
   | "spend_economy.costs.unlock_hidden_package";
 
 type BooleanPath =
+  | "progression.xp_decay_enabled"
+  | "progression.hard_auto_unlock_on_stale_normal_repass"
   | "spend_economy.enabled"
   | "celebration_effects.enabled"
   | "celebration_effects.confetti_on_pass"
@@ -138,6 +143,15 @@ function setNumberValue(settings: Settings, path: NumberPath, value: number): Se
     case "difficulty.xp_multiplier.expert":
       next.difficulty.xp_multiplier.expert = value;
       break;
+    case "progression.xp_decay_stale_window_days":
+      next.progression.xp_decay_stale_window_days = value;
+      break;
+    case "progression.xp_decay_rate_percent":
+      next.progression.xp_decay_rate_percent = value;
+      break;
+    case "progression.xp_decay_floor":
+      next.progression.xp_decay_floor = value;
+      break;
     case "spend_economy.costs.increase_difficulty_cap":
       next.spend_economy.costs.increase_difficulty_cap = value;
       break;
@@ -157,6 +171,12 @@ function setBooleanValue(
 ): Settings {
   const next = structuredClone(settings);
   switch (path) {
+    case "progression.xp_decay_enabled":
+      next.progression.xp_decay_enabled = value;
+      break;
+    case "progression.hard_auto_unlock_on_stale_normal_repass":
+      next.progression.hard_auto_unlock_on_stale_normal_repass = value;
+      break;
     case "spend_economy.enabled":
       next.spend_economy.enabled = value;
       break;
@@ -639,6 +659,33 @@ export function AdminSettingsPage() {
     { key: "spend_economy.enabled", label: "Enabled" },
   ];
 
+  const progressionFields: Array<{
+    key: NumberPath;
+    label: string;
+    step?: string;
+  }> = [
+    {
+      key: "progression.xp_decay_stale_window_days",
+      label: "Decay stale window (days)",
+    },
+    {
+      key: "progression.xp_decay_rate_percent",
+      label: "Decay rate per stale interval (%)",
+    },
+    {
+      key: "progression.xp_decay_floor",
+      label: "XP decay floor",
+    },
+  ];
+
+  const progressionToggleFields: Array<{ key: BooleanPath; label: string }> = [
+    { key: "progression.xp_decay_enabled", label: "XP decay enabled" },
+    {
+      key: "progression.hard_auto_unlock_on_stale_normal_repass",
+      label: "Auto-unlock Hard on stale Normal re-pass",
+    },
+  ];
+
   const celebrationFields: Array<{ key: BooleanPath; label: string }> = [
     { key: "celebration_effects.enabled", label: "Enabled" },
     {
@@ -703,6 +750,12 @@ export function AdminSettingsPage() {
         return s.difficulty.xp_multiplier.hard;
       case "difficulty.xp_multiplier.expert":
         return s.difficulty.xp_multiplier.expert;
+      case "progression.xp_decay_stale_window_days":
+        return s.progression.xp_decay_stale_window_days;
+      case "progression.xp_decay_rate_percent":
+        return s.progression.xp_decay_rate_percent;
+      case "progression.xp_decay_floor":
+        return s.progression.xp_decay_floor;
       case "spend_economy.costs.increase_difficulty_cap":
         return s.spend_economy.costs.increase_difficulty_cap;
       case "spend_economy.costs.unlock_hidden_package":
@@ -714,6 +767,10 @@ export function AdminSettingsPage() {
 
   function readBooleanValue(s: Settings, path: BooleanPath): boolean {
     switch (path) {
+      case "progression.xp_decay_enabled":
+        return s.progression.xp_decay_enabled;
+      case "progression.hard_auto_unlock_on_stale_normal_repass":
+        return s.progression.hard_auto_unlock_on_stale_normal_repass;
       case "spend_economy.enabled":
         return s.spend_economy.enabled;
       case "celebration_effects.enabled":
@@ -842,6 +899,52 @@ export function AdminSettingsPage() {
               </div>
               <div className="admin-page__grid">
                 {spendEconomyCostFields.map((field) => (
+                  <label key={field.key} className="admin-page__field">
+                    <span>{field.label}</span>
+                    <input
+                      type="number"
+                      step={field.step ?? "1"}
+                      value={readValue(settings, field.key)}
+                      onChange={(event) =>
+                        setSettings(
+                          setNumberValue(
+                            settings,
+                            field.key,
+                            Number(event.target.value),
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="admin-page__fieldset">
+              <legend>Progression</legend>
+              <p className="admin-page__preview-hint">
+                Normal refresher passes become stale after the configured number of
+                days. Each stale interval can deduct a percentage of the saved refresher
+                XP base, without going below the XP floor.
+              </p>
+              <div className="admin-page__toggle-grid">
+                {progressionToggleFields.map((field) => (
+                  <label key={field.key} className="admin-page__toggle">
+                    <input
+                      type="checkbox"
+                      checked={readBooleanValue(settings, field.key)}
+                      onChange={(event) =>
+                        setSettings(
+                          setBooleanValue(settings, field.key, event.target.checked),
+                        )
+                      }
+                    />
+                    <span>{field.label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="admin-page__grid">
+                {progressionFields.map((field) => (
                   <label key={field.key} className="admin-page__field">
                     <span>{field.label}</span>
                     <input

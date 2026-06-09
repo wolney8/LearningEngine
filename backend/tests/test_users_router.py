@@ -9,7 +9,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app.main import app
 from app.models.package import Package
 from app.models.settings import GameSettings
-from app.models.user import SpendHistory, UserTestResult, UserXPSpendHistory
+from app.models.user import SpendHistory, User, UserTestResult, UserXPSpendHistory
 from app.routers.packages import get_package_overrides, get_packages_cache
 from app.services.db import get_session
 from app.services.overrides_loader import PackageOverride
@@ -394,6 +394,59 @@ async def test_users_progress_returns_empty_for_new_user(
     assert response.json() == []
 
 
+async def test_read_my_streak_resets_stale_streaks(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="stale-streak-user",
+        email="stale-streak-user@example.com",
+    )
+
+    with Session(app.state._test_users_engine) as session:
+        user = session.exec(select(User)).first()
+        assert user is not None
+        user.streak_count = 4
+        user.last_practised_date = date.today() - timedelta(days=3)
+        session.add(user)
+        session.commit()
+
+    response = await users_client.get(
+        "/users/me/streak",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["streak_count"] == 0
+
+    with Session(app.state._test_users_engine) as session:
+        user = session.exec(select(User)).first()
+        assert user is not None
+        assert user.streak_count == 0
+
+
+async def test_read_me_resets_stale_streaks(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="stale-streak-me-user",
+        email="stale-streak-me-user@example.com",
+    )
+
+    with Session(app.state._test_users_engine) as session:
+        user = session.exec(select(User)).first()
+        assert user is not None
+        user.streak_count = 3
+        user.last_practised_date = date.today() - timedelta(days=4)
+        session.add(user)
+        session.commit()
+
+    response = await users_client.get(
+        "/users/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["streak_count"] == 0
+
+
 async def test_read_my_xp_applies_lazy_decay_once(users_client: AsyncClient) -> None:
     token = await _register_user_and_get_token(
         users_client,
@@ -524,6 +577,59 @@ async def test_read_my_xp_respects_decay_floor(users_client: AsyncClient) -> Non
     assert body["xp"] == 100
     assert body["decay_notice"]["deducted_xp"] == 10
     assert body["decay_notice"]["floor_reached"] is True
+
+
+async def test_read_my_xp_uses_progression_settings(users_client: AsyncClient) -> None:
+    token = await _register_user_and_get_token(
+        users_client,
+        username="xp-progression-settings-user",
+        email="xp-progression-settings-user@example.com",
+    )
+    await _set_user_xp(users_client, token, 500)
+
+    progress_response = await users_client.post(
+        "/users/me/progress/sample-demo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "difficulty": "normal",
+            "latest_weighted_score": 0.9,
+            "completed": True,
+            "best_xp_earned": 200,
+        },
+    )
+    assert progress_response.status_code == 200
+
+    app.state.settings = app.state.settings.model_copy(
+        update={
+            "progression": app.state.settings.progression.model_copy(
+                update={
+                    "xp_decay_stale_window_days": 14,
+                    "xp_decay_rate_percent": 5,
+                    "xp_decay_floor": 50,
+                }
+            )
+        }
+    )
+
+    with Session(app.state._test_users_engine) as session:
+        result = session.exec(select(UserTestResult)).first()
+        assert result is not None
+        result.refresher_last_passed_at = datetime.now(timezone.utc) - timedelta(
+            days=15
+        )
+        result.refresher_decay_intervals_applied = 0
+        session.add(result)
+        session.commit()
+
+    response = await users_client.get(
+        "/users/me/xp",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["xp"] == 490
+    assert body["decay_notice"]["deducted_xp"] == 10
+    assert body["decay_notice"]["stale_window_days"] == 14
 
 
 async def test_stale_normal_repass_auto_unlocks_hard(users_client: AsyncClient) -> None:

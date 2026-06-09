@@ -50,6 +50,11 @@ def test_game_settings_model_parses_valid_payload() -> None:
     assert settings.celebration_effects.confetti_on_bonus_xp_gain is True
     assert settings.celebration_effects.lightning_on_streak_milestones is True
     assert settings.celebration_effects.respect_reduced_motion is True
+    assert settings.progression.xp_decay_enabled is True
+    assert settings.progression.xp_decay_stale_window_days == 7
+    assert settings.progression.xp_decay_rate_percent == 10
+    assert settings.progression.xp_decay_floor == 100
+    assert settings.progression.hard_auto_unlock_on_stale_normal_repass is True
 
 
 def test_game_settings_rejects_unknown_fields() -> None:
@@ -223,6 +228,39 @@ def test_game_settings_celebration_effects_rejects_unknown_fields() -> None:
         "lightning_on_streak_milestones": True,
         "respect_reduced_motion": True,
         "sparkle_mode": True,
+    }
+
+    with pytest.raises(ValidationError):
+        GameSettings.model_validate(payload)
+
+
+def test_game_settings_progression_accepts_override_values() -> None:
+    payload = _valid_settings_dict()
+    payload["progression"] = {
+        "xp_decay_enabled": False,
+        "xp_decay_stale_window_days": 14,
+        "xp_decay_rate_percent": 5,
+        "xp_decay_floor": 75,
+        "hard_auto_unlock_on_stale_normal_repass": False,
+    }
+
+    settings = GameSettings.model_validate(payload)
+
+    assert settings.progression.xp_decay_enabled is False
+    assert settings.progression.xp_decay_stale_window_days == 14
+    assert settings.progression.xp_decay_rate_percent == 5
+    assert settings.progression.xp_decay_floor == 75
+    assert settings.progression.hard_auto_unlock_on_stale_normal_repass is False
+
+
+def test_game_settings_progression_rejects_invalid_values() -> None:
+    payload = _valid_settings_dict()
+    payload["progression"] = {
+        "xp_decay_enabled": True,
+        "xp_decay_stale_window_days": 0,
+        "xp_decay_rate_percent": 101,
+        "xp_decay_floor": -1,
+        "hard_auto_unlock_on_stale_normal_repass": True,
     }
 
     with pytest.raises(ValidationError):

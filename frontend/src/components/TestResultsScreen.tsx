@@ -19,6 +19,7 @@ interface TestResultsScreenProps {
   isFirstCompletion: boolean;
   firstCompletionBonus: number;
   timedOut: boolean;
+  isPerfectScore: boolean;
   onRetry: () => void;
   onBack: () => void;
   onRevise: (revisionPageIds: string[]) => void;
@@ -42,6 +43,7 @@ export function TestResultsScreen({
   isFirstCompletion,
   firstCompletionBonus,
   timedOut,
+  isPerfectScore,
   onRetry,
   onBack,
   onRevise,
@@ -114,6 +116,12 @@ export function TestResultsScreen({
         {isFirstCompletion && (
           <span className="test-results__badge test-results__badge--xp">
             +{firstCompletionBonus} XP bonus
+          </span>
+        )}
+
+        {isPerfectScore && (
+          <span className="test-results__badge test-results__badge--perfect">
+            100% perfect score
           </span>
         )}
 

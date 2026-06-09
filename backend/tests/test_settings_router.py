@@ -63,6 +63,8 @@ async def test_get_settings_returns_expected_shape() -> None:
     assert body["celebration_effects"]["confetti_on_bonus_xp_gain"] is True
     assert body["celebration_effects"]["lightning_on_streak_milestones"] is True
     assert body["celebration_effects"]["respect_reduced_motion"] is True
+    assert body["progression"]["xp_decay_enabled"] is True
+    assert body["progression"]["xp_decay_floor"] == 100
 
 
 async def test_get_settings_dependency_override_path() -> None:

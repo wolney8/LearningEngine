@@ -6,3 +6,7 @@
 .app-shell__content {
   padding-bottom: 1rem;
 }
+
+.app-shell dialog {
+  max-width: calc(100vw - 2rem);
+}

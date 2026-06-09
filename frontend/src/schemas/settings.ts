@@ -96,6 +96,16 @@ const CelebrationEffectsSettingsSchema = z
   })
   .strict();
 
+const ProgressionSettingsSchema = z
+  .object({
+    xp_decay_enabled: z.boolean().default(true),
+    xp_decay_stale_window_days: z.number().int().positive().default(7),
+    xp_decay_rate_percent: z.number().int().min(0).max(100).default(10),
+    xp_decay_floor: z.number().int().nonnegative().default(100),
+    hard_auto_unlock_on_stale_normal_repass: z.boolean().default(true),
+  })
+  .strict();
+
 export const SettingsSchema = z
   .object({
     version: z.number().int().nonnegative(),
@@ -110,6 +120,7 @@ export const SettingsSchema = z
     }),
     spend_economy: SpendEconomySettingsSchema.default({}),
     celebration_effects: CelebrationEffectsSettingsSchema.default({}),
+    progression: ProgressionSettingsSchema.default({}),
   })
   .strict();
 

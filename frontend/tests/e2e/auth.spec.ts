@@ -554,9 +554,7 @@ test.describe("Optional auth shell", () => {
     const profileStats = page.getByLabel("Profile stats overview");
     await expect(page.getByRole("heading", { name: "Your Profile" })).toBeVisible();
     await expect(profileStats.getByText("Total XP").locator("..")).toContainText("88");
-    await expect(profileStats.getByText("Current streak").locator("..")).toContainText(
-      /\d+/,
-    );
+    await expect(profileStats.getByText("Streak").locator("..")).toContainText(/\d+/);
     await expect(
       profileStats.getByText("Completed packages").locator(".."),
     ).toContainText("1");
@@ -986,6 +984,130 @@ test.describe("Optional auth shell", () => {
     expect(storage.results).toBeNull();
   });
 
+  test("user can log in again after logout without a full browser refresh", async ({
+    page,
+  }) => {
+    const authUser = {
+      id: 33,
+      username: "relogin-user",
+      email: "relogin-user@example.com",
+      role: "student",
+      xp: 25,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-relogin-user",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 2,
+          last_practised_date: "2026-05-24",
+        }),
+      });
+    });
+
+    await page.goto("/login");
+    await checkA11y(page);
+    await page.getByLabel("Username or email").fill("relogin-user");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(
+      page.getByTestId("app-top-bar").getByText("relogin-user"),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page).toHaveURL("/login");
+
+    await page.getByLabel("Username or email").fill("relogin-user");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(
+      page.getByTestId("app-top-bar").getByText("relogin-user"),
+    ).toBeVisible();
+  });
+
+  test("authenticated visits to login redirect to learner view", async ({ page }) => {
+    const authUser = {
+      id: 34,
+      username: "redirect-user",
+      email: "redirect-user@example.com",
+      role: "student",
+      xp: 12,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.addInitScript(() => {
+      sessionStorage.setItem("lle_auth_token", "token-redirect-user");
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/progress`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me/streak`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          streak_count: 0,
+          last_practised_date: null,
+        }),
+      });
+    });
+
+    await page.goto("/login");
+
+    await expect(page).toHaveURL("/");
+    await expect(
+      page.getByTestId("app-top-bar").getByText("redirect-user"),
+    ).toBeVisible();
+  });
+
   test("inactivity timeout logs out and redirects to login", async ({ page }) => {
     const authUser = {
       id: 32,
@@ -1000,8 +1122,15 @@ test.describe("Optional auth shell", () => {
       (
         window as Window & {
           __LLE_INACTIVITY_TIMEOUT_MS__?: number;
+          __LLE_INACTIVITY_WARNING_MS__?: number;
         }
       ).__LLE_INACTIVITY_TIMEOUT_MS__ = 150;
+      (
+        window as Window & {
+          __LLE_INACTIVITY_TIMEOUT_MS__?: number;
+          __LLE_INACTIVITY_WARNING_MS__?: number;
+        }
+      ).__LLE_INACTIVITY_WARNING_MS__ = 75;
     });
 
     await page.route(`${API_BASE_URL}/auth/login`, (route) => {
@@ -1032,10 +1161,76 @@ test.describe("Optional auth shell", () => {
 
     await expect(page).toHaveURL("/");
     await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Are you still there?" }),
+    ).toBeVisible();
 
     await expect(page).toHaveURL("/login", { timeout: 3_000 });
     await expect(page.locator("[data-auth-status='idle']")).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  });
+
+  test("inactivity warning can extend the session before logout", async ({ page }) => {
+    const authUser = {
+      id: 33,
+      username: "steady-user",
+      email: "steady-user@example.com",
+      role: "student",
+      xp: 35,
+      created_at: "2026-05-23T00:00:00Z",
+    };
+
+    await page.addInitScript(() => {
+      (
+        window as Window & {
+          __LLE_INACTIVITY_TIMEOUT_MS__?: number;
+          __LLE_INACTIVITY_WARNING_MS__?: number;
+        }
+      ).__LLE_INACTIVITY_TIMEOUT_MS__ = 400;
+      (
+        window as Window & {
+          __LLE_INACTIVITY_TIMEOUT_MS__?: number;
+          __LLE_INACTIVITY_WARNING_MS__?: number;
+        }
+      ).__LLE_INACTIVITY_WARNING_MS__ = 250;
+    });
+
+    await page.route(`${API_BASE_URL}/auth/login`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "token-steady-user",
+          token_type: "bearer",
+          user: authUser,
+        }),
+      });
+    });
+
+    await page.route(`${API_BASE_URL}/users/me`, (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authUser),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Username or email").fill("steady-user");
+    await page.getByLabel("Password").fill("StrongPass123");
+    await page.getByRole("button", { name: "Sign in" }).click();
+
+    await expect(page).toHaveURL("/");
+    await expect(
+      page.getByRole("heading", { name: "Are you still there?" }),
+    ).toBeVisible({ timeout: 3_000 });
+
+    await page.getByRole("button", { name: "Stay signed in" }).click();
+    await expect(page.getByTestId("inactivity-warning-modal")).toHaveCount(0);
+    await expect(page).toHaveURL("/");
+
+    await page.waitForTimeout(150);
+    await expect(page.locator("[data-auth-status='authenticated']")).toBeVisible();
   });
 
   test("switching accounts remounts the auth boundary without stale user state", async ({

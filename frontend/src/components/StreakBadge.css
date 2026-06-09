@@ -31,12 +31,31 @@
   background: var(--colour-streak-lightning-sheen), var(--colour-streak-lightning-glow);
 }
 
+.streak-badge__sparks {
+  position: absolute;
+  inset: -10% -8%;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .streak-badge--lightning {
   box-shadow: var(--colour-streak-lightning-ring);
 }
 
 .streak-badge--lightning .streak-badge__lightning {
   animation: streak-lightning 640ms ease-out;
+}
+
+.streak-badge--lightning .streak-badge__sparks {
+  opacity: 0.95;
+  background: radial-gradient(
+      circle at 24% 52%,
+      rgba(255, 255, 255, 0.95) 0 2px,
+      transparent 3px
+    ),
+    radial-gradient(circle at 56% 24%, rgba(251, 191, 36, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 76% 68%, rgba(147, 197, 253, 0.95) 0 2px, transparent 3px);
+  animation: streak-sparks 640ms linear infinite;
 }
 
 .streak-badge__count {
@@ -60,6 +79,20 @@
   }
 }
 
+@keyframes streak-sparks {
+  0% {
+    transform: translateX(-8%) scale(0.96);
+  }
+
+  50% {
+    transform: translateX(0%) scale(1.02);
+  }
+
+  100% {
+    transform: translateX(8%) scale(1.06);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .streak-badge--lightning {
     box-shadow: none;
@@ -67,5 +100,10 @@
 
   .streak-badge--lightning .streak-badge__lightning {
     animation: none;
+  }
+
+  .streak-badge--lightning .streak-badge__sparks {
+    animation: none;
+    opacity: 0.18;
   }
 }

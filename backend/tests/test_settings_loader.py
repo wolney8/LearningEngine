@@ -58,6 +58,7 @@ def test_load_settings_reads_valid_yaml(tmp_path: Path) -> None:
     assert settings.spend_economy.enabled is True
     assert settings.spend_economy.allow_non_admin_ai_generation_spend is True
     assert settings.spend_economy.costs.generate_ai_course == 700
+    assert settings.progression.xp_decay_stale_window_days == 7
 
 
 def test_load_settings_raises_when_file_missing(tmp_path: Path) -> None:

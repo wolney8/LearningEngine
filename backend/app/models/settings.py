@@ -137,6 +137,16 @@ class CelebrationEffectsSettings(BaseModel):
     respect_reduced_motion: bool = True
 
 
+class ProgressionSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    xp_decay_enabled: bool = True
+    xp_decay_stale_window_days: int = Field(default=7, ge=1)
+    xp_decay_rate_percent: int = Field(default=10, ge=0, le=100)
+    xp_decay_floor: int = Field(default=100, ge=0)
+    hard_auto_unlock_on_stale_normal_repass: bool = True
+
+
 class GameSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -151,3 +161,4 @@ class GameSettings(BaseModel):
     celebration_effects: CelebrationEffectsSettings = Field(
         default_factory=CelebrationEffectsSettings
     )
+    progression: ProgressionSettings = Field(default_factory=ProgressionSettings)

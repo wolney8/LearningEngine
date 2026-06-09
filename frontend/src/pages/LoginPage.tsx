@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import "./AuthPages.css";
 
@@ -10,6 +10,10 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
 
   useEffect(() => clearError, [clearError]);
+
+  if (status === "authenticated") {
+    return <Navigate to="/" replace />;
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

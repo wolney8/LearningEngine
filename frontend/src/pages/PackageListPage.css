@@ -17,30 +17,12 @@
   border: 1px solid var(--colour-status-strip-border);
   border-radius: 0.75rem;
   background: var(--colour-status-strip-bg);
-}
-
-.package-list-page__auth-status {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  align-items: center;
-  margin: 0;
-  font-family: "Inter", sans-serif;
-  font-size: 0.9rem;
-  color: var(--colour-text-strong);
-}
-
-.package-list-page__status-label {
-  color: var(--colour-text);
-  font-weight: 600;
-}
-
-.package-list-page__auth-user {
-  color: var(--colour-text-strong);
-  font-weight: 700;
+  align-items: flex-start;
 }
 
 .package-list-page__streak {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
@@ -60,12 +42,86 @@
   font-weight: 700;
 }
 
-.package-list-page__streak-icon {
+.package-list-page__streak--warm {
+  border-color: var(--colour-warning-border);
+  background: linear-gradient(
+    90deg,
+    var(--colour-warning-bg) 0%,
+    var(--colour-warning-bg-hover) 100%
+  );
   color: var(--colour-warning-text);
 }
 
+.package-list-page__streak--flame {
+  border-color: var(--colour-streak-flame-border);
+  background: linear-gradient(90deg, var(--colour-streak-flame-bg) 0%, #ffedd5 100%);
+  color: var(--colour-streak-flame-text);
+}
+
+.package-list-page__streak--surge {
+  border-color: var(--colour-streak-zap-border);
+  background: linear-gradient(90deg, var(--colour-streak-zap-bg) 0%, #dbeafe 100%);
+  color: var(--colour-streak-zap-text);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+}
+
+.package-list-page__streak--storm {
+  border-color: #4338ca;
+  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.35), transparent 48%),
+    linear-gradient(90deg, #312e81 0%, #1d4ed8 100%);
+  color: #e0f2fe;
+  box-shadow: 0 10px 20px rgba(49, 46, 129, 0.3);
+}
+
+.package-list-page__streak-sparks {
+  position: absolute;
+  inset: -20% -10%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.package-list-page__streak--animated .package-list-page__streak-sparks {
+  opacity: 0.95;
+  background: radial-gradient(
+      circle at 20% 55%,
+      rgba(255, 255, 255, 0.95) 0 3px,
+      transparent 4px
+    ),
+    radial-gradient(circle at 58% 28%, rgba(251, 191, 36, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 82% 68%, rgba(147, 197, 253, 0.95) 0 2px, transparent 3px);
+  animation: package-streak-sparks 1.6s linear infinite;
+}
+
+.package-list-page__streak-icon {
+  color: currentColor;
+}
+
 .package-list-page__streak-value {
-  color: var(--colour-warning-text);
+  color: currentColor;
+}
+
+@keyframes package-streak-sparks {
+  0% {
+    transform: translateX(-12%) scale(0.94);
+    opacity: 0.25;
+  }
+
+  50% {
+    transform: translateX(0%) scale(1);
+    opacity: 0.95;
+  }
+
+  100% {
+    transform: translateX(12%) scale(1.05);
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .package-list-page__streak--animated .package-list-page__streak-sparks {
+    animation: none;
+    opacity: 0.18;
+  }
 }
 
 .package-list-page__scope-toggle {
