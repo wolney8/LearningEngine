@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "index.py": {
+      "runtime": "@vercel/python",
+      "maxDuration": 10,
+      "includeFiles": [
+        "app/**",
+        "settings.yaml",
+        "package-overrides.yaml",
+        "package-refresh-metadata.yaml",
+        "../packages/**/*.yaml"
+      ]
+    }
+  }
+}

@@ -120,6 +120,7 @@ LocalLearningEngine/
 | `APP_ENV_FILE`                 | repo-root `.env`                | Bootstrap dotenv file loaded at backend startup           |
 | `APP_AI_KEY_STORE_FILE`        | `<runtime>/ai-provider-secrets.yaml` | Persistent runtime AI provider key store              |
 | `DATABASE_URL`                 | `sqlite:///backend/data/lle.db` | SQLModel database connection string                       |
+| `PACKAGE_STORAGE_BUDGET_BYTES` | `104857600`                    | Runtime package YAML storage budget for stateless deployments |
 | `VITE_API_BASE_URL`            | `/api`                          | Backend base path used by the frontend; local Vite dev may use `http://localhost:8000` |
 | `GEMINI_API_KEY`               | unset                           | Optional Gemini API key                                   |
 | `OPENAI_API_KEY`               | unset                           | Optional OpenAI API key                                   |
@@ -221,3 +222,147 @@ kubectl -n learning-engine logs deploy/learning-engine-frontend
 ```
 
 For more detail, see `k8s/README.md`.
+
+## Deployment to Vercel + Neon
+
+This repository can be deployed as a single Vercel project backed by Neon.
+
+What persists:
+
+- users
+- auth data
+- XP and progress
+- admin-created or admin-edited runtime packages
+
+What still comes from the repo:
+
+- frontend code
+- backend code
+- seed package YAML files in `packages/`
+
+### How it works
+
+- GitHub `main` is connected to one Vercel project.
+- Each push to `main` triggers a new deployment automatically.
+- Vercel serves the frontend and backend under one public URL.
+- Neon stores runtime data, including admin-managed package YAML content.
+- Repo `packages/*.yaml` files still load as seed content, but runtime package changes are persisted in the database for stateless deployments.
+
+### One-project Vercel structure
+
+The repo root now contains `vercel.json` with two services:
+
+- `frontend` rooted at `frontend/`
+- `backend` rooted at `backend/`
+
+Requests are routed like this:
+
+- `/api/*` -> backend
+- everything else -> frontend
+
+This means production frontend calls can use same-origin `/api`.
+
+### 1. Create the Neon database
+
+Create a Neon project and copy the pooled connection string.
+
+Example:
+
+```text
+postgresql://<user>:<password>@<host>/<database>?sslmode=require
+```
+
+### 2. Create the Vercel project
+
+In Vercel:
+
+1. Import this GitHub repository as one project.
+2. Keep the detected Services flow.
+3. Add these environment variables:
+
+```text
+APP_DEPLOYMENT_MODE=stateless
+DATABASE_URL=<your Neon connection string>
+JWT_SECRET_KEY=<long-random-secret>
+PACKAGE_STORAGE_BUDGET_BYTES=104857600
+LLE_BOOTSTRAP_ADMIN_USERNAME=<optional>
+LLE_BOOTSTRAP_ADMIN_EMAIL=<optional>
+LLE_BOOTSTRAP_ADMIN_PASSWORD=<optional>
+```
+
+Optional AI environment variables:
+
+```text
+GEMINI_API_KEY=<optional>
+OPENAI_API_KEY=<optional>
+ANTHROPIC_API_KEY=<optional>
+GROQ_API_KEY=<optional>
+MISTRAL_API_KEY=<optional>
+```
+
+Notes:
+
+- `PACKAGE_STORAGE_BUDGET_BYTES` defaults to `104857600` (100 MB) if omitted.
+- That budget is for runtime package YAML content stored by this app in stateless mode.
+- It is an app-level guardrail to help avoid consuming too much of a shared Neon free-tier database.
+
+### 3. What persists across redeploys
+
+These survive Vercel redeploys because they are stored in Neon:
+
+- users
+- XP
+- streak and progress data
+- admin-published package YAML
+- admin package tag edits
+- admin package availability / threshold changes
+- admin package refresh output
+
+These do not depend on Vercel local disk.
+
+### 4. Package storage budget behavior
+
+In stateless deployments:
+
+- runtime package YAML is stored in Neon
+- the admin package page shows current runtime package storage usage
+- publishing or updating packages is blocked when the configured package budget is exceeded
+- deleting packages frees that runtime package budget
+
+This budget is separate from total Neon project storage, but it gives the app a practical cap so it does not grow unchecked.
+
+### 5. Current stateless limitations
+
+The following still remain file-backed and are therefore better suited to k3s/stateful deployments:
+
+- backend settings YAML saves
+- runtime AI key file persistence via admin UI
+
+On Vercel, configure those through environment variables instead.
+
+### 6. Local test commands before pushing
+
+Backend:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+export APP_DEPLOYMENT_MODE=stateless
+export DATABASE_URL='postgresql://<user>:<password>@<host>/<database>?sslmode=require'
+export PACKAGE_STORAGE_BUDGET_BYTES='104857600'
+uvicorn app.main:app --reload
+```
+
+Frontend:
+
+```bash
+cd frontend
+pnpm install
+VITE_API_BASE_URL=http://localhost:8000 pnpm dev
+```
+
+### 7. Operational note
+
+If you continue to use the k3s deployment, the stateful filesystem-backed package and settings flow still works there. The stateless database-backed runtime package path is primarily for Vercel-style deployments where local disk is not durable.

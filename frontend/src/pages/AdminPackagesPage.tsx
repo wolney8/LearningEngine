@@ -6,8 +6,10 @@ import { useToast } from "../hooks/useToast";
 import type { AdminPackageSummary } from "../schemas/package";
 import {
   AdminAIPackageError,
+  type AdminPackageStorageStatus,
   type AdminPackageValidationResult,
   deleteAdminPackage,
+  fetchAdminPackageStorageStatus,
   fetchAdminPackages,
   generateAdminPackage,
   publishAdminPackage,
@@ -49,6 +51,7 @@ export function AdminPackagesPage() {
   const { status: authStatus, token, user, logout } = useAuth();
   const { error: toastError } = useToast();
   const canAccess = authStatus === "authenticated" && user?.role === "admin";
+  const adminToken = token ?? "";
   const [packages, setPackages] = useState<AdminPackageSummary[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [publishYAML, setPublishYAML] = useState("");
@@ -74,6 +77,9 @@ export function AdminPackagesPage() {
   const [refreshMessage, setRefreshMessage] = useState<string>("");
   const [tagsErrorMessage, setTagsErrorMessage] = useState<string>("");
   const [persistedNotice, setPersistedNotice] = useState<AdminTaskNotice | null>(null);
+  const [storageStatus, setStorageStatus] = useState<AdminPackageStorageStatus | null>(
+    null,
+  );
   const shouldPersistCompletionNoticeRef = useRef(false);
 
   const isActionInFlight =
@@ -90,6 +96,16 @@ export function AdminPackagesPage() {
       isActionInFlight && currentLocation.pathname !== nextLocation.pathname,
   );
 
+  const loadAdminPackages = async () => {
+    const [data, packageStorageStatus] = await Promise.all([
+      fetchAdminPackages(adminToken),
+      fetchAdminPackageStorageStatus(adminToken),
+    ]);
+    setPackages(data);
+    setStorageStatus(packageStorageStatus);
+    setStatus("ready");
+  };
+
   useEffect(() => {
     if (!canAccess || !token) {
       return;
@@ -97,16 +113,14 @@ export function AdminPackagesPage() {
 
     const load = async () => {
       try {
-        const data = await fetchAdminPackages(token);
-        setPackages(data);
-        setStatus("ready");
+        await loadAdminPackages();
       } catch {
         setStatus("error");
       }
     };
 
     void load();
-  }, [canAccess, token]);
+  }, [adminToken, canAccess, token]);
 
   useEffect(() => {
     setTagsInputByPackageId((current) => {
@@ -185,8 +199,6 @@ export function AdminPackagesPage() {
     );
   }
 
-  const adminToken = token;
-
   function persistCompletionNotice(level: AdminTaskNoticeLevel, message: string) {
     if (!shouldPersistCompletionNoticeRef.current) {
       return;
@@ -219,12 +231,10 @@ export function AdminPackagesPage() {
 
   async function setAvailability(pkg: AdminPackageSummary, availability: Availability) {
     try {
-      const updated = await updateAdminPackage(adminToken, pkg.id, {
+      await updateAdminPackage(adminToken, pkg.id, {
         availability,
       });
-      setPackages((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
+      await loadAdminPackages();
     } catch {
       setStatus("error");
     }
@@ -237,12 +247,10 @@ export function AdminPackagesPage() {
     }
 
     try {
-      const updated = await updateAdminPackage(adminToken, pkg.id, {
+      await updateAdminPackage(adminToken, pkg.id, {
         xp_threshold: parsed,
       });
-      setPackages((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
+      await loadAdminPackages();
     } catch {
       setStatus("error");
     }
@@ -261,7 +269,7 @@ export function AdminPackagesPage() {
     setPublishValidationErrors([]);
     try {
       const created = await publishAdminPackage(adminToken, publishYAML);
-      setPackages((current) => [created, ...current]);
+      await loadAdminPackages();
       setPublishYAML("");
       setPublishStatus("success");
       setPublishValidationMessage("Package published.");
@@ -383,8 +391,7 @@ export function AdminPackagesPage() {
     setRefreshMessage("");
     try {
       const result = await refreshAdminPackage(adminToken, pkg.id);
-      const nextPackages = await fetchAdminPackages(adminToken);
-      setPackages(nextPackages);
+      await loadAdminPackages();
       const successMessage = `${pkg.id} refreshed: ${result.previous_version} -> ${result.new_version}`;
       setRefreshMessage(successMessage);
       persistCompletionNotice("success", successMessage);
@@ -405,14 +412,8 @@ export function AdminPackagesPage() {
     setDeletingPackageId(pkg.id);
     setRefreshMessage("");
     try {
-      const result = await deleteAdminPackage(adminToken, pkg.id);
-      if (result.summary) {
-        setPackages((current) =>
-          current.map((item) =>
-            item.id === result.summary?.id ? result.summary : item,
-          ),
-        );
-      }
+      await deleteAdminPackage(adminToken, pkg.id);
+      await loadAdminPackages();
       setRefreshMessage(`Package '${pkg.id}' archived. You can restore it later.`);
     } catch (error) {
       setRefreshMessage(
@@ -443,9 +444,7 @@ export function AdminPackagesPage() {
       const updated = await updateAdminPackage(adminToken, pkg.id, {
         tags,
       });
-      setPackages((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
+      await loadAdminPackages();
       setTagsInputByPackageId((current) => ({
         ...current,
         [updated.id]: updated.tags.join(", "),
@@ -480,7 +479,7 @@ export function AdminPackagesPage() {
         permanent: true,
         confirm: true,
       });
-      setPackages((current) => current.filter((item) => item.id !== pkg.id));
+      await loadAdminPackages();
       setRefreshMessage(`Package '${pkg.id}' permanently deleted.`);
     } catch (error) {
       setRefreshMessage(
@@ -502,6 +501,18 @@ export function AdminPackagesPage() {
       return "-";
     }
     return new Date(parsed).toLocaleString();
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    const kb = bytes / 1024;
+    if (kb < 1024) {
+      return `${kb.toFixed(1)} KB`;
+    }
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
   }
 
   return (
@@ -526,6 +537,19 @@ export function AdminPackagesPage() {
 
       <section className="admin-page__panel" aria-label="Publish new package">
         <h2>Add new package</h2>
+        {storageStatus && (
+          <p
+            className="admin-page__hint"
+            role={storageStatus.limit_reached ? "alert" : undefined}
+          >
+            Runtime package YAML storage: {formatBytes(storageStatus.used_bytes)} /{" "}
+            {formatBytes(storageStatus.budget_bytes)} ({storageStatus.percent_used.toFixed(1)}
+            % used)
+            {storageStatus.limit_reached
+              ? ". Limit reached. Delete packages or raise PACKAGE_STORAGE_BUDGET_BYTES before publishing more."
+              : ""}
+          </p>
+        )}
         <div className="admin-page__grid">
           <label className="admin-page__field" htmlFor="generate-topic">
             <span>Topic</span>

@@ -13,7 +13,9 @@ from app.services.security import hash_password
 _DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "data" / "lle.db"
 _DEFAULT_DATABASE_URL = f"sqlite:///{_DEFAULT_DB_PATH}"
 
-DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DATABASE_URL)
+DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DATABASE_URL).strip()
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 _connect_args = (
     {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
@@ -188,6 +190,7 @@ def init_db() -> None:
         UserTestResult,
         UserXPSpendHistory,
     )
+    from app.models.runtime_package import ManagedPackageRecord  # noqa: F401
 
     if DATABASE_URL.startswith("sqlite"):
         sqlite_path = DATABASE_URL.replace("sqlite:///", "", 1)

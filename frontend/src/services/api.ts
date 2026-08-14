@@ -154,6 +154,21 @@ const AdminAIConnectionTestSchema = z
     model_used: z.string(),
   })
   .strict();
+const AdminRuntimeCapabilitiesSchema = z
+  .object({
+    deployment_mode: z.enum(["stateful", "stateless"]),
+    stateful_admin_writes: z.boolean(),
+  })
+  .strict();
+const AdminPackageStorageStatusSchema = z
+  .object({
+    used_bytes: z.number().int().nonnegative(),
+    budget_bytes: z.number().int().nonnegative(),
+    remaining_bytes: z.number().int().nonnegative(),
+    percent_used: z.number().nonnegative(),
+    limit_reached: z.boolean(),
+  })
+  .strict();
 const AdminAIKeyUpdateResponseSchema = z
   .object({
     success: z.boolean(),
@@ -261,6 +276,10 @@ const AdminAuditLogEntrySchema = z
 export type AdminAIConfig = z.infer<typeof AdminAIConfigSchema>;
 export type AdminAIConnectionTestResult = z.infer<typeof AdminAIConnectionTestSchema>;
 export type AdminAIKeyUpdateResult = z.infer<typeof AdminAIKeyUpdateResponseSchema>;
+export type AdminRuntimeCapabilities = z.infer<typeof AdminRuntimeCapabilitiesSchema>;
+export type AdminPackageStorageStatus = z.infer<
+  typeof AdminPackageStorageStatusSchema
+>;
 export type AdminPackageValidationResult = z.infer<
   typeof AdminPackageValidationResponseSchema
 >;
@@ -1224,6 +1243,32 @@ export async function fetchAdminAIConfig(token: string): Promise<AdminAIConfig> 
   }
   const data: unknown = await response.json();
   return AdminAIConfigSchema.parse(data);
+}
+
+export async function fetchAdminRuntimeCapabilities(
+  token: string,
+): Promise<AdminRuntimeCapabilities> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/runtime-capabilities`, {
+    headers: getAdminHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch admin runtime capabilities: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return AdminRuntimeCapabilitiesSchema.parse(data);
+}
+
+export async function fetchAdminPackageStorageStatus(
+  token: string,
+): Promise<AdminPackageStorageStatus> {
+  const response = await fetchWithTimeout(`${BASE_URL}/admin/packages/storage-status`, {
+    headers: getAdminHeaders(token),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch admin package storage status: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return AdminPackageStorageStatusSchema.parse(data);
 }
 
 export async function updateAdminAIConfig(

@@ -42,6 +42,8 @@ def get_last_updated_at(
         record = refresh_metadata[package_id]
         if record.last_refreshed_at is not None:
             return record.last_refreshed_at
+        if record.added_at is not None:
+            return record.added_at
     yaml_file = packages_dir / f"{package_id}.yaml"
     try:
         mtime = os.stat(yaml_file).st_mtime

@@ -5,10 +5,11 @@ from pathlib import Path
 import yaml
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.main import app
 from app.models.package import Package
+from app.models.runtime_package import ManagedPackageRecord
 from app.models.settings import GameSettings
 from app.models.user import User
 from app.routers.admin import (
@@ -1662,3 +1663,102 @@ async def test_admin_ai_key_save_updates_settings_and_runtime_store(
 
     saved = yaml.safe_load((tmp_path / "settings.yaml").read_text(encoding="utf-8"))
     assert saved["ai"] == {"provider": "openai", "model": "gpt-4o-mini"}
+
+
+async def test_admin_publish_package_persists_to_db_in_stateless_mode(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _install_admin_override()
+    monkeypatch.setenv("APP_DEPLOYMENT_MODE", "stateless")
+    monkeypatch.setenv("PACKAGE_STORAGE_BUDGET_BYTES", "1048576")
+
+    db_path = tmp_path / "managed-packages.db"
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+    )
+    SQLModel.metadata.create_all(engine)
+
+    def session_override():
+        with Session(engine) as session:
+            yield session
+
+    seed_package = _sample_package("seed-demo")
+    app.dependency_overrides[get_session] = session_override
+    app.state.seed_packages = {seed_package.id: seed_package}
+    app.state.packages = {seed_package.id: seed_package}
+    app.state.package_overrides = {}
+    app.state.refresh_metadata = {}
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        publish_response = await client.post(
+            "/admin/packages",
+            json={"yaml_content": _publish_yaml_content("runtime-demo")},
+        )
+        list_response = await client.get("/admin/packages")
+        storage_response = await client.get("/admin/packages/storage-status")
+
+    with Session(engine) as session:
+        managed = session.exec(
+            select(ManagedPackageRecord).where(
+                ManagedPackageRecord.package_id == "runtime-demo"
+            )
+        ).first()
+
+    app.dependency_overrides.clear()
+
+    assert publish_response.status_code == 201
+    assert publish_response.json()["id"] == "runtime-demo"
+    assert list_response.status_code == 200
+    assert [item["id"] for item in list_response.json()] == ["runtime-demo", "seed-demo"]
+    assert storage_response.status_code == 200
+    assert storage_response.json()["used_bytes"] > 0
+    assert managed is not None
+    assert "runtime-demo" in managed.yaml_content
+    assert managed.deleted is False
+
+
+async def test_admin_publish_package_rejects_when_runtime_storage_budget_is_exceeded(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _install_admin_override()
+    monkeypatch.setenv("APP_DEPLOYMENT_MODE", "stateless")
+    monkeypatch.setenv("PACKAGE_STORAGE_BUDGET_BYTES", "64")
+
+    db_path = tmp_path / "managed-packages-budget.db"
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+    )
+    SQLModel.metadata.create_all(engine)
+
+    def session_override():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = session_override
+    app.state.seed_packages = {}
+    app.state.packages = {}
+    app.state.package_overrides = {}
+    app.state.refresh_metadata = {}
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        publish_response = await client.post(
+            "/admin/packages",
+            json={"yaml_content": _publish_yaml_content("budget-demo")},
+        )
+
+    with Session(engine) as session:
+        managed_rows = session.exec(select(ManagedPackageRecord)).all()
+
+    app.dependency_overrides.clear()
+
+    assert publish_response.status_code == 409
+    assert "storage limit reached" in publish_response.json()["detail"].lower()
+    assert managed_rows == []

@@ -25,6 +25,11 @@ from app.models.user import (
     UserTestResult,
 )
 from app.routers.users import require_admin_user
+from app.services.deployment_mode import (
+    get_deployment_mode,
+    is_stateless_deployment,
+    require_stateful_admin_write,
+)
 from app.services.ai_generator import (
     AI_ERROR_CODE_MISSING_API_KEY,
     AI_ERROR_CODE_PROVIDER_OVERLOADED,
@@ -67,6 +72,14 @@ from app.services.refresh_service import (
     compute_diff_summary,
     detect_stale_packages,
     write_refreshed_package,
+)
+from app.services.runtime_package_store import (
+    compute_package_content_hash,
+    enforce_runtime_package_storage_budget,
+    get_runtime_package_storage_status,
+    load_runtime_package_state,
+    save_managed_package_record,
+    serialise_package_yaml,
 )
 from app.services.settings_loader import SETTINGS_FILE, load_settings, save_settings
 
@@ -200,6 +213,23 @@ class AdminAIKeyUpdateResponse(BaseModel):
     message: str
     model_used: str
     config: AdminAIConfigResponse
+
+
+class AdminRuntimeCapabilitiesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deployment_mode: Literal["stateful", "stateless"]
+    stateful_admin_writes: bool
+
+
+class AdminPackageStorageStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    used_bytes: int
+    budget_bytes: int
+    remaining_bytes: int
+    percent_used: float
+    limit_reached: bool
 
 
 class AdminUserSummary(BaseModel):
@@ -463,6 +493,14 @@ def get_refresh_metadata_cache(
     return request.app.state.refresh_metadata
 
 
+def _sync_stateless_runtime_package_state(request: Request, session: Session) -> None:
+    seed_packages = getattr(request.app.state, "seed_packages", {})
+    runtime_state = load_runtime_package_state(seed_packages, session)
+    request.app.state.packages = runtime_state.packages
+    request.app.state.package_overrides = runtime_state.overrides
+    request.app.state.refresh_metadata = runtime_state.refresh_metadata
+
+
 def build_package_summary(
     pkg: Package,
     override: PackageOverride | None,
@@ -665,6 +703,29 @@ async def read_admin_settings(
     return settings
 
 
+@router.get(
+    "/runtime-capabilities",
+    response_model=AdminRuntimeCapabilitiesResponse,
+)
+async def read_admin_runtime_capabilities() -> AdminRuntimeCapabilitiesResponse:
+    deployment_mode = get_deployment_mode()
+    return AdminRuntimeCapabilitiesResponse(
+        deployment_mode=deployment_mode,
+        stateful_admin_writes=deployment_mode == "stateful",
+    )
+
+
+@router.get(
+    "/packages/storage-status",
+    response_model=AdminPackageStorageStatusResponse,
+)
+async def read_admin_package_storage_status(
+    session: Session = Depends(get_session),
+) -> AdminPackageStorageStatusResponse:
+    status = get_runtime_package_storage_status(session)
+    return AdminPackageStorageStatusResponse(**status.model_dump())
+
+
 @router.put(
     "/settings",
     response_model=GameSettings,
@@ -676,6 +737,7 @@ async def update_admin_settings(
     session: Session = Depends(get_session),
     current_settings: GameSettings = Depends(get_settings_cache),
 ) -> GameSettings:
+    require_stateful_admin_write()
     previous_payload = current_settings.model_dump(mode="json")
     next_payload = body.model_dump(mode="json")
     changed_keys = _collect_changed_key_paths(previous_payload, next_payload)
@@ -720,6 +782,7 @@ async def _update_admin_ai_config(
     request: Request,
     settings: GameSettings,
 ) -> AdminAIConfigResponse:
+    require_stateful_admin_write()
     updated_ai = settings.ai.model_copy(
         update={"provider": body.provider, "model": body.model}
     )
@@ -793,6 +856,7 @@ async def save_admin_ai_key(
     request: Request,
     settings: GameSettings = Depends(get_settings_cache),
 ) -> AdminAIKeyUpdateResponse:
+    require_stateful_admin_write()
     updated_ai = settings.ai.model_copy(
         update={"provider": body.provider, "model": body.model}
     )
@@ -844,7 +908,7 @@ async def list_admin_packages(
             overrides.get(pkg.id),
             refresh_metadata.get(pkg.id),
         )
-        for pkg in packages.values()
+        for pkg in sorted(packages.values(), key=lambda item: item.id)
     ]
 
 
@@ -1130,6 +1194,7 @@ async def patch_admin_package(
     package_id: str,
     body: PackageOverridePatchRequest,
     request: Request,
+    session: Session = Depends(get_session),
     packages: dict[str, Package] = Depends(get_packages_cache),
     overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
 ) -> PackageSummary:
@@ -1137,19 +1202,53 @@ async def patch_admin_package(
     if pkg is None:
         raise HTTPException(status_code=404, detail="Package not found")
 
+    if not is_stateless_deployment():
+        require_stateful_admin_write()
+
     updated_pkg = pkg
     if "tags" in body.model_fields_set:
         normalised_tags = _normalise_tags(body.tags)
         updated_pkg = pkg.model_copy(update={"tags": normalised_tags})
-        try:
-            _write_package_yaml_file(updated_pkg, f"{package_id}.yaml")
-        except OSError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to write package file",
-            ) from exc
-        packages[package_id] = updated_pkg
-        request.app.state.packages = packages
+        if is_stateless_deployment():
+            yaml_content = serialise_package_yaml(updated_pkg)
+            try:
+                enforce_runtime_package_storage_budget(
+                    session,
+                    new_yaml_content=yaml_content,
+                    package_id=package_id,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            current_override = overrides.get(package_id, PackageOverride())
+            metadata = request.app.state.refresh_metadata.get(package_id)
+            save_managed_package_record(
+                session,
+                package_id=package_id,
+                yaml_content=yaml_content,
+                availability=resolve_effective_availability(current_override),
+                xp_threshold=current_override.xp_threshold,
+                deleted=False,
+                added_at=metadata.added_at if metadata else None,
+                last_refreshed_at=metadata.last_refreshed_at if metadata else None,
+                previous_version=metadata.previous_version if metadata else None,
+                new_version=metadata.new_version if metadata else None,
+                diff_summary=metadata.diff_summary if metadata else None,
+                content_hash=compute_package_content_hash(yaml_content),
+            )
+            _sync_stateless_runtime_package_state(request, session)
+            packages = request.app.state.packages
+            overrides = request.app.state.package_overrides
+            updated_pkg = packages[package_id]
+        else:
+            try:
+                _write_package_yaml_file(updated_pkg, f"{package_id}.yaml")
+            except OSError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to write package file",
+                ) from exc
+            packages[package_id] = updated_pkg
+            request.app.state.packages = packages
 
     current = overrides.get(package_id, PackageOverride())
     update_data: dict[str, Any] = {}
@@ -1163,10 +1262,39 @@ async def patch_admin_package(
         update_data["xp_threshold"] = body.xp_threshold
 
     updated_override = current.model_copy(update=update_data)
-    overrides[package_id] = updated_override
+    if is_stateless_deployment():
+        yaml_content = serialise_package_yaml(updated_pkg)
+        try:
+            enforce_runtime_package_storage_budget(
+                session,
+                new_yaml_content=yaml_content,
+                package_id=package_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        metadata = request.app.state.refresh_metadata.get(package_id)
+        save_managed_package_record(
+            session,
+            package_id=package_id,
+            yaml_content=yaml_content,
+            availability=resolve_effective_availability(updated_override),
+            xp_threshold=updated_override.xp_threshold,
+            deleted=False,
+            added_at=metadata.added_at if metadata else None,
+            last_refreshed_at=metadata.last_refreshed_at if metadata else None,
+            previous_version=metadata.previous_version if metadata else None,
+            new_version=metadata.new_version if metadata else None,
+            diff_summary=metadata.diff_summary if metadata else None,
+            content_hash=compute_package_content_hash(yaml_content),
+        )
+        _sync_stateless_runtime_package_state(request, session)
+        updated_pkg = request.app.state.packages[package_id]
+        updated_override = request.app.state.package_overrides[package_id]
+    else:
+        overrides[package_id] = updated_override
 
-    save_package_overrides(overrides, OVERRIDES_FILE)
-    request.app.state.package_overrides = overrides
+        save_package_overrides(overrides, OVERRIDES_FILE)
+        request.app.state.package_overrides = overrides
 
     return build_package_summary(updated_pkg, updated_override)
 
@@ -1192,15 +1320,38 @@ async def delete_admin_package(
     if pkg is None:
         raise HTTPException(status_code=404, detail="Package not found")
 
+    if not is_stateless_deployment():
+        require_stateful_admin_write()
+
     if not permanent:
         current = overrides.get(package_id, PackageOverride())
         archived_override = current.model_copy(
             update={"availability": "hidden", "enabled": None}
         )
-        overrides[package_id] = archived_override
+        if is_stateless_deployment():
+            yaml_content = serialise_package_yaml(pkg)
+            metadata = refresh_metadata.get(package_id)
+            save_managed_package_record(
+                session,
+                package_id=package_id,
+                yaml_content=yaml_content,
+                availability="hidden",
+                xp_threshold=archived_override.xp_threshold,
+                deleted=False,
+                added_at=metadata.added_at if metadata else None,
+                last_refreshed_at=metadata.last_refreshed_at if metadata else None,
+                previous_version=metadata.previous_version if metadata else None,
+                new_version=metadata.new_version if metadata else None,
+                diff_summary=metadata.diff_summary if metadata else None,
+                content_hash=compute_package_content_hash(yaml_content),
+            )
+            _sync_stateless_runtime_package_state(request, session)
+            archived_override = request.app.state.package_overrides[package_id]
+        else:
+            overrides[package_id] = archived_override
 
-        save_package_overrides(overrides, OVERRIDES_FILE)
-        request.app.state.package_overrides = overrides
+            save_package_overrides(overrides, OVERRIDES_FILE)
+            request.app.state.package_overrides = overrides
 
         _log_admin_action(
             session,
@@ -1232,26 +1383,37 @@ async def delete_admin_package(
             detail="Cannot permanently delete the last remaining package",
         )
 
-    package_file = PACKAGES_DIR / f"{package_id}.yaml"
-    if package_file.exists():
-        try:
-            package_file.unlink()
-        except OSError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to delete package file",
-            ) from exc
+    if is_stateless_deployment():
+        save_managed_package_record(
+            session,
+            package_id=package_id,
+            yaml_content="",
+            availability="hidden",
+            xp_threshold=None,
+            deleted=True,
+        )
+        _sync_stateless_runtime_package_state(request, session)
+    else:
+        package_file = PACKAGES_DIR / f"{package_id}.yaml"
+        if package_file.exists():
+            try:
+                package_file.unlink()
+            except OSError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to delete package file",
+                ) from exc
 
-    packages.pop(package_id, None)
-    overrides.pop(package_id, None)
-    refresh_metadata.pop(package_id, None)
+        packages.pop(package_id, None)
+        overrides.pop(package_id, None)
+        refresh_metadata.pop(package_id, None)
 
-    save_package_overrides(overrides, OVERRIDES_FILE)
-    save_refresh_metadata(refresh_metadata, REFRESH_METADATA_FILE)
+        save_package_overrides(overrides, OVERRIDES_FILE)
+        save_refresh_metadata(refresh_metadata, REFRESH_METADATA_FILE)
 
-    request.app.state.packages = packages
-    request.app.state.package_overrides = overrides
-    request.app.state.refresh_metadata = refresh_metadata
+        request.app.state.packages = packages
+        request.app.state.package_overrides = overrides
+        request.app.state.refresh_metadata = refresh_metadata
 
     _log_admin_action(
         session,
@@ -1370,12 +1532,15 @@ async def validate_admin_package_upload(
 async def publish_admin_package(
     body: PublishPackageRequest,
     request: Request,
+    session: Session = Depends(get_session),
     packages: dict[str, Package] = Depends(get_packages_cache),
     overrides: dict[str, PackageOverride] = Depends(get_package_overrides),
     refresh_metadata: dict[str, PackageAdminMetadataRecord] = Depends(
         get_refresh_metadata_cache
     ),
 ) -> AdminPackageSummary:
+    if not is_stateless_deployment():
+        require_stateful_admin_write()
     validation_result = validate_package_yaml_content(
         body.yaml_content,
         existing_package_ids=set(packages.keys()),
@@ -1403,40 +1568,70 @@ async def publish_admin_package(
 
     pkg = validation_result.package
 
-    try:
-        _write_package_yaml_file(pkg, f"{pkg.id}.yaml")
-    except OSError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to write package file",
-        ) from exc
-
-    packages[pkg.id] = pkg
-    request.app.state.packages = packages
-
     now = datetime.now(tz=timezone.utc)
-    existing_record = refresh_metadata.get(pkg.id)
-    if existing_record is None or existing_record.added_at is None:
-        refresh_metadata[pkg.id] = PackageAdminMetadataRecord(
+    if is_stateless_deployment():
+        try:
+            enforce_runtime_package_storage_budget(
+                session,
+                new_yaml_content=body.yaml_content,
+                package_id=pkg.id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        existing_record = refresh_metadata.get(pkg.id)
+        save_managed_package_record(
+            session,
+            package_id=pkg.id,
+            yaml_content=body.yaml_content,
+            availability="available",
+            xp_threshold=None,
+            deleted=False,
             added_at=(existing_record.added_at or now) if existing_record else now,
             last_refreshed_at=(
                 existing_record.last_refreshed_at if existing_record else None
             ),
-            refreshed_at=(existing_record.refreshed_at if existing_record else None),
             previous_version=(
                 existing_record.previous_version if existing_record else None
             ),
             new_version=existing_record.new_version if existing_record else None,
             diff_summary=existing_record.diff_summary if existing_record else None,
-            content_hash=existing_record.content_hash if existing_record else None,
+            content_hash=compute_package_content_hash(body.yaml_content),
         )
-        save_refresh_metadata(refresh_metadata, REFRESH_METADATA_FILE)
-        request.app.state.refresh_metadata = refresh_metadata
+        _sync_stateless_runtime_package_state(request, session)
+    else:
+        try:
+            _write_package_yaml_file(pkg, f"{pkg.id}.yaml")
+        except OSError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to write package file",
+            ) from exc
+
+        packages[pkg.id] = pkg
+        request.app.state.packages = packages
+
+        existing_record = refresh_metadata.get(pkg.id)
+        if existing_record is None or existing_record.added_at is None:
+            refresh_metadata[pkg.id] = PackageAdminMetadataRecord(
+                added_at=(existing_record.added_at or now) if existing_record else now,
+                last_refreshed_at=(
+                    existing_record.last_refreshed_at if existing_record else None
+                ),
+                refreshed_at=(existing_record.refreshed_at if existing_record else None),
+                previous_version=(
+                    existing_record.previous_version if existing_record else None
+                ),
+                new_version=existing_record.new_version if existing_record else None,
+                diff_summary=existing_record.diff_summary if existing_record else None,
+                content_hash=existing_record.content_hash if existing_record else None,
+            )
+            save_refresh_metadata(refresh_metadata, REFRESH_METADATA_FILE)
+            request.app.state.refresh_metadata = refresh_metadata
 
     return build_admin_package_summary(
-        pkg,
-        overrides.get(pkg.id),
-        refresh_metadata.get(pkg.id),
+        request.app.state.packages[pkg.id],
+        request.app.state.package_overrides.get(pkg.id),
+        request.app.state.refresh_metadata.get(pkg.id),
     )
 
 
@@ -1475,12 +1670,15 @@ async def refresh_admin_package(
     package_id: str,
     request: Request,
     dry_run: bool = False,
+    session: Session = Depends(get_session),
     packages: dict[str, Package] = Depends(get_packages_cache),
     refresh_metadata: dict[str, PackageAdminMetadataRecord] = Depends(
         get_refresh_metadata_cache
     ),
     settings: GameSettings = Depends(get_settings_cache),
 ) -> RefreshResult:
+    if not is_stateless_deployment():
+        require_stateful_admin_write()
     pkg = packages.get(package_id)
     if pkg is None:
         raise HTTPException(status_code=404, detail="Package not found")
@@ -1519,22 +1717,56 @@ async def refresh_admin_package(
         )
 
     now = datetime.now(tz=timezone.utc)
-    try:
-        _, record = write_refreshed_package(
-            package_id,
-            new_yaml,
-            PACKAGES_DIR,
-            pkg,
-            refresh_metadata,
-            REFRESH_METADATA_FILE,
-            now,
+    if is_stateless_deployment():
+        final_yaml = serialise_package_yaml(new_pkg_patched)
+        try:
+            enforce_runtime_package_storage_budget(
+                session,
+                new_yaml_content=final_yaml,
+                package_id=package_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        current_override = request.app.state.package_overrides.get(
+            package_id, PackageOverride()
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        save_managed_package_record(
+            session,
+            package_id=package_id,
+            yaml_content=final_yaml,
+            availability=resolve_effective_availability(current_override),
+            xp_threshold=current_override.xp_threshold,
+            deleted=False,
+            added_at=(
+                refresh_metadata.get(package_id).added_at
+                if refresh_metadata.get(package_id)
+                else now
+            ),
+            last_refreshed_at=now,
+            previous_version=pkg.version,
+            new_version=new_pkg_patched.version,
+            diff_summary=diff,
+            content_hash=compute_package_content_hash(final_yaml),
+        )
+        _sync_stateless_runtime_package_state(request, session)
+        record = request.app.state.refresh_metadata[package_id]
+    else:
+        try:
+            _, record = write_refreshed_package(
+                package_id,
+                new_yaml,
+                PACKAGES_DIR,
+                pkg,
+                refresh_metadata,
+                REFRESH_METADATA_FILE,
+                now,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    packages[package_id] = new_pkg_patched
-    request.app.state.packages = packages
-    request.app.state.refresh_metadata = refresh_metadata
+        packages[package_id] = new_pkg_patched
+        request.app.state.packages = packages
+        request.app.state.refresh_metadata = refresh_metadata
 
     return RefreshResult(
         package_id=package_id,
