@@ -6,10 +6,10 @@
       "maxDuration": 60,
       "includeFiles": [
         "app/**",
+        "packages/**/*.yaml",
         "settings.yaml",
         "package-overrides.yaml",
-        "package-refresh-metadata.yaml",
-        "../packages/**/*.yaml"
+        "package-refresh-metadata.yaml"
       ]
     }
   }

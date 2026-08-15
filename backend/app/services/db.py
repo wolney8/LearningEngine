@@ -207,7 +207,19 @@ def init_db() -> None:
             _ensure_sqlite_spend_history_schema_compatibility(session)
             session.commit()
     else:
-        SQLModel.metadata.create_all(engine)
+        # Prevent concurrent cold starts from racing table/sequence creation in Postgres.
+        with engine.begin() as connection:
+            connection.execute(
+                text("SELECT pg_advisory_lock(hashtext('learning_engine_init_db'))")
+            )
+            try:
+                SQLModel.metadata.create_all(connection)
+            finally:
+                connection.execute(
+                    text(
+                        "SELECT pg_advisory_unlock(hashtext('learning_engine_init_db'))"
+                    )
+                )
     bootstrap_initial_admin_user()
 
 
