@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from importlib import import_module
 from datetime import datetime, timezone
 from typing import Any, Literal
 
@@ -29,19 +30,6 @@ from app.services.deployment_mode import (
     get_deployment_mode,
     is_stateless_deployment,
     require_stateful_admin_write,
-)
-from app.services.ai_generator import (
-    AI_ERROR_CODE_MISSING_API_KEY,
-    AI_ERROR_CODE_PROVIDER_OVERLOADED,
-    AI_ERROR_CODE_PROVIDER_UNAVAILABLE,
-    AI_ERROR_CODE_UPSTREAM_FAILURE,
-    DEFAULT_GEMINI_MODEL,
-    SUPPORTED_AI_PROVIDERS,
-    AIGenerationError,
-    generate_package,
-    get_recommended_ai_model,
-    refresh_package,
-    test_connection,
 )
 from app.services.ai_key_store import (
     KeySource,
@@ -90,6 +78,92 @@ router = APIRouter(
 )
 
 AI_KEY_STORE_FILE = get_ai_key_store_file()
+AI_ERROR_CODE_MISSING_API_KEY = "ai_missing_api_key"
+AI_ERROR_CODE_PROVIDER_OVERLOADED = "ai_provider_overloaded"
+AI_ERROR_CODE_PROVIDER_UNAVAILABLE = "ai_provider_unavailable"
+AI_ERROR_CODE_UPSTREAM_FAILURE = "ai_upstream_failure"
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
+SUPPORTED_AI_PROVIDERS: tuple[AIProviderName, ...] = (
+    "gemini",
+    "openai",
+    "anthropic",
+    "groq",
+    "mistral",
+)
+AI_PROVIDER_DEFAULT_MODELS: dict[AIProviderName, str] = {
+    "gemini": "gemini-2.5-flash",
+    "openai": "gpt-4o-mini",
+    "anthropic": "claude-3-5-haiku-latest",
+    "groq": "llama-3.3-70b-versatile",
+    "mistral": "mistral-small-latest",
+}
+
+
+class OptionalAIModuleUnavailableError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Optional AI provider modules are unavailable")
+        self.error_code = AI_ERROR_CODE_UPSTREAM_FAILURE
+
+
+class AIGenerationError(Exception):
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = AI_ERROR_CODE_UPSTREAM_FAILURE,
+    ) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+
+
+def get_recommended_ai_model(provider: AIProviderName) -> str:
+    return AI_PROVIDER_DEFAULT_MODELS[provider]
+
+
+def _load_ai_generator_module():
+    try:
+        return import_module("app.services.ai_generator")
+    except ModuleNotFoundError as exc:
+        raise OptionalAIModuleUnavailableError() from exc
+
+
+async def test_connection(
+    *,
+    settings: GameSettings,
+    api_key: str | None,
+    provider_override: AIProviderName | None,
+    model_override: str | None,
+) -> str:
+    module = _load_ai_generator_module()
+    return await module.test_connection(
+        settings=settings,
+        api_key=api_key,
+        provider_override=provider_override,
+        model_override=model_override,
+    )
+
+
+async def generate_package(
+    *,
+    topic: str,
+    audience: str,
+    num_pages: int,
+    num_questions: int,
+    settings: GameSettings,
+) -> str:
+    module = _load_ai_generator_module()
+    return await module.generate_package(
+        topic=topic,
+        audience=audience,
+        num_pages=num_pages,
+        num_questions=num_questions,
+        settings=settings,
+    )
+
+
+async def refresh_package(pkg: Package, *, settings: GameSettings) -> str:
+    module = _load_ai_generator_module()
+    return await module.refresh_package(pkg, settings=settings)
 
 
 class PackageOverridePatchRequest(BaseModel):
@@ -557,8 +631,8 @@ def build_ai_config_response(settings: GameSettings) -> AdminAIConfigResponse:
     )
 
 
-def _build_ai_error_detail(exc: AIGenerationError) -> dict[str, str]:
-    code = exc.error_code
+def _build_ai_error_detail(exc: Exception) -> dict[str, str]:
+    code = getattr(exc, "error_code", AI_ERROR_CODE_UPSTREAM_FAILURE)
     safe_messages = {
         AI_ERROR_CODE_MISSING_API_KEY: (
             "AI service is not configured. Ask an administrator to add the API key."
@@ -599,6 +673,10 @@ def _build_ai_connection_test_failure_message(error_code: str) -> str:
     if error_code == AI_ERROR_CODE_MISSING_API_KEY:
         return "AI API key is missing or invalid. Check the key and AI configuration."
     return "Connection test failed. Check provider, model, and API key."
+
+
+def _get_ai_error_code(exc: Exception) -> str:
+    return getattr(exc, "error_code", AI_ERROR_CODE_UPSTREAM_FAILURE)
 
 
 def _normalise_tags(raw_tags: list[str] | None) -> list[str]:
@@ -833,10 +911,10 @@ async def test_admin_ai_connection(
             provider_override=body.provider,
             model_override=body.model,
         )
-    except AIGenerationError as exc:
+    except Exception as exc:
         return AdminAIConnectionTestResponse(
             success=False,
-            message=_build_ai_connection_test_failure_message(exc.error_code),
+            message=_build_ai_connection_test_failure_message(_get_ai_error_code(exc)),
             model_used=model_used,
         )
 
@@ -878,9 +956,9 @@ async def save_admin_ai_key(
         )
         message = "API key saved and connection test succeeded."
         success = True
-    except AIGenerationError as exc:
+    except Exception as exc:
         tested_model = _resolve_ai_test_model(updated_settings, body.model)
-        message = _build_ai_connection_test_failure_message(exc.error_code)
+        message = _build_ai_connection_test_failure_message(_get_ai_error_code(exc))
         success = False
 
     return AdminAIKeyUpdateResponse(
@@ -1648,8 +1726,8 @@ async def generate_admin_package(
             num_questions=body.num_questions,
             settings=settings,
         )
-    except AIGenerationError as exc:
-        if exc.error_code == AI_ERROR_CODE_MISSING_API_KEY:
+    except Exception as exc:
+        if _get_ai_error_code(exc) == AI_ERROR_CODE_MISSING_API_KEY:
             raise HTTPException(
                 status_code=503,
                 detail=_build_ai_error_detail(exc),
@@ -1685,7 +1763,7 @@ async def refresh_admin_package(
 
     try:
         new_yaml = await refresh_package(pkg, settings=settings)
-    except AIGenerationError as exc:
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail=_build_ai_error_detail(exc),
